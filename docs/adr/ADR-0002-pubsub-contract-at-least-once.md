@@ -1,6 +1,6 @@
 # ADR-0002 — Pub/Sub message contract & at-least-once delivery with downstream dedup
 
-**Status:** Proposed · **Date:** 2026-08-18 · **Work package:** F0 / W2
+**Status:** Accepted · **Date:** 2026-08-18 · **Work package:** F0 / W2
 **Architecture:** §2.2, §3.2, §3.3, §3.4, §4.1, §7, §8
 **Supersedes:** — · **Superseded by:** —
 

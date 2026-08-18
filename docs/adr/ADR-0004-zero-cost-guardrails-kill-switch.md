@@ -1,6 +1,6 @@
 # ADR-0004 — Zero-cost guardrails & billing kill-switch design
 
-**Status:** Proposed · **Date:** 2026-08-18 · **Work package:** F0 / W2
+**Status:** Accepted · **Date:** 2026-08-18 · **Work package:** F0 / W2
 **Architecture:** §2.3, §6.2, §7, §8
 **Supersedes:** — · **Superseded by:** —
 

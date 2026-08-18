@@ -1,6 +1,6 @@
 # ADR-0005 — Static JSON export as the v0.1 SPA data path
 
-**Status:** Proposed · **Date:** 2026-08-18 · **Work package:** F0 / W2
+**Status:** Accepted · **Date:** 2026-08-18 · **Work package:** F0 / W2
 **Architecture:** §2.5, §2.7, §3.5, §4.1, §6.1
 **Supersedes:** — · **Superseded by:** —
 

@@ -1,6 +1,6 @@
 # ADR-0003 — Normalization mappings as versioned in-repo YAML embedded at build time
 
-**Status:** Proposed · **Date:** 2026-08-18 · **Work package:** F0 / W2
+**Status:** Accepted · **Date:** 2026-08-18 · **Work package:** F0 / W2
 **Architecture:** §2.3, §2.6, §4.2, §5
 **Supersedes:** — · **Superseded by:** —
 
