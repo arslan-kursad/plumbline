@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.2 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-18
+**Version:** 0.3 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-18
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -86,9 +86,12 @@ Boundary violations are treated as design regressions.
   via **Storage Write API** (default stream).
 - **Contract in:** Pub/Sub push envelope per §3.2.
 - **Contract out:** rows in `spans` per §4.1.
-- **Must not:** use `insertAll` (hard-forbidden, cost invariant); drop unmapped
-  attributes (they are preserved in `attributes` JSON); silently swallow poison messages
-  (NACK → retry → DLQ, per §3.4).
+- **Must not:** write to BigQuery through the legacy streaming insert path — the
+  `tabledata.insertAll` REST method and every client-library surface over it
+  (`BigQueryClient.InsertRow` / `InsertRows` / `InsertRowsAsync`, Go `Table.Inserter`).
+  The Storage Write API is the only permitted write path (cost invariant, §7).
+- **Must not:** drop unmapped attributes (they are preserved in `attributes` JSON), or
+  silently swallow poison messages (NACK → retry → DLQ, per §3.4).
 
 ### 2.4 BigQuery (analytical store)
 - **Owns:** span storage and all analytical queries.
@@ -320,13 +323,15 @@ Escape hatch: any spend > $0.00 for two consecutive days triggers an incident no
 | ADR | Title | Status |
 |---|---|---|
 | ADR-0001 | Preserve OTLP wire format end-to-end; no invented canonical schema (wire-only scope per §3.1) | Accepted |
-| ADR-0002 | Pub/Sub message contract & at-least-once delivery with downstream dedup | Proposed (this doc §3.2–3.3) |
-| ADR-0003 | Normalization mappings as versioned in-repo YAML embedded at build time | Proposed (this doc §5) |
-| ADR-0004 | Zero-cost guardrails & billing kill-switch design | Proposed (this doc §7) |
-| ADR-0005 | Static JSON export as v0.1 SPA data path | Proposed (this doc §3.5) |
+| ADR-0002 | Pub/Sub message contract & at-least-once delivery with downstream dedup | Accepted |
+| ADR-0003 | Normalization mappings as versioned in-repo YAML embedded at build time | Accepted |
+| ADR-0004 | Zero-cost guardrails & billing kill-switch design | Accepted |
+| ADR-0005 | Static JSON export as v0.1 SPA data path | Accepted |
 
-Titles for 0002–0005 mirror decisions fixed in this document; each still needs its
-rationale/alternatives write-up before F0 exit.
+Rationale, alternatives, and consequences live in `docs/adr/`; this index carries titles
+and status only. Where this document and an ADR disagree, the ADR is the decision record
+and this document is the summary — the contradiction is a bug in one of them, and is
+raised rather than resolved silently.
 
 ### Open questions
 1. `eval_results` BigQuery schema — owned by F3 eval-engine spec.
@@ -335,10 +340,26 @@ rationale/alternatives write-up before F0 exit.
 3. SPA export cadence & payload size budget for GitHub Pages — confirm in F4.
 4. Claude Code emitter: confirm actual resource/scope markers for dialect detection
    against a captured sample before freezing its mapping YAML (F1).
+5. GitHub Pages push credential for the nightly export (ADR-0005): scope, storage, and
+   rotation. The export job needs repository write access, which is the first secret in
+   an otherwise secret-free design (§6.3). Decide in F4, before the exporter is written.
 
 ---
 
 ## 11. Changelog
+
+**v0.3 — 2026-08-18** — F0 spec W2.
+
+1. **§2.3 write-path prohibition restated in terms of the API surface an implementer
+   actually encounters.** The v0.2 wording forbade `insertAll`, a string the .NET client
+   never surfaces; someone writing `BigQueryClient.InsertRowsAsync` would read the
+   prohibition, never meet it, and believe they had complied. The v0.2 §7 correction
+   addressed the control only; this is the same defect in the contract.
+2. **§10 ADR index updated:** ADR-0001..0005 now exist as files under `docs/adr/`, and
+   0002–0005 are Accepted. The note that they still needed a rationale write-up is
+   removed, and precedence between this document and an ADR is stated.
+3. **Open question 5 added:** the GitHub Pages push credential implied by §3.5 and named
+   in ADR-0005 — the first secret in a design described as secret-free by construction.
 
 **v0.2 — 2026-08-18** — imported into the repository (F0 spec W1.1). Three changes
 applied at import time; the ADR index (§10) and the open questions carry over from
