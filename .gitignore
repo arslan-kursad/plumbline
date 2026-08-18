@@ -1,0 +1,31 @@
+# OS
+.DS_Store
+
+# Go
+collector/collector
+*.test
+*.out
+
+# .NET
+bin/
+obj/
+*.user
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl.backup
+crash.log
+
+# Credentials — never committed
+*.key.json
+*service-account*.json
+*credentials*.json
+.env
+.env.*
+
+# Editors
+.vscode/
+.idea/

@@ -1,0 +1,6 @@
+@Plumbline.Analytics_HostAddress = http://localhost:5038
+
+GET {{Plumbline.Analytics_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
