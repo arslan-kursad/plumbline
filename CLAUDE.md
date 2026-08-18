@@ -9,6 +9,11 @@ here binds regardless of enforcement.
 English only in every repo artifact, no exceptions: code, comments, identifiers,
 commits, branches, PRs, docs, logs, test names.
 
+The working conversation with the maintainer is held in Turkish. This does not
+relax the rule above: the moment text is destined for the repository or for
+GitHub it is written in English, including commit messages and pull request
+descriptions drafted during a Turkish conversation.
+
 ## Cost invariants (hard)
 
 - Never write an `insertAll` code path. The BigQuery Storage Write API is the only
