@@ -16,8 +16,11 @@ descriptions drafted during a Turkish conversation.
 
 ## Cost invariants (hard)
 
-- Never write an `insertAll` code path. The BigQuery Storage Write API is the only
-  BigQuery write path.
+- The BigQuery write path is the Storage Write API only. The legacy streaming insert
+  API **and its client package** are forbidden: never add a dependency on
+  `Google.Cloud.BigQuery.V2`, and never call `InsertRow`/`InsertRows`/
+  `InsertRowsAsync`/`.Inserter(` or the REST `insertAll` method. The permitted
+  package is `Google.Cloud.BigQuery.Storage.V1`.
 - Never create Terraform resources outside the resource-type allowlist
   (architecture.md §7).
 - Cloud Run services are always `min_instances = 0`, `max_instances <= 2`,
@@ -42,4 +45,11 @@ descriptions drafted during a Turkish conversation.
 ## Docs
 
 `docs/` is the single source of truth. Contradictions between docs are raised,
-not resolved unilaterally.
+not resolved unilaterally. External snapshots that disagree with `docs/` are stale
+by definition.
+
+## Public repository
+
+The repository is public: every commit is world-readable the moment it is pushed,
+and history is not erasable in practice. No secrets, no customer data, no internal
+hostnames, ever — including in test fixtures and example payloads.

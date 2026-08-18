@@ -1,38 +1,74 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.1 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-18
+**Version:** 0.2 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-18
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
-**Repo target:** `docs/specs/F0-foundations.md`
+**Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
 ---
 
-## 0. Naming decision (RESOLVED)
+## 0. Project constants (RESOLVED)
+
+### 0.1 Naming
 
 Project name: **`plumbline`** (decided 2026-08-18, human sign-off). All derived names
 follow from it and are fixed here:
 
-- Repository: `plumbline`
+- Repository: `arslan-kursad/plumbline`
 - Go module: `github.com/arslan-kursad/plumbline/collector`
 - .NET solutions: `Plumbline.Worker`, `Plumbline.Analytics`
 - Container images: `collector`, `ingestion-worker`, `analytics-api` under the
   `plumbline` Artifact Registry repo
-- BigQuery dataset: `plumbline` (replaces the pre-decision working name;
-  underscores unnecessary, single word is a valid dataset ID)
+- BigQuery dataset: `plumbline` (replaces the pre-decision working name; underscores
+  unnecessary, single word is a valid dataset ID)
 
-Alignment task (part of W1 PR): update Project Brief and architecture.md §4.1 dataset
-name; grep the docs tree for the old working name (hyphenated and underscored
-variants) — zero occurrences after W1. This copy of the spec is itself aligned:
-the old name is referred to only descriptively, never literally.
+The pre-decision working name must not appear anywhere in the repository, in any
+casing or separator variant. Enforcement: W1.1 grep, zero occurrences.
+
+### 0.2 Repository visibility: **public** (decided 2026-08-18)
+
+The repository is public from F0 onward, not flipped at F5.
+
+Rationale:
+- GitHub Pages is available on public repositories under GitHub Free; publishing Pages
+  from a private repository requires a paid plan. The Trace Waterfall SPA
+  (architecture §2.7, §3.5) depends on Pages, so a private repository would force either
+  a paid plan — violating the "no paid SaaS anywhere in the loop" invariant — or an
+  architecture change discovered at F4.
+- GitHub Actions minutes are unmetered for public repositories and capped on Free for
+  private ones. F1–F3 run Go + two .NET + Terraform jobs on every PR.
+- The project's stated positioning is a live case study. A repository opened only after
+  completion discards the visible-process value that is part of the deliverable.
+
+Consequences, all handled in W1.1 and W6:
+- The visibility flip happens **before** W6 begins, so WIF and CI are validated in their
+  final security posture rather than a temporary one.
+- WIF provider attribute conditions and fork-PR workflow posture become explicit
+  acceptance criteria (W6), not implementation detail.
+- Branch protection on `main` is enabled (free for public repositories): PR required,
+  force-push denied, status checks required once W6 is green.
+
+### 0.3 License: **Apache-2.0** (decided 2026-08-18)
+
+Replaces the MIT license committed in W1. The target ecosystem (OpenTelemetry / CNCF)
+standardizes on Apache-2.0; the explicit patent grant removes friction for corporate
+readers of a reference implementation. Changing this is free while the project has a
+single author and becomes expensive afterward.
+
+- `LICENSE` contains the unmodified Apache-2.0 text; copyright line names the author.
+- No per-file license headers in v0.1 (noise for a solo repository). Revisit only if
+  external contributors appear; that would be a spec change, not a silent addition.
+- `README.md` license section and any package metadata updated to match.
 
 ---
 
 ## 1. Purpose
 
 Establish the project skeleton and the zero-cost safety envelope **before any pipeline
-code exists**: repository scaffold with Claude Code governance files, ADR rationale
-write-ups, a pre-registered evaluation plan draft, a GCP project whose billing
-kill-switch has been **live-fired**, a Terraform skeleton, and a green CI pipeline
-authenticated via Workload Identity Federation (no exported SA keys).
+code exists**: repository scaffold with Claude Code governance files, the design corpus
+imported as the repository's source of truth, ADR rationale write-ups, a pre-registered
+evaluation plan draft, a GCP project whose billing kill-switch has been **live-fired**,
+a Terraform skeleton, and a green CI pipeline authenticated via Workload Identity
+Federation (no exported SA keys).
 
 ## 2. Out of scope
 
@@ -42,12 +78,19 @@ authenticated via Workload Identity Federation (no exported SA keys).
   project-level quota/guardrail settings.
 - Freezing `eval-plan.md` (draft in F0; freeze is the F1 entry gate).
 - Dashboards, SPA, load generator (F4).
+- A deploy-capable CI identity. F0 CI authenticates read-only (build, validate, plan).
+  The deploy service account and its branch-scoped binding land in F2; only the binding
+  *pattern* is documented here.
 
 ## 3. Context files (read before starting)
 
-- `docs/architecture.md` v0.1 — §7 (cost guardrails), §6.1 (WIF row), §8 (deployment).
-- Project Brief — Phases (F0 DoD), Zero-cost invariants.
+- `docs/architecture.md` — §7 (cost guardrails), §6.1 (WIF row), §8 (deployment).
+- `docs/project-brief.md` — Phases (F0 DoD), Zero-cost invariants.
 - ADR-0001 (Accepted) — scope constraint on all future work.
+
+Until W1.1 merges, these files exist only as external snapshots. **W2 must not start
+before W1.1 is merged**: ADR-0002..0005 cite architecture sections by number, and citing
+a document that is not in the repository produces dangling references.
 
 ## 4. Work items
 
@@ -60,22 +103,56 @@ Monorepo layout:
 /analytics/            # .NET 8 (empty solution + project stubs)
 /normalization/mappings/v1.41/   # placeholder README, no YAML yet (F1)
 /infra/terraform/      # W5
-/docs/                 # architecture.md, adr/, specs/, runbooks/, eval-plan.md
+/docs/                 # architecture.md, project-brief.md, adr/, specs/, runbooks/, eval-plan.md
+/scripts/ci/           # invariant gate scripts (W6)
 /.github/workflows/    # W6
 CLAUDE.md              # advisory contract for Claude Code (content: Appendix A)
 .claude/settings.json  # enforced constraints (deny-list per Appendix A)
-LICENSE, README.md (stub), .gitignore, .editorconfig
+LICENSE (Apache-2.0), README.md (stub), .gitignore, .editorconfig
 ```
 
 Constraints: everything in the repo is English-only without exception (code, comments,
 identifiers, commits, branches, PRs, docs, logs, test names). Conventional Commits.
 
+**Status:** merged content complete except §0.3 license replacement, which is folded
+into the W1 branch alongside W1.1.
+
+### W1.1 — Source-of-truth import (blocks W2)
+
+The design corpus currently lives outside the repository. The stated working model is
+that `docs/` is the single source of truth and external Project Knowledge holds
+snapshots; today that relationship is inverted. W1.1 corrects it.
+
+Delivered on the **same branch and PR as W1** — this is W1's acceptance criterion 1,
+not a new work package.
+
+1. Import `docs/architecture.md` and `docs/project-brief.md` into the repository.
+2. Apply at import time (not as a follow-up commit):
+   - BigQuery dataset renamed to `plumbline` in architecture §4.1 and every other
+     occurrence, including the §1 diagram.
+   - Project Brief architecture summary and any naming references aligned to §0.1.
+   - Architecture §7 cost-guardrail row for the BigQuery write path rewritten per W6.2
+     below. The existing wording ("Code review + CI grep gate") describes a control that
+     cannot detect the violation it targets; importing it unchanged would enshrine a
+     known-defective guardrail.
+   - Repository visibility and license (§0.2, §0.3) recorded where the architecture or
+     Brief makes assumptions about them (Pages data path, zero-cost invariants).
+3. Bump `architecture.md` to v0.2 with a dated changelog entry naming the three changes
+   above. ADR index and open questions carry over unchanged.
+4. Add a precedence note to `README.md`: `docs/` is authoritative; external snapshots
+   that disagree are stale by definition.
+5. Grep the repository for the pre-decision project name in every casing and separator
+   variant, including its underscored dataset form: zero occurrences.
+
 ### W2 — ADR-0002..0005 rationale write-ups
-Decisions are already fixed in architecture.md; each ADR adds context, alternatives
-considered, and consequences. One file per ADR under `docs/adr/`, format of ADR-0001.
+Decisions are already fixed in `docs/architecture.md`; each ADR adds context,
+alternatives considered, and consequences. One file per ADR under `docs/adr/`, format of
+ADR-0001.
 - ADR-0002: Pub/Sub contract & at-least-once + downstream dedup (arch §3.2–3.3).
 - ADR-0003: mappings as in-repo versioned YAML, build-time embedded (arch §5).
-- ADR-0004: zero-cost guardrails & kill-switch design (arch §7).
+- ADR-0004: zero-cost guardrails & kill-switch design (arch §7). **Must record** why a
+  literal-string grep is insufficient as the BigQuery write-path control and why the
+  forbidden-dependency check is the load-bearing one (see W6.2).
 - ADR-0005: static JSON export as v0.1 SPA data path (arch §3.5).
 Status moves Proposed → Accepted on PR merge after human review.
 
@@ -111,32 +188,98 @@ us-central1) calling `projects.updateBillingInfo` to detach billing.
   check ships now).
 
 ### W6 — GitHub Actions via Workload Identity Federation
-- WIF pool + provider bound to the repo (`main` + PR branches), no SA key JSON
-  anywhere (CI grep gate asserts absence of `"private_key"` patterns).
-- Pipeline `ci.yml`: path-filtered jobs — Go build/vet (collector), .NET build
-  (worker, analytics), Terraform fmt/validate, English-only lint on docs is out of
-  scope (manual review). All jobs green on empty scaffolds.
-- CI grep gate from arch §7 ships now: fail on `insertAll` anywhere in the repo.
+
+#### W6.1 — WIF and fork-PR posture
+
+The repository is public (§0.2), so the identity binding must be explicit rather than
+relying on default GitHub behavior.
+
+- WIF pool + OIDC provider for `token.actions.githubusercontent.com`.
+- Attribute mapping includes at minimum `assertion.repository`,
+  `assertion.repository_owner`, `assertion.ref`.
+- **Provider-level attribute condition** pins both repository and owner:
+  `assertion.repository == 'arslan-kursad/plumbline' && assertion.repository_owner == 'arslan-kursad'`.
+  A pool/provider without an attribute condition is treated as a defect, not a default.
+- F0 ships one service account, `ci-readonly`: Terraform state read/write, resource read,
+  no mutating IAM. Its principalSet is scoped by the repository attribute.
+- The F2 deploy identity pattern is documented here but not created: a separate
+  `ci-deploy` SA whose principalSet additionally requires
+  `attribute.ref == 'refs/heads/main'`.
+- No SA key JSON anywhere — enforced by Gate C below, not by convention.
+
+Workflow-level rules:
+- `pull_request_target` is not used anywhere in the repository (Gate D).
+- Top-level `permissions:` is `contents: read`. `id-token: write` is granted only on the
+  single job that authenticates to GCP.
+- That job is additionally guarded by
+  `if: github.event.pull_request.head.repo.full_name == github.repository`, so a fork PR
+  cannot reach the cloud identity even if GitHub's default token scoping changes.
+- Repository Actions setting: require approval for workflow runs from all outside
+  contributors.
+
+#### W6.2 — Cost-invariant CI gates (replaces the v0.1 `insertAll` grep)
+
+The v0.1 gate grepped the repository for the literal string `insertAll`. That control is
+defective in both directions: the .NET BigQuery client exposes the streaming insert path
+as `BigQueryClient.InsertRow` / `InsertRows` / `InsertRowsAsync` and never surfaces the
+literal REST method name, so a real violation in `worker/` would pass; meanwhile
+`CLAUDE.md` legitimately contains the string and would fail. A gate that cannot fail on
+the violation it targets is worse than no gate, because it is trusted.
+
+Gates live in `scripts/ci/invariant-gates.sh`, are runnable locally, and exit non-zero
+printing offending `path:line`.
+
+- **Gate A — forbidden dependency (load-bearing).** Fail if any `*.csproj` or
+  `Directory.Packages.props` references `Google.Cloud.BigQuery.V2`. The only permitted
+  BigQuery write dependency is `Google.Cloud.BigQuery.Storage.V1`. If the package is
+  absent, the forbidden API surface does not exist regardless of symbol naming.
+- **Gate B — path-scoped symbol scan (secondary).** Over `collector/**/*.go`,
+  `worker/**/*.cs`, `analytics/**/*.cs` only: `insertAll`, `tabledata.insertAll`,
+  `InsertRow(`, `InsertRows(`, `InsertRowsAsync(`, `.Inserter(`. Scope is a path
+  allowlist, not a file denylist — documentation will keep naming these symbols and must
+  never need an exclusion entry.
+- **Gate C — no exported service account keys.** Whole repository: `"private_key"` and
+  `"type": "service_account"`.
+- **Gate D — no `pull_request_target`** in `.github/workflows/`.
+
+#### W6.3 — Pipeline
+
+`ci.yml`, path-filtered jobs: Go build/vet (collector), .NET build (worker, analytics),
+Terraform fmt/validate + plan-diff guard, invariant gates. English-only linting of docs
+is out of scope (manual review). All jobs green on empty scaffolds.
 
 ## 5. Acceptance criteria (Definition of Done)
 
-1. Naming decision (`plumbline`) applied everywhere: architecture.md §4.1 dataset
-   renamed, Brief updated, zero occurrences of the old working name in the repo.
-2. Repo scaffold merged to `main`; `CLAUDE.md` + `.claude/settings.json` present.
-3. ADR-0001..0005 in `docs/adr/`, 0002–0005 Accepted after review.
-4. `docs/eval-plan.md` draft PR open (not frozen).
-5. **Kill-switch live-fired**: billing detached by the function during the test,
+1. Naming decision (`plumbline`) applied everywhere; zero occurrences of the
+   pre-decision name in the repository, in any casing or separator variant including
+   its underscored dataset form.
+2. Repo scaffold merged to `main`; `CLAUDE.md` + `.claude/settings.json` present;
+   `LICENSE` is Apache-2.0.
+3. **W1.1 complete:** `docs/architecture.md` (v0.2) and `docs/project-brief.md` in the
+   repository with the dataset rename and the §7 guardrail correction applied at import;
+   `README.md` states `docs/` precedence.
+4. Repository is public; `main` branch protection enabled (PR required, force-push
+   denied, required status checks once CI is green).
+5. ADR-0001..0005 in `docs/adr/`, 0002–0005 Accepted after review; ADR-0004 records the
+   grep-insufficiency rationale.
+6. `docs/eval-plan.md` draft PR open (not frozen).
+7. **Kill-switch live-fired**: billing detached by the function during the test,
    evidence archived, re-attach runbook written. Billing re-attached afterward.
-6. CI pipeline green on `main` via WIF; zero exported SA keys in repo or GitHub
-   secrets; `insertAll` grep gate active.
-7. `terraform plan` clean; state in GCS backend.
-8. GCP bill for the period: **$0.00**.
+8. CI pipeline green on `main` via WIF; WIF provider carries the repository+owner
+   attribute condition; zero exported SA keys in repo or GitHub secrets.
+9. Gates A–D active **and each proven to fail** — see §6.
+10. `terraform plan` clean; state in GCS backend.
+11. GCP bill for the period: **$0.00**.
 
 ## 6. Test expectations
 
 - No unit tests in F0 (no product code). Placeholder test targets may exist so CI
   jobs are real, but must not assert trivialities to fake coverage.
 - Kill-switch: one documented live-fire with archived evidence — this is the test.
+- **Gates A–D: each proven by a deliberate local violation** (temporary commit on a
+  throwaway branch, gate observed failing, revert). A gate verified only against a clean
+  tree is unverified. Evidence recorded in the F0 completion note; the same philosophy as
+  the kill-switch live-fire.
 - CI: link to green run on `main` recorded in the F0 completion note.
 
 ---
@@ -147,10 +290,10 @@ Advisory contract for Claude Code; `.claude/settings.json` enforces the mechanic
 subset (file-path deny rules, command deny-list). Minimum content:
 
 - **Language:** English only in every repo artifact, no exceptions.
-- **Cost invariants (hard):** never write an `insertAll` code path; never create
-  Terraform outside the resource-type allowlist; Cloud Run always
-  `min_instances=0`, `max_instances<=2`, us-central1; no topic-level Pub/Sub
-  retention; Storage Write API is the only BigQuery write path.
+- **Cost invariants (hard):** the BigQuery write path is Storage Write API only — the
+  legacy streaming insert API and its client package are forbidden; never create
+  Terraform outside the resource-type allowlist; Cloud Run always `min_instances=0`,
+  `max_instances<=2`, us-central1; no topic-level Pub/Sub retention.
 - **Boundaries:** collector never parses span semantics; worker never mutates raw
   OTLP bytes before deserialization; mappings live only in
   `normalization/mappings/` (never Firestore, never env config).
@@ -159,3 +302,42 @@ subset (file-path deny rules, command deny-list). Minimum content:
   discovered work is proposed back as a spec change, not silently implemented.
 - **Docs:** `docs/` is the single source of truth; contradictions are raised, not
   resolved unilaterally.
+- **Public repository:** every commit is world-readable on push. No secrets, no
+  customer data, no internal hostnames, ever — including in test fixtures.
+
+---
+
+## Changelog
+
+**v0.2 — 2026-08-18** (supersedes v0.1, same date)
+
+1. §0 expanded from "Naming decision" to "Project constants": repository visibility
+   fixed to **public** (§0.2) and license changed from MIT to **Apache-2.0** (§0.3),
+   with rationale. Driver: GitHub Pages on Free requires a public repository, so the
+   SPA data path (arch §3.5) is incompatible with a private repository under the
+   zero-cost invariant.
+2. **W1.1 added** — import of `architecture.md` and `project-brief.md` into `docs/`.
+   v0.1 assumed these files were already in the repository; they were not, leaving the
+   source of truth outside version control and W1 acceptance criterion 1
+   unsatisfiable. W1.1 is delivered on the W1 branch and blocks W2.
+3. **W6 rewritten.** The v0.1 `insertAll` repository grep cannot detect the violation it
+   targets (the .NET client exposes `InsertRow`/`InsertRows`/`InsertRowsAsync`) while
+   failing on `CLAUDE.md`. Replaced by Gate A (forbidden NuGet package, load-bearing),
+   Gate B (path-scoped symbol scan), Gate C (SA key scan), Gate D
+   (`pull_request_target` ban). Architecture §7 is corrected to match during the W1.1
+   import.
+4. **W6.1 added** — explicit WIF attribute conditions and fork-PR workflow posture,
+   required because the repository is public.
+5. §6 now requires each CI gate to be proven failing, not merely passing on a clean tree.
+6. Acceptance criteria renumbered 1–11 accordingly.
+
+### Import note (applied by W1.1, 2026-08-18)
+
+The external v0.2 snapshot quoted the pre-decision name's underscored dataset form as a
+literal in W1.1 item 5 and in acceptance criterion 1, while both clauses require zero
+occurrences of that string in the repository — the document could not satisfy its own
+gate. On import the two literals were replaced with descriptive wording; the gate is
+unchanged in meaning and is now satisfiable. This is the same defect class as the v0.1
+`insertAll` gate that §W6.2 corrects: a control whose own artifact trips it. Raised
+rather than resolved silently — if the intent was instead to scope the grep and keep the
+literals, that is a spec change and this note should be reverted with it.
