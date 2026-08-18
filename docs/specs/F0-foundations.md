@@ -1,6 +1,6 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.2 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-18
+**Version:** 0.3 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-18
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
 **Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
@@ -54,7 +54,9 @@ standardizes on Apache-2.0; the explicit patent grant removes friction for corpo
 readers of a reference implementation. Changing this is free while the project has a
 single author and becomes expensive afterward.
 
-- `LICENSE` contains the unmodified Apache-2.0 text; copyright line names the author.
+- `LICENSE` carries the standard Apache-2.0 text with the appendix boilerplate
+  completed — year and copyright owner — which is what the GitHub license template
+  produces. No `NOTICE` file in v0.1: there are no third-party attributions to carry.
 - No per-file license headers in v0.1 (noise for a solo repository). Revisit only if
   external contributors appear; that would be a spec change, not a silent addition.
 - `README.md` license section and any package metadata updated to match.
@@ -141,13 +143,17 @@ not a new work package.
    above. ADR index and open questions carry over unchanged.
 4. Add a precedence note to `README.md`: `docs/` is authoritative; external snapshots
    that disagree are stale by definition.
-5. Grep the repository for the pre-decision project name in every casing and separator
-   variant, including its underscored dataset form: zero occurrences.
+5. Grep the repository for the pre-decision project name, case-insensitively, in the
+   pattern `agent[-_. ]?lens` — which covers every separator variant including its
+   underscored dataset form: zero occurrences.
 
-### W2 — ADR-0002..0005 rationale write-ups
+### W2 — ADR-0001..0005 rationale write-ups
 Decisions are already fixed in `docs/architecture.md`; each ADR adds context,
 alternatives considered, and consequences. One file per ADR under `docs/adr/`, format of
 ADR-0001.
+- ADR-0001: OTLP wire-format preservation, wire-only scope (arch §3.1). Accepted in the
+  architecture index since v0.1 but never written as a file; it is the constraint every
+  later spec cites, and it defines the ADR format for this repository.
 - ADR-0002: Pub/Sub contract & at-least-once + downstream dedup (arch §3.2–3.3).
 - ADR-0003: mappings as in-repo versioned YAML, build-time embedded (arch §5).
 - ADR-0004: zero-cost guardrails & kill-switch design (arch §7). **Must record** why a
@@ -226,6 +232,14 @@ literal REST method name, so a real violation in `worker/` would pass; meanwhile
 `CLAUDE.md` legitimately contains the string and would fail. A gate that cannot fail on
 the violation it targets is worse than no gate, because it is trusted.
 
+**Pattern notation (applies to every gate).** Forbidden-string patterns are written in a
+form that does not match their own textual representation; a character class around a
+single literal character is sufficient (`private[_]key`, `agent[-_. ]?lens`). This holds
+both in the gate scripts and in this specification. Consequence: no gate requires an
+exclusion list, no gate can be defeated by adding a path to one, and a whole-repository
+scan stays whole-repository. Gate B is path-scoped for an unrelated reason — it targets a
+property of source code, where a match in documentation is not a defect.
+
 Gates live in `scripts/ci/invariant-gates.sh`, are runnable locally, and exit non-zero
 printing offending `path:line`.
 
@@ -238,9 +252,16 @@ printing offending `path:line`.
   `InsertRow(`, `InsertRows(`, `InsertRowsAsync(`, `.Inserter(`. Scope is a path
   allowlist, not a file denylist — documentation will keep naming these symbols and must
   never need an exclusion entry.
-- **Gate C — no exported service account keys.** Whole repository: `"private_key"` and
-  `"type": "service_account"`.
+- **Gate C — no exported service account keys.** Whole repository, no exclusions:
+  `"private[_]key"` and `"type"\s*:\s*"service[_]account"`. Scope stays whole-repository:
+  a leaked key can land in any path, so narrowing this gate would be a regression.
+  Gate C is a detection backstop behind W6.4, not the control.
 - **Gate D — no `pull_request_target`** in `.github/workflows/`.
+- **Gate E — retired project name.** Whole repository, case-insensitive:
+  `agent[-_. ]?lens`. Value here is documentation hygiene rather than correctness — a
+  stale dataset name would fail loudly at query time — but the repository is public and
+  is itself the case study. Live reintroduction vector: documents re-derived from
+  external snapshots that predate the rename.
 
 #### W6.3 — Pipeline
 
@@ -248,18 +269,92 @@ printing offending `path:line`.
 Terraform fmt/validate + plan-diff guard, invariant gates. English-only linting of docs
 is out of scope (manual review). All jobs green on empty scaffolds.
 
+#### W6.4 — Repository-level secret controls
+
+Enable GitHub secret scanning and **push protection** (free on public repositories).
+Push protection rejects the commit at push time, before the secret reaches history;
+Gate C runs in CI, after the push has already happened. Recorded in ADR-0004 alongside
+the Gate A / Gate B asymmetry: for every invariant, the spec names which control
+prevents and which merely reports.
+
+Repository security settings are configured manually (adding a GitHub Terraform provider
+for three toggles is disproportionate; the "nothing hand-created" rule in architecture §8
+scopes to GCP resources). Baseline at F0 start, verified via the repository API:
+`secret_scanning`, `secret_scanning_push_protection`, and
+`secret_scanning_validity_checks` all disabled. All three are enabled in W6.4 and the
+post-change API output is archived in `docs/runbooks/repository-settings.md` alongside
+the kill-switch evidence.
+
+The baseline above is verified, not assumed — `gh api repos/arslan-kursad/plumbline
+--jq '.security_and_analysis'` on 2026-08-18 returned `disabled` for all three.
+
+**Fourth setting — `secret_scanning_non_provider_patterns`, also enabled in W6.4.**
+Provider patterns match known vendor key formats. This repository's real future exposure
+sits outside them: plumbline mints its own API keys (architecture §6.3 — generated once,
+shown once, stored hashed), and those carry no provider signature. The concrete collision
+point is F1, where golden-file fixtures will contain OTLP payloads with key-like strings.
+Both outcomes are the wanted ones: either a real leak is caught, or the fixtures are
+forced to use values that are obviously fake and marked as such — the discipline a public
+repository should have anyway. Noise cost is low and alerts are dismissible. Extend the
+archived evidence in `docs/runbooks/repository-settings.md` to cover all four settings.
+
+**Runbook scope — the inventory is wider than W6.4.** A setting changed outside any work
+package is drift unless it is written down, and "drift = bug" is this project's own rule.
+`docs/runbooks/repository-settings.md` is the complete inventory of manually managed
+repository settings, not only those touched by W6.4. Each entry records the setting,
+its state, the date and reason it was changed, and the API evidence. Settings changed
+outside a work package are recorded the same way — Dependabot alerts was enabled during
+an F0 design session (see issue #2), ahead of §W6.6, to close the exposure window on a
+public repository; auto-update PRs remain disabled until F1.
+
+#### W6.5 — Branch protection: scope and recovery
+
+`main` protection is enabled with `enforce_admins=true` and zero required approvals.
+Zero is deliberate: a single-author repository cannot self-approve, and requiring one
+approval would deadlock every merge. State the consequence plainly — the PR requirement
+does not produce review. What it produces is CI execution before `main` and a recorded
+diff. Review in this project is a process commitment (propose → confirm), not a
+mechanically enforced one. A reader of a public case study must not infer otherwise.
+
+Once required status checks are added, a broken workflow file can deadlock `main`:
+the fix cannot merge because the check it repairs is failing. `enforce_admins` blocks
+rule bypass, not rule modification, so the escape is to disable protection, merge the
+fix, and re-enable. Every use of that escape is logged in
+`docs/runbooks/branch-protection.md` with date, PR, and reason — an undocumented
+disable/re-enable cycle is exactly the silent degradation this project rejects.
+
+#### W6.6 — Dependency-vulnerability posture
+
+A separate item, deliberately not part of W6.4. W6.4 is about secrets; this is supply
+chain. Keeping them in one bullet would blur two different threat classes, so this lands
+as its own spec item and hangs off the F5 threat model rather than off W6.4. Two distinct
+controls, often confused:
+
+- **Dependabot alerts** (endpoint `/vulnerability-alerts`) — information only, produces
+  no pull requests. Enabled on 2026-08-18: the endpoint returned `404` (disabled) before
+  and `204` (enabled) after. Free and silent, and a public case study with vulnerability
+  alerts switched off reads as careless.
+- **Dependabot security updates** (`security_and_analysis.dependabot_security_updates`,
+  the field measured earlier) — this is the one that opens automatic PRs. **Deferred to
+  F1**, and deferred in writing rather than silently omitted: on an empty scaffold the
+  benefit is zero while the cost is real, since a ~90-hour part-time budget cannot absorb
+  review-queue churn. Verified still `disabled`. Enable it once F1 creates an actual
+  dependency surface.
+
 ## 5. Acceptance criteria (Definition of Done)
 
 1. Naming decision (`plumbline`) applied everywhere; zero occurrences of the
-   pre-decision name in the repository, in any casing or separator variant including
-   its underscored dataset form.
+   pre-decision name in the repository — pattern `agent[-_. ]?lens`, case-insensitive,
+   covering every separator variant including its underscored dataset form.
 2. Repo scaffold merged to `main`; `CLAUDE.md` + `.claude/settings.json` present;
    `LICENSE` is Apache-2.0.
 3. **W1.1 complete:** `docs/architecture.md` (v0.2) and `docs/project-brief.md` in the
    repository with the dataset rename and the §7 guardrail correction applied at import;
    `README.md` states `docs/` precedence.
 4. Repository is public; `main` branch protection enabled (PR required, force-push
-   denied, required status checks once CI is green).
+   denied, required status checks once CI is green), **and** its scope and recovery
+   procedure recorded in `docs/runbooks/branch-protection.md` per W6.5 — including the
+   statement that the PR requirement does not by itself produce review.
 5. ADR-0001..0005 in `docs/adr/`, 0002–0005 Accepted after review; ADR-0004 records the
    grep-insufficiency rationale.
 6. `docs/eval-plan.md` draft PR open (not frozen).
@@ -267,7 +362,7 @@ is out of scope (manual review). All jobs green on empty scaffolds.
    evidence archived, re-attach runbook written. Billing re-attached afterward.
 8. CI pipeline green on `main` via WIF; WIF provider carries the repository+owner
    attribute condition; zero exported SA keys in repo or GitHub secrets.
-9. Gates A–D active **and each proven to fail** — see §6.
+9. Gates A–E active **and each proven to fail** — see §6.
 10. `terraform plan` clean; state in GCS backend.
 11. GCP bill for the period: **$0.00**.
 
@@ -276,7 +371,7 @@ is out of scope (manual review). All jobs green on empty scaffolds.
 - No unit tests in F0 (no product code). Placeholder test targets may exist so CI
   jobs are real, but must not assert trivialities to fake coverage.
 - Kill-switch: one documented live-fire with archived evidence — this is the test.
-- **Gates A–D: each proven by a deliberate local violation** (temporary commit on a
+- **Gates A–E: each proven by a deliberate local violation** (temporary commit on a
   throwaway branch, gate observed failing, revert). A gate verified only against a clean
   tree is unverified. Evidence recorded in the F0 completion note; the same philosophy as
   the kill-switch live-fire.
@@ -309,6 +404,37 @@ subset (file-path deny rules, command deny-list). Minimum content:
 
 ## Changelog
 
+**v0.3 — 2026-08-18** (supersedes v0.2)
+
+1. Pattern notation convention added to W6.2: forbidden-string patterns are written so
+   they cannot match their own representation. Replaces the descriptive-phrasing
+   workaround applied during the W1.1 import; literals are restored in W1.1 item 5 and
+   acceptance criterion 1.
+2. Gate C corrected to self-non-matching patterns; scope stays whole-repository —
+   path-scoping a secret scan would be a regression.
+3. Gate E added (retired project name), W6.4 added (push protection as the preventive
+   control behind Gate C). Acceptance criterion 9 and §6 now read Gates A–E: a gate that
+   exists but is not required to be proven failing is the defect class §W6.2 was written
+   to remove.
+4. W6.4 extended: repository security settings are named as manually owned with archived
+   evidence, since the "nothing hand-created" rule in architecture §8 scopes to GCP
+   resources; the F0-start baseline is recorded.
+5. W6.5 added: branch protection scope and recovery — the PR requirement does not produce
+   review, and the deadlock escape for a broken workflow file is documented rather than
+   discovered under pressure. Acceptance criterion 4 extended accordingly.
+6. Dependency-vulnerability posture recorded as a separate item from W6.4: alerts enabled
+   at F0, automatic security-update PRs deferred to F1 in writing. Secrets and supply
+   chain are distinct threat classes and are specified separately.
+7. W2 scope corrected to ADR-0001..0005. ADR-0001 was Accepted in the architecture index
+   but had no file; acceptance criterion 5 already required one, and `docs/adr/README.md`
+   referred to a format defined by a document that did not exist.
+8. §0.3 wording corrected: the LICENSE file carries the standard Apache-2.0 text with the
+   appendix boilerplate filled in (year and copyright owner), which is what the GitHub
+   license template produces; "unmodified" overstated it. No NOTICE file in v0.1 — there
+   are no third-party attributions to carry.
+9. Architecture bumped to v0.3 on this branch: §2.3 write-path contract, §10 ADR index and
+   open question 5, §11 changelog.
+
 **v0.2 — 2026-08-18** (supersedes v0.1, same date)
 
 1. §0 expanded from "Naming decision" to "Project constants": repository visibility
@@ -330,14 +456,3 @@ subset (file-path deny rules, command deny-list). Minimum content:
    required because the repository is public.
 5. §6 now requires each CI gate to be proven failing, not merely passing on a clean tree.
 6. Acceptance criteria renumbered 1–11 accordingly.
-
-### Import note (applied by W1.1, 2026-08-18)
-
-The external v0.2 snapshot quoted the pre-decision name's underscored dataset form as a
-literal in W1.1 item 5 and in acceptance criterion 1, while both clauses require zero
-occurrences of that string in the repository — the document could not satisfy its own
-gate. On import the two literals were replaced with descriptive wording; the gate is
-unchanged in meaning and is now satisfiable. This is the same defect class as the v0.1
-`insertAll` gate that §W6.2 corrects: a control whose own artifact trips it. Raised
-rather than resolved silently — if the intent was instead to scope the grep and keep the
-literals, that is a spec change and this note should be reverted with it.
