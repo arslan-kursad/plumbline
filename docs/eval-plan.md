@@ -2,7 +2,8 @@
 
 **Version:** 0.1 · **Status:** DRAFT — NOT FROZEN · **Date:** 2026-08-19
 **Work package:** F0 / W3 · **Repo target:** `docs/eval-plan.md`
-**Semantic conventions:** OTel GenAI semconv pinned at v1.41
+**Semantic conventions:** OTel GenAI semconv pinned at v1.41 (upstream status:
+**Development** — see SC-1)
 
 > This document is a pre-registration. Once frozen (§2), every number, rule and
 > procedure in it is a commitment made *before* the corresponding data is observed.
@@ -108,7 +109,7 @@ the provider supports it; residual non-determinism is measured, not assumed away
 | # | Metric | Method | Data source | Threshold |
 |---|---|---|---|---|
 | 1.1 | Golden-file test pass rate | CI job, per dialect | `normalization/testdata/<dialect>/` | 100%, ≥3 dialects |
-| 1.2 | Fixture provenance | Manifest per fixture states capture origin | fixture manifest | ≥1 fixture per dialect **captured from a real emitter**, not hand-authored |
+| 1.2 | Fixture provenance | Manifest per fixture records capture origin, emitter SDK + version, the semconv version **actually emitted**, the `OTEL_SEMCONV_STABILITY_OPT_IN` value (recorded as `unset` when absent) and the capture date | fixture manifest | ≥1 fixture per dialect **captured from a real emitter**, not hand-authored; a fixture missing any manifest field is not admissible evidence |
 | 1.3 | **Losslessness** | Every attribute key in the input `ExportTraceServiceRequest` appears in a typed column or in the `attributes` JSON | normalizer output vs fixture | 100% of keys, all dialects |
 | 1.4 | **Semconv conformance** | Every emitted `gen_ai.*` / normalized column name validated against a machine-readable copy of the pinned v1.41 registry vendored in-repo | `normalization/semconv/v1.41/` | 0 non-conforming names |
 | 1.5 | Unknown-dialect fallback | Fixture with unregistered scope markers | golden test | `source_dialect='unknown'`, 0 dropped attributes, counter incremented |
@@ -116,6 +117,17 @@ the provider supports it; residual non-determinism is measured, not assumed away
 1.3 and 1.4 exist because 1.1 alone is self-referential: the expected output is authored
 by the same person as the mapping, so a passing golden test proves determinism, not
 correctness. 1.3 and 1.4 are checks the author cannot satisfy by agreeing with himself.
+
+**Stability of the pin.** At upstream tag `v1.41.0` the GenAI conventions carry status
+**Development**: the document banner states it, and every `stability` field in
+`model/gen-ai/registry.yaml` and `model/gen-ai/spans.yaml` reads `development` — none is
+`stable`. The pin is therefore a contract this project holds itself to, not a guarantee
+inherited from upstream, and claims made from SC-1 say so. Upstream additionally carries a
+transition rule: an instrumentation already emitting the conventions of v1.36.0 or earlier
+keeps emitting them by default, and the newer shapes are opt-in via the
+`OTEL_SEMCONV_STABILITY_OPT_IN` environment variable. A fixture whose emitted convention
+version and opt-in value are unknown cannot support the claim in this section, which is
+what 1.2 records.
 
 **Verdict rule:** SC-1 met iff all five rows pass in CI on `main`.
 
