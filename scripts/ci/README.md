@@ -15,9 +15,20 @@ commit it rejects.
 
 Two conventions hold across all of them.
 
-**Scan set.** Gates scan git-tracked files. What is in the repository is exactly
-the invariants' domain, so build output and local scratch files are irrelevant
-without any gate needing an exclusion list.
+**Scan set.** Gates scan every file git considers part of the repository: tracked
+files plus untracked ones that are not ignored. No gate needs an exclusion list.
+
+Two consequences of that choice are easy to trip over:
+
+- A local run is **stricter** than CI, because CI only ever sees committed files.
+  An untracked scratch file that violates a gate fails locally and does not exist
+  in CI. That direction is deliberate — the reverse, which is what this script
+  did first, passes a violation locally until someone runs `git add` and then
+  fails it in CI.
+- `.gitignore` therefore defines gate scope. A broad ignore pattern silently does
+  what an exclusion list would do, in a file nobody reads as a security control.
+  Widening `.gitignore` is a change to what these gates cover, and belongs in
+  review as one.
 
 **Pattern notation.** Forbidden-string patterns are written so they cannot match
 their own text — `private[_]key`, `agent[-_. ]?lens` (ADR-0004 §4). Consequence:
