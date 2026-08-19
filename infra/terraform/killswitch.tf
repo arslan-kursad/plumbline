@@ -206,8 +206,13 @@ resource "google_billing_budget" "zero_spend" {
 
   amount {
     specified_amount {
-      currency_code = "USD"
-      units         = var.budget_amount_usd
+      # Currency deliberately unset: the Budget API rejects a create whose
+      # currency does not match the billing account's, and this project's account
+      # bills in a currency that is not the one this file was first written with.
+      # Inheriting is both correct and portable. The amount is not the trigger, so
+      # its currency does not affect when the kill-switch fires.
+      currency_code = var.budget_currency_code
+      units         = var.budget_amount
     }
   }
 
