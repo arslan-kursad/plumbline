@@ -1,9 +1,9 @@
 # F0 — Completion note
 
 **Date:** 2026-08-19 · **Spec:** [`F0-foundations.md`](F0-foundations.md) v0.7
-**Status: F0 is not complete.** Seven of eleven acceptance criteria are met; four
-require a GCP project that does not exist yet, and are listed in §3 with the
-procedure to close them.
+**Status: F0 is not complete.** Six of eleven acceptance criteria are fully met,
+two are partly met, and three require a GCP project that does not exist yet. §3
+lists what remains, in the order it has to happen.
 
 This note exists because the spec asks for one (§6): the gate proofs and the CI
 run link are recorded here. It states what is done, what is not, and what the
@@ -17,7 +17,7 @@ is open is the failure this project is written against.
 | 1 | Naming applied; zero occurrences of the pre-decision name | **met** | Gate E, running on every build over every non-ignored file |
 | 2 | Scaffold on `main`; `CLAUDE.md`, `.claude/settings.json`, Apache-2.0 | **met** | Merged in PR #1 |
 | 3 | W1.1: architecture and Brief imported, dataset renamed, §7 guardrail corrected, `README` precedence | **met** | PR #1; architecture now v0.4 |
-| 4 | Repository public; `main` protection enabled **and** its scope recorded | **met** | [`runbooks/branch-protection.md`](../runbooks/branch-protection.md). Protection predated the runbook and was undocumented drift; required status checks are added after the first green run on `main` (§3.5) |
+| 4 | Repository public; `main` protection enabled **and** its scope recorded | **partly met** | Public, PR required, force-push denied, scope and recovery in [`runbooks/branch-protection.md`](../runbooks/branch-protection.md) — protection predated the runbook and was undocumented drift until now. The criterion's remaining clause, required status checks "once CI is green", is sequenced after the first green run on `main` (§3.5) |
 | 5 | ADR-0001..0005, 0002–0005 Accepted; ADR-0004 records the grep-insufficiency rationale | **met** | [`docs/adr/`](../adr/) |
 | 6 | `docs/eval-plan.md` on `main`, `DRAFT — NOT FROZEN` | **met** | PR #6 |
 | 7 | **Kill-switch live-fired**, evidence archived, billing re-attached | **open** (#17) | Configuration and procedure ready: [`runbooks/kill-switch.md`](../runbooks/kill-switch.md). §4 of that file is empty and says so |
@@ -64,13 +64,15 @@ the repository.
    [`infra/terraform/README.md`](../../infra/terraform/README.md). Closes criterion 10.
 4. **Live-fire the kill-switch** and archive the evidence in §4 of its runbook,
    then re-attach billing. Closes criterion 7.
-5. **Set the repository variables** so the CI plan job stops skipping:
+5. **Add the required status check** to `main` protection once CI has run green
+   there, per [`runbooks/branch-protection.md`](../runbooks/branch-protection.md).
+   Completes criterion 4.
+6. **Set the repository variables** so the CI plan job stops skipping:
    `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_CI_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`,
    `GCP_STATE_BUCKET`, and the `GCP_BILLING_ACCOUNT_ID` secret. The Terraform
-   outputs print the first two. Then add the required status check per
-   [`runbooks/branch-protection.md`](../runbooks/branch-protection.md), and record the green
-   run's URL in criterion 8 above. Closes criterion 8.
-6. **Check the bill** at the end of the billing period. Closes criterion 11.
+   outputs print the first two. Record the resulting green run's URL in criterion 8
+   above. Closes criterion 8.
+7. **Check the bill** at the end of the billing period. Closes criterion 11.
 
 Tracked as [issue #17](https://github.com/arslan-kursad/plumbline/issues/17), so the
 remaining work does not live only in this file.
