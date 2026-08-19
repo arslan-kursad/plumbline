@@ -1,6 +1,6 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.3 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-18
+**Version:** 0.5 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
 **Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
@@ -78,7 +78,8 @@ Federation (no exported SA keys).
 - Terraform for Pub/Sub, BigQuery, Firestore, Cloud Run application services (F2).
   F0 Terraform covers only: state backend, provider pinning, kill-switch resources,
   project-level quota/guardrail settings.
-- Freezing `eval-plan.md` (draft in F0; freeze is the F1 entry gate).
+- Freezing `eval-plan.md` (draft in F0; Freeze A is the F1 entry gate, Freeze B is at F3
+  — see W3).
 - Dashboards, SPA, load generator (F4).
 - A deploy-capable CI identity. F0 CI authenticates read-only (build, validate, plan).
   The deploy service account and its branch-scoped binding land in F2; only the binding
@@ -163,8 +164,22 @@ ADR-0001.
 Status moves Proposed → Accepted on PR merge after human review.
 
 ### W3 — `docs/eval-plan.md` draft (pre-registration)
-Draft only; freezing is a separate, explicit human action gating F1 code. Must contain:
-- The four success criteria from the Brief, made measurable (exact thresholds,
+Draft only; freezing is a separate, explicit human action, and it is **two-stage**
+(eval plan §2). A single freeze before F1 is not achievable: the practical-significance
+thresholds are functions of a baseline variance estimate, and no agent data exists at the
+F1 entry gate. Freezing constants there would produce arbitrary numbers presented as
+pre-registration.
+- **Freeze A** — human action at the F1 entry gate, gating F1 code. Fixes criteria,
+  metrics, endpoints, statistical tests, decision rules, threshold *formulas*, rubric
+  text, dataset spec and splits, degradation catalog, experiment design.
+- **Freeze B** — at F3, before the first seeded-regression run. Fills **only** the numeric
+  constants that the Freeze-A formulas produce from the baseline calibration run. It may
+  not add or remove endpoints, change tests or decision rules, alter the rubric, or
+  reweight metrics.
+
+Must contain:
+- The four success criteria from the Brief, made measurable (exact thresholds — or, where
+  a threshold is a Freeze-B constant, the formula and the calibration input it consumes —
   measurement method, data source for each).
 - Seeded-regression experiment design: baseline agent, degradation applied,
   pre-registered detection threshold, pass/fail rule for the gate.
@@ -357,7 +372,8 @@ controls, often confused:
    statement that the PR requirement does not by itself produce review.
 5. ADR-0001..0005 in `docs/adr/`, 0002–0005 Accepted after review; ADR-0004 records the
    grep-insufficiency rationale.
-6. `docs/eval-plan.md` draft PR open (not frozen).
+6. `docs/eval-plan.md` present on `main` with Status `DRAFT — NOT FROZEN`; Freeze A is a
+   separate, explicitly tagged human action and is **not** part of F0.
 7. **Kill-switch live-fired**: billing detached by the function during the test,
    evidence archived, re-attach runbook written. Billing re-attached afterward.
 8. CI pipeline green on `main` via WIF; WIF provider carries the repository+owner
@@ -403,6 +419,31 @@ subset (file-path deny rules, command deny-list). Minimum content:
 ---
 
 ## Changelog
+
+**v0.5 — 2026-08-19** (supersedes v0.4)
+
+1. Acceptance criterion 6 rewritten. "Draft PR open (not frozen)" was inconsistent with
+   the rest of the design on three counts: eval plan §2 defines Freeze A as an annotated
+   tag plus the file's SHA-256, and a file that is not on `main` cannot be tagged;
+   CLAUDE.md makes `docs/` the source of truth, so declaring F0 done while
+   `docs/eval-plan.md` exists only on a branch contradicts it; and an open PR is not a
+   durable state — it rots and conflicts once F1 starts. The draft property is carried by
+   the file's own `Status: DRAFT — NOT FROZEN` header, which survives the merge, rather
+   than by the review state of a pull request.
+2. §2 out-of-scope entry aligned with the two-stage freeze introduced in v0.4; it still
+   said "freeze is the F1 entry gate", which is true of Freeze A only.
+
+**v0.4 — 2026-08-19** (supersedes v0.3)
+
+1. W3 freeze mechanics corrected to two stages. v0.3 assumed one freeze, before F1 code.
+   The delivered `docs/eval-plan.md` v0.1 draft (§2) splits it: Freeze A at the F1 entry
+   gate still gates F1 code, while Freeze B at F3 fills the numeric constants that cannot
+   exist before a baseline calibration run. Without the split, the eval plan and this spec
+   contradict each other on when thresholds become binding, and the pre-registration claim
+   would rest on constants invented rather than measured. Freeze B is bounded: constants
+   only, no change to criteria, endpoints, tests, rules or rubric.
+2. W3 first required item reworded accordingly — a criterion whose threshold is a Freeze-B
+   constant states the formula and its calibration input instead of a number.
 
 **v0.3 — 2026-08-18** (supersedes v0.2)
 
