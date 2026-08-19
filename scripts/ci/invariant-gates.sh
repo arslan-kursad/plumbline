@@ -12,9 +12,12 @@
 #
 # Two conventions hold throughout.
 #
-#   Scan set. Gates scan git-tracked files. What is in the repository is exactly
-#   the invariants' domain, and it makes build output and local scratch files
-#   irrelevant without any gate needing an exclusion list.
+#   Scan set. Gates scan every file git would consider part of the repository:
+#   tracked files plus untracked ones that are not ignored. Ignored paths (build
+#   output, provider caches) are out by construction, so no gate needs an
+#   exclusion list. Untracked files are in deliberately — scanning only tracked
+#   files passes a violation locally until someone runs `git add`, and then fails
+#   it in CI, which is the worst possible ordering.
 #
 #   Pattern notation. Forbidden-string patterns are written so they cannot match
 #   their own text; a character class around a single literal character is
@@ -43,12 +46,13 @@ pass() {
   printf 'ok    %s\n' "$1"
 }
 
-# tracked_files [pathspec...] — git-tracked files, NUL-separated.
-tracked_files() {
+# repo_files [pathspec...] — every non-ignored file in the repository,
+# NUL-separated, tracked or not.
+repo_files() {
   if [ "$#" -eq 0 ]; then
-    git ls-files -z
+    git ls-files -z --cached --others --exclude-standard
   else
-    git ls-files -z -- "$@"
+    git ls-files -z --cached --others --exclude-standard -- "$@"
   fi
 }
 
@@ -59,7 +63,7 @@ scan() {
   shift 2
 
   local matches
-  matches="$(tracked_files "$@" | xargs -0 -r grep -nE -- "$pattern" 2>/dev/null || true)"
+  matches="$(repo_files "$@" | xargs -0 -r grep -nE -- "$pattern" 2>/dev/null || true)"
 
   if [ -n "$matches" ]; then
     printf '      %s: %s\n' "$name" "$pattern"
@@ -134,7 +138,7 @@ gate_b() {
       esac
     done
     [ "$covered" -eq 1 ] || uncovered+="        ${file}"$'\n'
-  done < <(tracked_files '*.go' '*.cs' '*.csproj' '*.sln')
+  done < <(repo_files '*.go' '*.cs' '*.csproj' '*.sln')
 
   if [ -n "$uncovered" ]; then
     printf '      source files outside the declared scan roots (%s):\n' "${SOURCE_ROOTS[*]}"
@@ -192,7 +196,7 @@ gate_d() {
 # ---------------------------------------------------------------------------
 gate_e() {
   local matches
-  matches="$(tracked_files | xargs -0 -r grep -nEi -- 'agent[-_. ]?lens' 2>/dev/null || true)"
+  matches="$(repo_files | xargs -0 -r grep -nEi -- 'agent[-_. ]?lens' 2>/dev/null || true)"
 
   if [ -n "$matches" ]; then
     printf '      retired project name:\n'

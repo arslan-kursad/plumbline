@@ -17,126 +17,21 @@ Two of the strings the prover must write are strings a whole-repository gate
 forbids; it assembles them at runtime from fragments, so the prover itself cannot
 match them (ADR-0004 §4).
 
+**The transcript below is redacted, mechanically, by the prover.** Gate C and
+Gate E scan the whole repository, so a document quoting what they matched trips
+the gate it documents — this file did exactly that, and CI caught it. Matched
+literals are rewritten into the gates' own notation (`private[_]key`); paths,
+line numbers, gate names and verdicts are untouched. The alternative fix would
+have been to exempt `docs/evidence/` from Gate C, and a secret scan with a
+directory it does not look at is not a secret scan.
+
 ## Transcript
 
 Produced by `./scripts/ci/prove-gates.sh` on 2026-08-19, macOS, git worktree from
 the branch head. Exit code 0.
 
 ```
-gate failure proofs (F0 spec §6)
-
---- case 0: clean tree
-    invariant gates (F0 spec §W6.2)
-    
-    ok    Gate A — no legacy BigQuery client package
-    ok    Gate B — no streaming-insert symbols in source
-    ok    Gate B coverage — all source under the scanned roots
-    ok    Gate C — no exported service account keys
-    ok    Gate D — no pull_request_target in workflows
-    ok    Gate E — retired project name absent
-    
-    all gates passed
-    baseline: gates pass on a clean tree
-
---- case 1: Gate A: legacy BigQuery client package in a csproj
-    invariant gates (F0 spec §W6.2)
-    
-          forbidden package: Google[.]Cloud[.]BigQuery[.]V2
-            worker/Plumbline.Worker/Plumbline.Worker.csproj:3:    <PackageReference Include="Google.Cloud.BigQuery.V2" Version="3.5.0" />
-    FAIL  Gate A — legacy BigQuery client package referenced
-    ok    Gate B — no streaming-insert symbols in source
-    ok    Gate B coverage — all source under the scanned roots
-    ok    Gate C — no exported service account keys
-    ok    Gate D — no pull_request_target in workflows
-    ok    Gate E — retired project name absent
-    
-    1 gate(s) failed:
-      - Gate A — legacy BigQuery client package referenced
-    proven: Gate A failed on the violation
-
---- case 2: Gate B: streaming-insert symbol in worker source
-    invariant gates (F0 spec §W6.2)
-    
-    ok    Gate A — no legacy BigQuery client package
-          streaming-insert symbol: InsertRowsAsync[(]
-            worker/Plumbline.Worker/BadWrite.cs:3:    public static void Write(BigQueryClient client) => client.InsertRowsAsync(null, null, null);
-    FAIL  Gate B — streaming-insert symbol in source
-    ok    Gate B coverage — all source under the scanned roots
-    ok    Gate C — no exported service account keys
-    ok    Gate D — no pull_request_target in workflows
-    ok    Gate E — retired project name absent
-    
-    1 gate(s) failed:
-      - Gate B — streaming-insert symbol in source
-    proven: Gate B failed on the violation
-
---- case 3: Gate B coverage: source outside the declared roots
-    invariant gates (F0 spec §W6.2)
-    
-    ok    Gate A — no legacy BigQuery client package
-    ok    Gate B — no streaming-insert symbols in source
-          source files outside the declared scan roots (collector worker analytics infra/functions):
-            services/gateway/Program.cs
-    FAIL  Gate B coverage — source outside the scanned roots
-    ok    Gate C — no exported service account keys
-    ok    Gate D — no pull_request_target in workflows
-    ok    Gate E — retired project name absent
-    
-    1 gate(s) failed:
-      - Gate B coverage — source outside the scanned roots
-    proven: Gate B coverage failed on the violation
-
---- case 4: Gate C: exported service account key
-    invariant gates (F0 spec §W6.2)
-    
-    ok    Gate A — no legacy BigQuery client package
-    ok    Gate B — no streaming-insert symbols in source
-    ok    Gate B coverage — all source under the scanned roots
-          service account key field: "private[_]key"
-            infra/terraform/leaked.json:3:  "private_key": "-----BEGIN PRIVATE KEY-----"
-          service account key type: "type"[[:space:]]*:[[:space:]]*"service[_]account"
-            infra/terraform/leaked.json:2:  "type": "service_account",
-    FAIL  Gate C — exported service account key material
-    ok    Gate D — no pull_request_target in workflows
-    ok    Gate E — retired project name absent
-    
-    1 gate(s) failed:
-      - Gate C — exported service account key material
-    proven: Gate C failed on the violation
-
---- case 5: Gate D: pull_request_target in a workflow
-    invariant gates (F0 spec §W6.2)
-    
-    ok    Gate A — no legacy BigQuery client package
-    ok    Gate B — no streaming-insert symbols in source
-    ok    Gate B coverage — all source under the scanned roots
-    ok    Gate C — no exported service account keys
-          fork-privileged trigger: pull_request[_]target
-            3:  pull_request_target:
-    FAIL  Gate D — pull_request_target in a workflow
-    ok    Gate E — retired project name absent
-    
-    1 gate(s) failed:
-      - Gate D — pull_request_target in a workflow
-    proven: Gate D failed on the violation
-
---- case 6: Gate E: retired project name
-    invariant gates (F0 spec §W6.2)
-    
-    ok    Gate A — no legacy BigQuery client package
-    ok    Gate B — no streaming-insert symbols in source
-    ok    Gate B coverage — all source under the scanned roots
-    ok    Gate C — no exported service account keys
-    ok    Gate D — no pull_request_target in workflows
-          retired project name:
-            docs/stale-snapshot.md:3:BigQuery dataset: agent_lens_dataset (pre-rename)
-    FAIL  Gate E — retired project name present
-    
-    1 gate(s) failed:
-      - Gate E — retired project name present
-    proven: Gate E failed on the violation
-
-all 6 gate failure proofs passed
+PENDING REGENERATION
 ```
 
 ## What each case demonstrates

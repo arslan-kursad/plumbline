@@ -1,8 +1,9 @@
 name: ci
 
-# pull_request, never pull_request_target: the latter runs with repository write
-# permissions against untrusted fork code, and Gate D fails the build if it ever
-# appears in this directory (F0 spec §W6.1).
+# pull_request, never `pull_request[_]target` — written in this repository's
+# self-non-matching notation (ADR-0004 §4) because Gate D scans this file. That
+# trigger runs with repository write permissions against untrusted fork code, and
+# Gate D fails the build if it ever appears in a workflow file (F0 spec §W6.1).
 on:
   push:
     branches: [main]

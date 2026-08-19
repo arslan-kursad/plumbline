@@ -17,6 +17,12 @@
 # repository gate forbids. They are assembled at runtime from fragments so that
 # this file cannot match them — the same self-non-matching rule the gates
 # themselves follow (ADR-0004 §4).
+#
+# For the same reason the transcript is redacted on the way out: Gate C and
+# Gate E scan the whole repository, so a document quoting what they matched
+# would trip the gate it documents. Matched literals are rewritten into the
+# gates' own notation; paths, line numbers, gate names and verdicts are
+# untouched.
 
 set -euo pipefail
 
@@ -40,6 +46,17 @@ install -m 0755 "$gates" "${worktree}/scripts/ci/invariant-gates.sh"
 failures=0
 case_number=0
 
+# One underscore, held in a variable, so the patterns below do not appear in
+# this file in the form they match.
+U='_'
+
+redact() {
+  sed -E \
+    -e "s/private${U}key/private[${U}]key/g" \
+    -e "s/service${U}account/service[${U}]account/g" \
+    -e "s/agent${U}lens/agent[${U}]lens/g"
+}
+
 # expect_failure NAME EXPECTED_GATE — run the gates, require a non-zero exit
 # and require EXPECTED_GATE to be the gate that reported.
 expect_failure() {
@@ -53,7 +70,7 @@ expect_failure() {
   status=$?
   set -e
 
-  printf '%s\n' "$output" | sed 's/^/    /'
+  printf '%s\n' "$output" | redact | sed 's/^/    /'
 
   if [ "$status" -eq 0 ]; then
     printf '    PROOF FAILED: gates passed while the violation was present\n'
@@ -84,7 +101,7 @@ printf 'gate failure proofs (F0 spec §6)\n'
 
 # Baseline: the clean tree must pass, otherwise every proof below is meaningless.
 printf '\n--- case 0: clean tree\n'
-if (cd "$worktree" && ./scripts/ci/invariant-gates.sh 2>&1 | sed 's/^/    /'); then
+if (cd "$worktree" && ./scripts/ci/invariant-gates.sh 2>&1 | redact | sed 's/^/    /'); then
   printf '    baseline: gates pass on a clean tree\n'
 else
   printf '    PROOF FAILED: gates do not pass on a clean tree\n'
@@ -117,8 +134,8 @@ expect_failure "Gate B coverage: source outside the declared roots" "Gate B cove
 
 # Gate C — both key markers, assembled so this script does not contain them.
 violate "infra/terraform/leaked.json" \
-"$(printf '{\n  "%s": "%s",\n  "%s": "-----BEGIN PRIVATE KEY-----"\n}' \
-   'type' 'service_account' 'private_key')"
+"$(printf '{\n  "%s": "%s",\n  "%s": "obviously-not-a-real-key"\n}' \
+   'type' "service${U}account" "private${U}key")"
 expect_failure "Gate C: exported service account key" "Gate C"
 
 # Gate D — the fork-privileged trigger, in the only place GitHub reads it from.
@@ -136,7 +153,7 @@ expect_failure "Gate D: pull_request_target in a workflow" "Gate D"
 # Gate E — the retired project name, reintroduced the way it realistically would
 # be: a document re-derived from a stale external snapshot.
 violate "docs/stale-snapshot.md" \
-"$(printf '# Stale snapshot\n\nBigQuery dataset: %s_dataset (pre-rename)\n' "$(printf 'agent%slens' '_')")"
+"$(printf '# Stale snapshot\n\nBigQuery dataset: %s_dataset (pre-rename)\n' "$(printf 'agent%slens' "$U")")"
 expect_failure "Gate E: retired project name" "Gate E"
 
 printf '\n'
