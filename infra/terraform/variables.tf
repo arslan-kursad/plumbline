@@ -81,3 +81,25 @@ variable "killswitch_runtime" {
   type        = string
   default     = "go125"
 }
+
+variable "github_owner" {
+  description = "GitHub account that owns the repository; pinned in the WIF provider's attribute condition."
+  type        = string
+  default     = "arslan-kursad"
+}
+
+variable "github_repository" {
+  description = "owner/name of the repository allowed to federate. Any other repository is refused by the provider itself."
+  type        = string
+  default     = "arslan-kursad/plumbline"
+}
+
+variable "state_bucket" {
+  description = <<-EOT
+    Terraform state bucket created by ./bootstrap. Named here so the CI identity's
+    storage access is scoped to this bucket alone rather than to the project.
+    Defaults to the name bootstrap/ generates.
+  EOT
+  type        = string
+  default     = null
+}

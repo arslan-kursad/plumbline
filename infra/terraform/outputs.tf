@@ -17,3 +17,13 @@ output "bigquery_daily_query_quota_mib" {
   description = "Applied BigQuery per-day query quota, MiB."
   value       = var.bigquery_daily_query_quota_mib
 }
+
+output "workload_identity_provider" {
+  description = "Value for the GCP_WORKLOAD_IDENTITY_PROVIDER repository variable used by .github/workflows/ci.yml."
+  value       = google_iam_workload_identity_pool_provider.github.name
+}
+
+output "ci_service_account" {
+  description = "Value for the GCP_CI_SERVICE_ACCOUNT repository variable."
+  value       = google_service_account.ci_readonly.email
+}
