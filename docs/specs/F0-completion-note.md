@@ -28,8 +28,9 @@ is open is the failure this project is written against.
 
 ## 2. What the phase produced beyond the checklist
 
-Three defects were found in the specification itself while implementing it, and
-each was fixed in the branch that found it rather than noted for later:
+Four defects were found while implementing the specification — three in the spec,
+one in the implementation — and each was fixed in the branch that found it rather
+than noted for later:
 
 1. **The Terraform resource-type allowlist did not exist.** `CLAUDE.md` and W5
    both forbid resources "outside the allowlist (architecture §7)", and §7 named
@@ -48,7 +49,18 @@ each was fixed in the branch that found it rather than noted for later:
    files now: scanning only tracked files passes a violation locally until
    someone runs `git add`, and then fails it in CI.
 
-Each is recorded in the F0 spec changelog (v0.6, v0.7) with its reasoning.
+4. **The budget measured the wrong thing** (found in review, before #14 merged).
+   The filter was `EXCLUDE_ALL_CREDITS`, which makes spend equal gross cost —
+   but Always Free is a `FREE_TIER` credit against a non-zero gross line, not an
+   absence of charge. The kill-switch would have detached billing on the first
+   Cloud Run request in F2, with the invoice at $0.00 and no way for the system
+   to undo it. Corrected to `INCLUDE_SPECIFIED_CREDITS` over `FREE_TIER` alone:
+   ADR-0004 Amendment 1. **The live-fire could not have caught this** — it starts
+   at Pub/Sub, and the defect was in how the budget computed the number the
+   function reads.
+
+Items 1–3 are recorded in the F0 spec changelog (v0.6, v0.7) with their
+reasoning; item 4 is ADR-0004 Amendment 1.
 
 ## 3. What is left, in order
 
@@ -60,19 +72,26 @@ the repository.
    stacked in that order.
 2. **Create the GCP project and link billing.** Prerequisites and the API-enabling
    step that must precede the first plan: [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §2.
-3. **Apply Terraform** — `bootstrap/`, then the root module:
+3. **Record Verification A** while the billing account is in front of you:
+   Billing → Reports with the credit filters cleared, confirming a non-zero usage
+   cost against a $0.00 net total. It is the premise the budget's spend basis
+   rests on (ADR-0004 Amendment 1), and it is currently supported by Google's
+   documentation alone. Procedure and evidence slot:
+   [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §1.
+4. **Apply Terraform** — `bootstrap/`, then the root module:
    [`infra/terraform/README.md`](../../infra/terraform/README.md). Closes criterion 10.
-4. **Live-fire the kill-switch** and archive the evidence in §4 of its runbook,
-   then re-attach billing. Closes criterion 7.
-5. **Add the required status check** to `main` protection once CI has run green
+5. **Live-fire the kill-switch** and archive the evidence in §4 of its runbook,
+   then re-attach billing. Closes criterion 7. Note what it does not cover: the
+   budget → notification segment is checked in F2, not here.
+6. **Add the required status check** to `main` protection once CI has run green
    there, per [`runbooks/branch-protection.md`](../runbooks/branch-protection.md).
    Completes criterion 4.
-6. **Set the repository variables** so the CI plan job stops skipping:
+7. **Set the repository variables** so the CI plan job stops skipping:
    `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_CI_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`,
    `GCP_STATE_BUCKET`, and the `GCP_BILLING_ACCOUNT_ID` secret. The Terraform
    outputs print the first two. Record the resulting green run's URL in criterion 8
    above. Closes criterion 8.
-7. **Check the bill** at the end of the billing period. Closes criterion 11.
+8. **Check the bill** at the end of the billing period. Closes criterion 11.
 
 Tracked as [issue #17](https://github.com/arslan-kursad/plumbline/issues/17), so the
 remaining work does not live only in this file.
@@ -84,6 +103,9 @@ remaining work does not live only in this file.
   is closed by a specific authenticated run's URL, not by the absence of red.
 - **Read settings back after writing them.** The two paid settings taught this
   the expensive way: the API reports success and changes nothing.
+- **A green live-fire is not a green kill-switch.** It exercises Pub/Sub →
+  function → detach and nothing upstream of that. The review that caught the
+  spend-basis defect caught something no F0 test could have.
 - **The Go and .NET jobs have not run in CI yet.** Path filtering applies to pull
   requests, and no pull request has touched those directories; on `main` every
   job runs, so the first push there is what proves W6.3's "all jobs green on
