@@ -1,6 +1,6 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.3 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-18
+**Version:** 0.4 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
 **Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
@@ -163,8 +163,22 @@ ADR-0001.
 Status moves Proposed → Accepted on PR merge after human review.
 
 ### W3 — `docs/eval-plan.md` draft (pre-registration)
-Draft only; freezing is a separate, explicit human action gating F1 code. Must contain:
-- The four success criteria from the Brief, made measurable (exact thresholds,
+Draft only; freezing is a separate, explicit human action, and it is **two-stage**
+(eval plan §2). A single freeze before F1 is not achievable: the practical-significance
+thresholds are functions of a baseline variance estimate, and no agent data exists at the
+F1 entry gate. Freezing constants there would produce arbitrary numbers presented as
+pre-registration.
+- **Freeze A** — human action at the F1 entry gate, gating F1 code. Fixes criteria,
+  metrics, endpoints, statistical tests, decision rules, threshold *formulas*, rubric
+  text, dataset spec and splits, degradation catalog, experiment design.
+- **Freeze B** — at F3, before the first seeded-regression run. Fills **only** the numeric
+  constants that the Freeze-A formulas produce from the baseline calibration run. It may
+  not add or remove endpoints, change tests or decision rules, alter the rubric, or
+  reweight metrics.
+
+Must contain:
+- The four success criteria from the Brief, made measurable (exact thresholds — or, where
+  a threshold is a Freeze-B constant, the formula and the calibration input it consumes —
   measurement method, data source for each).
 - Seeded-regression experiment design: baseline agent, degradation applied,
   pre-registered detection threshold, pass/fail rule for the gate.
@@ -403,6 +417,18 @@ subset (file-path deny rules, command deny-list). Minimum content:
 ---
 
 ## Changelog
+
+**v0.4 — 2026-08-19** (supersedes v0.3)
+
+1. W3 freeze mechanics corrected to two stages. v0.3 assumed one freeze, before F1 code.
+   The delivered `docs/eval-plan.md` v0.1 draft (§2) splits it: Freeze A at the F1 entry
+   gate still gates F1 code, while Freeze B at F3 fills the numeric constants that cannot
+   exist before a baseline calibration run. Without the split, the eval plan and this spec
+   contradict each other on when thresholds become binding, and the pre-registration claim
+   would rest on constants invented rather than measured. Freeze B is bounded: constants
+   only, no change to criteria, endpoints, tests, rules or rubric.
+2. W3 first required item reworded accordingly — a criterion whose threshold is a Freeze-B
+   constant states the formula and its calibration input instead of a number.
 
 **v0.3 — 2026-08-18** (supersedes v0.2)
 
