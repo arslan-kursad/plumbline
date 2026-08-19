@@ -257,3 +257,16 @@ raising the variable.
   quota and the Terraform-level limits are the controls that do not depend on
   anything executing.
 - **Reporting delay bounds the loss, it does not eliminate it.** See §1.
+- **Deploying the function creates storage this configuration does not own.**
+  A Gen2 function is built by Cloud Build into an auto-created `gcf-artifacts`
+  Artifact Registry repository. That repository is not a Terraform resource here,
+  it accumulates an image per deploy, and Artifact Registry's free allowance is
+  0.5 GB. One small function redeployed occasionally stays well inside it; nothing
+  in F0 enforces that. F2 owns Artifact Registry and its keep-last-2 cleanup
+  policy (architecture §8), and the same policy has to cover `gcf-artifacts` — not
+  only the repository this project creates for its own images.
+- **On a trial billing account the switch fires anyway.** Promotional credits are
+  not subtracted from the budget's spend (§1), so the first spend beyond Always
+  Free detaches billing even if a trial credit would have paid for it. That is the
+  intended behaviour — the project's claim is $0.00 gross — but it does mean trial
+  credit cannot be spent while the kill-switch is armed.
