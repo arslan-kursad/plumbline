@@ -1,6 +1,6 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.6 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
+**Version:** 0.7 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
 **Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
@@ -294,25 +294,33 @@ the Gate A / Gate B asymmetry: for every invariant, the spec names which control
 prevents and which merely reports.
 
 Repository security settings are configured manually (adding a GitHub Terraform provider
-for three toggles is disproportionate; the "nothing hand-created" rule in architecture §8
-scopes to GCP resources). Baseline at F0 start, verified via the repository API:
-`secret_scanning`, `secret_scanning_push_protection`, and
-`secret_scanning_validity_checks` all disabled. All three are enabled in W6.4 and the
-post-change API output is archived in `docs/runbooks/repository-settings.md` alongside
-the kill-switch evidence.
+for a handful of toggles is disproportionate; the "nothing hand-created" rule in
+architecture §8 scopes to GCP resources). Baseline at F0 start, verified via the
+repository API: `secret_scanning`, `secret_scanning_push_protection`, and
+`secret_scanning_validity_checks` all disabled. `secret_scanning` and
+`secret_scanning_push_protection` are enabled in W6.4 and the post-change API output is
+archived in `docs/runbooks/repository-settings.md` alongside the kill-switch evidence.
 
 The baseline above is verified, not assumed — `gh api repos/arslan-kursad/plumbline
 --jq '.security_and_analysis'` on 2026-08-18 returned `disabled` for all three.
 
-**Fourth setting — `secret_scanning_non_provider_patterns`, also enabled in W6.4.**
-Provider patterns match known vendor key formats. This repository's real future exposure
-sits outside them: plumbline mints its own API keys (architecture §6.3 — generated once,
-shown once, stored hashed), and those carry no provider signature. The concrete collision
-point is F1, where golden-file fixtures will contain OTLP payloads with key-like strings.
-Both outcomes are the wanted ones: either a real leak is caught, or the fixtures are
-forced to use values that are obviously fake and marked as such — the discipline a public
-repository should have anyway. Noise cost is low and alerts are dismissible. Extend the
-archived evidence in `docs/runbooks/repository-settings.md` to cover all four settings.
+**Two settings this spec asked for are not obtainable at zero cost.**
+`secret_scanning_validity_checks` and `secret_scanning_non_provider_patterns` are GitHub
+Secret Protection features, available on Team and Enterprise Cloud plans. This repository
+is owned by a personal account on the free plan: the API accepts the enabling request,
+returns HTTP 200, and leaves both `disabled`. Obtaining them means paying, and "no paid
+SaaS anywhere in the loop" is a zero-cost invariant of the project — so v0.6 of this spec
+required something the project's own invariant forbids. The invariant wins; the
+requirement is withdrawn, not quietly dropped.
+
+The exposure that motivated the non-provider request stands and is now uncovered by
+GitHub. Provider patterns match known vendor key formats; plumbline mints its own API
+keys (architecture §6.3 — generated once, shown once, stored hashed), which carry no
+provider signature, and the concrete collision point is F1, where golden-file fixtures
+will contain OTLP payloads with key-like strings. What remains is Gate C — detection
+after the push — plus the discipline of fixture values that are obviously fake and marked
+as such. **F1 owns making that discipline explicit rather than assumed**; it was the
+weaker half of the argument in v0.6 and is now the whole of it.
 
 **Runbook scope — the inventory is wider than W6.4.** A setting changed outside any work
 package is drift unless it is written down, and "drift = bug" is this project's own rule.
@@ -420,6 +428,40 @@ subset (file-path deny rules, command deny-list). Minimum content:
 ---
 
 ## Changelog
+
+**v0.7 — 2026-08-19** (supersedes v0.6) — W6 implementation.
+
+1. **§W6.4 corrected: two of the four secret-scanning settings are paid-plan
+   features.** `secret_scanning_validity_checks` and
+   `secret_scanning_non_provider_patterns` require GitHub Secret Protection (Team or
+   Enterprise Cloud). On this repository the enabling request returns HTTP 200 and
+   changes nothing. v0.6 therefore required a purchase that the zero-cost invariant
+   forbids. The requirement is withdrawn and the residual F1 exposure is stated instead
+   of being treated as covered. Evidence and the read-back discipline that exposed the
+   silent no-op: `docs/runbooks/repository-settings.md`.
+2. §W6.5's branch protection was already enabled on `main` before this work package,
+   outside any of them, and therefore undocumented — drift by this spec's own
+   definition. It is now recorded in `docs/runbooks/branch-protection.md` with its
+   pre-change state. Required status checks are added after the first green run, since
+   requiring a check that has never run blocks the pull request that would introduce it.
+3. Gates A–E are implemented with a repeatable prover (`scripts/ci/prove-gates.sh`)
+   rather than a one-time manual demonstration, and the prover runs in CI. §6's
+   requirement is that each gate be proven able to fail; a transcript stops being
+   evidence the moment the gate script changes, and the gate script will change.
+4. Gate B's coverage check is stricter than issue #5 required: it fails if any source
+   file sits outside the declared scan roots, not only if a new *top-level* source
+   directory appears. Source nested one level deeper would satisfy the top-level reading
+   while being scanned by nothing.
+5. Gate D scans workflow files (`*.yml`, `*.yaml`) under `.github/workflows/` rather
+   than everything in that directory. The first implementation failed on that
+   directory's `README.md`, which documents the trigger the workflow must not use. The
+   invariant is a property of workflow files, and the alternative fix — an exclusion
+   path — is how gates stop meaning anything (§W6.2).
+6. W6.3's path filtering is implemented without a third-party action — a `git diff` in
+   the workflow — and every job is aggregated into one `ci complete` status check.
+   Branch protection cannot distinguish a skipped job from one that never started, so
+   requiring the individual path-filtered jobs would stall docs-only pull requests
+   forever.
 
 **v0.6 — 2026-08-19** (supersedes v0.5) — W4/W5 implementation.
 
