@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.3 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-18
+**Version:** 0.4 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-19
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -288,6 +288,60 @@ secret-free by construction.
 Escape hatch: any spend > $0.00 for two consecutive days triggers an incident note in
 `docs/` — before the kill-switch makes the question moot.
 
+### 7.1 Terraform resource-type allowlist
+
+`CLAUDE.md` forbids creating Terraform resources outside "the resource-type
+allowlist (architecture §7)", and §7 named that allowlist without containing one.
+The list is below, and it is the normative one: `scripts/ci/terraform-plan-guard.sh`
+parses **this section** rather than keeping a second copy, so the document and the
+control cannot drift apart.
+
+A type absent from this table is not merely unreviewed, it is refused by the guard.
+Adding one is a spec change with an entry in this changelog — which is the point:
+the resource classes that end the zero-cost envelope (a managed database, a load
+balancer, a reserved IP, a VM) all arrive as a resource type nobody argued about.
+
+| Resource type | Introduced | Role |
+| --- | --- | --- |
+| `google_project_service` | F0 | Enabling the APIs the footprint uses |
+| `google_storage_bucket` | F0 | Terraform state; Cloud Function source; both inside the 5 GB free tier |
+| `google_storage_bucket_object` | F0 | Function source archive |
+| `google_storage_bucket_iam_member` | F0 | State-bucket access for the CI identity |
+| `google_service_account` | F0 | Per-component identities |
+| `google_service_account_iam_member` | F0 | Workload Identity Federation binding to a service account |
+| `google_project_iam_member` | F0 | Project-scoped role grants |
+| `google_cloud_run_service_iam_member` | F0 | Invoker grants scoped to one service |
+| `google_pubsub_topic` | F0 | `billing-alerts`; F2 adds `traces` and `traces-dlq` |
+| `google_cloudfunctions2_function` | F0 | Billing kill-switch only |
+| `google_billing_budget` | F0 | Budget feeding the kill-switch |
+| `google_cloud_quotas_quota_preference` | F0 | Project-level BigQuery query quota |
+| `google_iam_workload_identity_pool` | F0 | CI identity federation (§6.1) |
+| `google_iam_workload_identity_pool_provider` | F0 | GitHub OIDC provider with attribute conditions |
+| `google_pubsub_subscription` | F2 | OIDC push subscription and the DLQ pull subscription (§3.2, §3.4) |
+| `google_bigquery_dataset` | F2 | Dataset `plumbline` |
+| `google_bigquery_table` | F2 | `spans`, views, `eval_results` (§4.1) |
+| `google_firestore_database` | F2 | Metadata store (§4.2) |
+| `google_cloud_run_v2_service` | F2 | `collector`, `ingestion-worker`, `analytics-api` |
+| `google_artifact_registry_repository` | F2 | Distroless images, keep-last-2 cleanup policy (§8) |
+| `google_cloud_scheduler_job` | F3 | Nightly eval batch (§2.5) |
+| `google_monitoring_alert_policy` | F2 | DLQ depth alert (§3.4) |
+| `google_monitoring_notification_channel` | F2 | Destination for the above |
+
+Named and refused, because each has been reached for by someone solving a problem
+this design solves differently: `google_sql_*` (no Cloud SQL — §9),
+`google_redis_*` (a shared rate limiter is the rejected fix for §6.2),
+`google_compute_*` (no VMs, no load balancers, no reserved addresses),
+`google_container_*` (no GKE), `google_cloud_run_domain_mapping` (no custom
+domain), and `google_service_account_key` — an exported key is what §6.1 exists to
+avoid, and Gate C only detects one after it has been written.
+
+Three further plan-time assertions ride along with the type check, because each
+enforces a `CLAUDE.md` hard invariant that otherwise had no mechanical control:
+Cloud Run and Cloud Functions scaling stays `min = 0` and `max <= 2`; every
+resource carrying a region or location is `us-central1`; and no Pub/Sub topic
+declares `message_retention_duration`, which is the paid retention feature §2.2
+forbids.
+
 ---
 
 ## 8. Deployment Topology
@@ -349,6 +403,20 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.4 — 2026-08-19** — F0 spec W4/W5.
+
+1. **§7.1 added — the Terraform resource-type allowlist now exists.** `CLAUDE.md`
+   and F0 spec W5 both instruct that no resource may be created outside "the
+   allowlist (architecture §7)", and §7 referred to a list this document never
+   contained. Every consumer of that rule — the plan-diff guard above all — was
+   therefore unimplementable as specified. The allowlist is enumerated here, and
+   `scripts/ci/terraform-plan-guard.sh` parses this section directly rather than
+   holding a copy, so there is one source of truth and no drift to detect.
+2. §7.1 also records the three plan-time assertions that accompany the type check
+   (Cloud Run scaling bounds, region, Pub/Sub topic retention). Each was a hard
+   invariant in `CLAUDE.md` with no enforcement point named in §7; naming them
+   here keeps the §7 register's promise that every invariant states what holds it.
 
 **v0.3 — 2026-08-18** — F0 spec W2.
 
