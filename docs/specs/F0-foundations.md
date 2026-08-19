@@ -1,6 +1,6 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.4 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
+**Version:** 0.5 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
 **Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
@@ -78,7 +78,8 @@ Federation (no exported SA keys).
 - Terraform for Pub/Sub, BigQuery, Firestore, Cloud Run application services (F2).
   F0 Terraform covers only: state backend, provider pinning, kill-switch resources,
   project-level quota/guardrail settings.
-- Freezing `eval-plan.md` (draft in F0; freeze is the F1 entry gate).
+- Freezing `eval-plan.md` (draft in F0; Freeze A is the F1 entry gate, Freeze B is at F3
+  — see W3).
 - Dashboards, SPA, load generator (F4).
 - A deploy-capable CI identity. F0 CI authenticates read-only (build, validate, plan).
   The deploy service account and its branch-scoped binding land in F2; only the binding
@@ -371,7 +372,8 @@ controls, often confused:
    statement that the PR requirement does not by itself produce review.
 5. ADR-0001..0005 in `docs/adr/`, 0002–0005 Accepted after review; ADR-0004 records the
    grep-insufficiency rationale.
-6. `docs/eval-plan.md` draft PR open (not frozen).
+6. `docs/eval-plan.md` present on `main` with Status `DRAFT — NOT FROZEN`; Freeze A is a
+   separate, explicitly tagged human action and is **not** part of F0.
 7. **Kill-switch live-fired**: billing detached by the function during the test,
    evidence archived, re-attach runbook written. Billing re-attached afterward.
 8. CI pipeline green on `main` via WIF; WIF provider carries the repository+owner
@@ -417,6 +419,19 @@ subset (file-path deny rules, command deny-list). Minimum content:
 ---
 
 ## Changelog
+
+**v0.5 — 2026-08-19** (supersedes v0.4)
+
+1. Acceptance criterion 6 rewritten. "Draft PR open (not frozen)" was inconsistent with
+   the rest of the design on three counts: eval plan §2 defines Freeze A as an annotated
+   tag plus the file's SHA-256, and a file that is not on `main` cannot be tagged;
+   CLAUDE.md makes `docs/` the source of truth, so declaring F0 done while
+   `docs/eval-plan.md` exists only on a branch contradicts it; and an open PR is not a
+   durable state — it rots and conflicts once F1 starts. The draft property is carried by
+   the file's own `Status: DRAFT — NOT FROZEN` header, which survives the merge, rather
+   than by the review state of a pull request.
+2. §2 out-of-scope entry aligned with the two-stage freeze introduced in v0.4; it still
+   said "freeze is the F1 entry gate", which is true of Freeze A only.
 
 **v0.4 — 2026-08-19** (supersedes v0.3)
 
