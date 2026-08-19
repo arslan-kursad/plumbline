@@ -340,6 +340,8 @@ raised rather than resolved silently.
 3. SPA export cadence & payload size budget for GitHub Pages — confirm in F4.
 4. Claude Code emitter: confirm actual resource/scope markers for dialect detection
    against a captured sample before freezing its mapping YAML (F1).
+   Capture evidence: `docs/evidence/claude-code-otel-capture.md` (scope marker measured;
+   tool/hook spans still unobserved).
 5. GitHub Pages push credential for the nightly export (ADR-0005): scope, storage, and
    rotation. The export job needs repository write access, which is the first secret in
    an otherwise secret-free design (§6.3). Decide in F4, before the exporter is written.
