@@ -10,6 +10,15 @@ Claude Code fixture is born in F1 with its own golden-file tests and its own man
 (`docs/eval-plan.md` SC-1 row 1.2). The raw capture is not in this repository and never
 was — see §5.
 
+> **Capture scope — known limit.** Confirmed against every capture: **resource attributes
+> and instrumentation scope**, plus two span types (`claude_code.interaction`,
+> `claude_code.llm_request`) and their attributes. The emitter's event level was **not
+> exercised**: zero `claude_code.*` events were produced, and the only event of any kind is
+> `gen_ai.request.attempt`. Everything this file says about event-level attributes —
+> `workspace.host_paths` above all — is therefore documentation, not measurement. Detection
+> conclusions (§6) rest on resource and scope, which are fully measured; mapping conclusions
+> do not. §3 states the reason and what closing the gap requires.
+
 ---
 
 ## 1. Manifest
@@ -79,9 +88,11 @@ attributes here would have hidden the exposure being documented.
 
 Stated explicitly, because evidence that overstates its reach is worse than none.
 
-**Observed.** `claude_code.interaction` (root) and `claude_code.llm_request` (child),
-resource attribute set, instrumentation scope, span attributes on both span types, one
-span event, status shape, absence of `schemaUrl`.
+**Observed.** `claude_code.interaction` (root, 3 spans) and `claude_code.llm_request`
+(child, 6 spans), resource attribute set, instrumentation scope, span attributes on both
+span types, one span event name (`gen_ai.request.attempt`, 4 occurrences), status shape,
+absence of `schemaUrl`. The resource attribute key set and the scope were identical in
+every capture.
 
 **Not observed.**
 
@@ -302,6 +313,11 @@ decisions. None of them is resolved in this file.
 ---
 
 ## Changelog
+
+**v0.2 — 2026-08-19** — capture scope confirmed against all three captures and stated as a
+known limit in the header: resource and scope are measured, the `claude_code.*` event level
+was never exercised. §3 carries the per-span counts. No new capture; no change to any
+measured value.
 
 **v0.1 — 2026-08-19** — first capture. Answers OQ-4 on scope markers; tool/hook spans and
 event-level attributes unobserved (§3).
