@@ -187,9 +187,21 @@ resource "google_billing_budget" "zero_spend" {
   budget_filter {
     projects = ["projects/${data.google_project.this.number}"]
 
-    # Free-trial and promotional credits must not mask spend: the project's claim
-    # is $0.00 gross, not $0.00 after credits.
-    credit_types_treatment = "EXCLUDE_ALL_CREDITS"
+    # Counter-intuitive on purpose; do not "correct" this to EXCLUDE_ALL_CREDITS
+    # (ADR-0004 Amendment 1).
+    #
+    # Always Free is not an absence of charge: it is a FREE_TIER credit applied
+    # against a non-zero gross cost line. Excluding all credits would therefore
+    # make the budget report spend during entirely free operation, and this chain
+    # detaches billing on any reported spend — a false positive that takes the
+    # project down and cannot be undone by the system, since re-attachment is
+    # human-only by design.
+    #
+    # Subtracting FREE_TIER and nothing else gives the intended meaning: usage
+    # beyond Always Free is visible immediately, and PROMOTION credits — which
+    # cover the Free Trial and marketing grants — cannot mask it.
+    credit_types_treatment = "INCLUDE_SPECIFIED_CREDITS"
+    credit_types           = ["FREE_TIER"]
   }
 
   amount {

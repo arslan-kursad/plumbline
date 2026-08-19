@@ -28,10 +28,47 @@ Consequences, stated rather than discovered later:
   budget data as delayed; the window between the first billable byte and the
   notification carrying it is real and is not controlled by this project. The
   kill-switch bounds the loss, it does not make it zero.
-- Credits are excluded from the budget filter (`EXCLUDE_ALL_CREDITS`). A free
-  trial credit must not mask spend: the project's claim is $0.00 gross.
+- The budget subtracts **Free Tier credits only** — see "Spend basis" below. A
+  promotional credit must not mask spend; Always Free must not be mistaken for it.
 - A cost update below the smallest reported amount is not visible to the
   function. In practice the first non-zero report fires it.
+
+### Spend basis
+
+The budget measures gross cost minus Free Tier credits only
+(`INCLUDE_SPECIFIED_CREDITS` with `credit_types = ["FREE_TIER"]`). Promotional
+credits — the Free Trial and marketing grants, which Cloud Billing groups under
+`PROMOTION` — are **not** subtracted, so spend beyond the Always Free tier is
+visible immediately even when a promotional credit is paying for it. Free Tier
+usage nets to zero and does not trigger the switch.
+
+Always Free is a credit against a non-zero gross cost line, not an absence of
+charge. Excluding all credits — the first implementation — would make the budget
+report spend during entirely free operation, and this chain detaches billing on
+any reported spend. See ADR-0004 Amendment 1.
+
+**Verification A — documented behaviour. Performed once, at setup. NOT YET DONE.**
+
+Billing → Reports → clear the savings and credit filters. A non-zero usage cost
+alongside a $0.00 net total confirms that Free Tier is credit-implemented, which
+is the premise the spend basis rests on. Record the date and the observed figures
+here:
+
+> Not yet executed. There is no billing account yet. Until this is recorded, the
+> spend basis rests on Google's documentation alone — which states that free-tier
+> services apply credits to implement the free usage — and not on an observation
+> of this account.
+
+If the observation contradicts the premise, stop: the amendment is withdrawn, not
+patched.
+
+**Verification B — empirical. F2, with services running.**
+
+Capture a real budget notification from `billing-alerts` while Cloud Run services
+are serving traffic, and assert `costAmount = 0.00`. Archive the redacted payload
+next to the live-fire evidence. This is the only check that covers the
+budget → notification segment; the live-fire does not reach it. Registered as an
+F2 acceptance criterion.
 
 ## 2. Human prerequisites (F0 spec W4, human-only)
 
@@ -107,7 +144,32 @@ details. Crop before committing.
 > Leaving it empty while claiming F0 complete would be exactly the silent
 > degradation this project rejects.
 
+**What this test does not cover.** The live-fire publishes a synthetic message and
+exercises Pub/Sub → function → detach. It says nothing about how the budget
+computes the cost figure the function reads: a spend-basis defect sits upstream of
+the boundary this test starts at, and a green live-fire is not evidence against
+one. That segment is covered by Verification B in §1, in F2.
+
 ## 5. Re-attach procedure (manual, human-only)
+
+### Triage first — a fire is not self-evidently a true positive
+
+Before re-attaching, establish which case you are in:
+
+1. Read the function's logged decision inputs: reported cost, currency, the
+   threshold flag, and the cost interval. (`budgetAmount` is not logged on
+   purpose — it is a constant of `infra/terraform/killswitch.tf`, so the
+   configuration is the better source than a log line.)
+2. Compare against the billing report for the same interval **with credits
+   applied**.
+3. Net cost above $0.00 → **true positive.** Find and remove the paid resource
+   before re-attaching, or the switch fires again.
+4. Net cost of $0.00 → **false positive**, most likely credit-application lag
+   (ADR-0004 Amendment 1, residual risk). Record the payload: it is the input to
+   the F2 decision between an epsilon threshold and a two-update confirmation
+   rule. Do not invent either mitigation on the spot.
+
+### Re-attaching
 
 The kill-switch identity holds `roles/billing.projectManager` **on the project**
 only. It can detach and cannot re-attach — deliberate: re-attaching spend is a
@@ -142,6 +204,12 @@ Set by `infra/terraform/quota.tf` as a Cloud Quotas preference on
 
 Arithmetic: 20 GiB/day over a 31-day month is 620 GiB, about 60% of the monthly
 free tier, leaving headroom for Looker Studio and eval runs in the same month.
+
+**Assumption, stated so it is not silently outgrown:** the 1 TiB/month free query
+allowance is per *billing account*, not per project. This quota is per project. A
+second project on the same billing account would consume the same allowance while
+this quota kept reporting compliance, so the headroom above is a property of this
+billing account having one project in it.
 The variable's validation refuses anything above 33825 MiB/day, the point at
 which a full month at the daily limit would leave the free tier.
 

@@ -188,8 +188,105 @@ either version alone.
 - **Terraform owns every GCP resource** (§8); anything hand-created is drift, and drift is
   a bug.
 
+## Amendment 1 (2026-08-19) — Budget spend basis
+
+Status unchanged: the decision above stands. What is corrected is one parameter of §5 —
+the basis on which the budget computes the number the kill-switch function reads.
+
+### Problem
+
+The chain was implemented with the budget filter set to `EXCLUDE_ALL_CREDITS`. The intent
+was right: promotional credits — the Free Trial and marketing grants, which Cloud Billing
+groups under the `PROMOTION` credit type — act as a form of payment, and a net-cost basis
+would sit at $0.00 while real money was being consumed.
+
+The setting overshoots. Budgets compute spend as gross cost minus the *selected* credits;
+with all credits excluded, spend is gross cost. Always Free is not an absence of charge —
+it is a `FREE_TIER` credit applied against a non-zero gross cost line. Under
+`EXCLUDE_ALL_CREDITS` the budget therefore reports spend above zero during entirely
+normal, entirely free operation.
+
+Consequences of leaving it:
+
+- The kill-switch detaches billing on the first Cloud Run request in F2, while the
+  invoice reads $0.00.
+- The failure is not recoverable by the system. Re-attachment is human-only by design
+  (§5), so a false positive is an outage rather than a blip.
+- **The F0 live-fire cannot detect it.** The live-fire publishes a synthetic message and
+  exercises Pub/Sub → function → detach. This defect is upstream of that boundary, in how
+  the budget computes the number the function reads. A passing live-fire is not evidence
+  against this class of defect, and the runbook now says so where the evidence is
+  archived.
+
+### Decision
+
+Subtract the Free Tier credit type and nothing else:
+
+```hcl
+budget_filter {
+  credit_types_treatment = "INCLUDE_SPECIFIED_CREDITS"
+  credit_types           = ["FREE_TIER"]
+}
+```
+
+`credit_types` may only be non-empty under `INCLUDE_SPECIFIED_CREDITS`; any other
+treatment requires it empty, so a mismatch fails at the API rather than degrading
+silently. The enum values were read from the Cloud Billing credit-type reference, not
+from memory: `FREE_TIER` is the free-tier credit, and `PROMOTION` is the type that covers
+the Free Trial and campaign grants.
+
+This yields the intended semantics exactly: **any spend not covered by Always Free fires
+the switch, and promotional credits cannot mask it** — on a trial account and on a paid
+one alike, so the control does not depend on which kind of account it is pointed at.
+
+No change to the Cloud Function. The `costAmount > 0` comparison and its zero-boundary
+and permanent-versus-retryable tests remain valid; only the meaning of `costAmount`
+changes, and it changes to what this design always intended it to mean.
+
+### Alternatives considered
+
+| Option | Free Tier reads as spend | Promotional credit masks spend | Verdict |
+|---|---|---|---|
+| `INCLUDE_ALL_CREDITS` (API default) | no | **yes** | Rejected: the original risk stands. |
+| `EXCLUDE_ALL_CREDITS` (as first built) | **yes** | no | Rejected: false-positive detach during normal operation. |
+| `INCLUDE_SPECIFIED_CREDITS` + `FREE_TIER` | no | no | **Adopted.** |
+| Non-zero (epsilon) threshold | n/a | n/a | Deferred to F2 — see residual risk below. |
+
+### Consequences
+
+1. The F0 live-fire stays a valid test of the Pub/Sub → function → detach segment and is
+   **not** re-run for this change. Its scope limit is now written down rather than
+   implied.
+2. A new empirical criterion lands in F2: with services deployed and serving traffic, a
+   **real** budget notification must show `costAmount = 0.00`. It is the only test that
+   exercises the budget → message segment, and it is vacuous before F2 because nothing
+   billable is running.
+3. A detach is human-irreversible, so a fire must be triageable from the function's own
+   log output. The function already logs the per-invocation decision inputs — reported
+   cost, currency, threshold flag and cost interval. `budgetAmount` is deliberately not
+   among them: it is a constant of the Terraform configuration, not per-invocation data,
+   and reading it from the log rather than from the configuration would be the weaker
+   source. The triage sequence in the runbook names the fields that exist.
+
+### Residual risk — deliberately not decided here
+
+Credit application can lag usage reporting. If a `FREE_TIER` credit lands in a later
+budget update than the usage it offsets, a transient non-zero cost is possible while the
+account is genuinely free. Two mitigations are candidates: an epsilon threshold — an
+explicit, documented relaxation of "any spend above $0" — or a two-consecutive-updates
+confirmation rule, which trades a bounded exposure window for false-positive immunity at
+the cost of function state.
+
+**Neither is adopted now.** Choosing before observing real notification sequences would
+substitute a guess for a measurement, in the one control whose whole argument is that it
+was tested rather than assumed. The decision is taken in F2 against captured payloads and
+recorded as a further amendment. Until then the residual risk is accepted and stated, not
+mitigated by assumption.
+
 ## References
 
-- `docs/architecture.md` §2.3, §6.2, §7, §8.
+- `docs/architecture.md` §2.3, §6.2, §7, §7.1, §8.
 - `docs/specs/F0-foundations.md` §W4, §W6.2, §W6.4, §W6.5, §W6.6, §5, §6.
 - ADR-0001, ADR-0002, ADR-0003, ADR-0005 — each names its controls against this taxonomy.
+- Cloud Billing credit types (`FREE_TIER`, `PROMOTION`, …) and the rule that
+  `credit_types` is non-empty only under `INCLUDE_SPECIFIED_CREDITS` — Amendment 1.
