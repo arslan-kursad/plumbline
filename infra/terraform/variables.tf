@@ -28,15 +28,29 @@ variable "region" {
   }
 }
 
-variable "budget_amount_usd" {
+variable "budget_amount" {
   description = <<-EOT
-    Budget amount in whole USD. The budget is not the trigger: notifications are
-    published on every cost update (all_updates_rule) and the function detaches
-    billing whenever reported cost is strictly greater than zero. The amount only
-    scales the threshold rule that records "budget exceeded" in the alert stream.
+    Budget amount in whole units of the billing account's own currency. The budget
+    is not the trigger: notifications are published on every cost update
+    (all_updates_rule) and the function detaches billing whenever reported cost is
+    strictly greater than zero. The amount only scales the threshold rule that
+    records "budget exceeded" in the alert stream, so its currency is immaterial to
+    the control.
   EOT
   type        = string
   default     = "1"
+}
+
+variable "budget_currency_code" {
+  description = <<-EOT
+    ISO 4217 currency for the budget amount. Left null on purpose: the Budget API
+    requires a specified currency to match the billing account's currency exactly,
+    and rejects the create otherwise. Omitting it inherits the account's currency,
+    so this configuration is portable across billing accounts rather than pinned to
+    whichever one it was first written against.
+  EOT
+  type        = string
+  default     = null
 }
 
 variable "bigquery_daily_query_quota_mib" {
