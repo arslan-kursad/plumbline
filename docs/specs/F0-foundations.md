@@ -461,7 +461,10 @@ subset (file-path deny rules, command deny-list). Minimum content:
    the workflow — and every job is aggregated into one `ci complete` status check.
    Branch protection cannot distinguish a skipped job from one that never started, so
    requiring the individual path-filtered jobs would stall docs-only pull requests
-   forever.
+   forever. Filtering applies to pull requests only: on `main` every job runs, because
+   W6.3's "all jobs green on empty scaffolds" is not satisfied by jobs that were
+   skipped — a broken job configuration would otherwise stay green until F1 touched its
+   directory.
 
 **v0.6 — 2026-08-19** (supersedes v0.5) — W4/W5 implementation.
 

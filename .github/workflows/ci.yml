@@ -8,6 +8,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manual full run, for when a job needs re-running without a commit to force it.
+  workflow_dispatch:
 
 # Read-only by default. The single job that authenticates to GCP raises its own
 # permissions and nothing else can.
@@ -36,11 +38,16 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_REF: ${{ github.base_ref }}
-          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
-          # Any doubt about what changed means everything runs. A path filter
+          # Path filtering applies to pull requests only. On main every job
+          # runs, so "green on main" means every job actually ran and passed —
+          # with filtering there too, a job whose configuration is broken stays
+          # skipped and green until the phase that finally touches its
+          # directory (F0 spec §W6.3).
+          #
+          # Any doubt about what changed also means everything runs. A filter
           # that guesses wrong silently skips the job that would have caught the
           # defect, so its failure mode has to be "too much CI", never "too
           # little".
@@ -48,8 +55,6 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then
             git fetch --quiet origin "$BASE_REF"
             range="origin/${BASE_REF}...HEAD"
-          elif [ -n "${BEFORE:-}" ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            range="${BEFORE}..HEAD"
           fi
 
           if [ -n "$range" ]; then

@@ -14,6 +14,10 @@ Posture (F0 spec §W6.1, §W6.3):
   moving tag is a supply-chain decision made by someone else.
 - No exported service account key: GCP access is a short-lived token from
   Workload Identity Federation.
+- Path filtering applies to pull requests only. On `main` every job runs, so
+  "green on `main`" means every job actually ran — a job whose configuration is
+  broken would otherwise stay skipped and green until the phase that finally
+  touches its directory.
 - `terraform plan (wif)` stays skipped until the GCP repository variables exist.
   A skipped job proves nothing, which is why F0 acceptance criterion 8 is tied to
   a specific authenticated run recorded in the completion note.
