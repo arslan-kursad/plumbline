@@ -20,11 +20,11 @@ is open is the failure this project is written against.
 | 4 | Repository public; `main` protection enabled **and** its scope recorded | **met** | [`runbooks/branch-protection.md`](../runbooks/branch-protection.md). Protection predated the runbook and was undocumented drift; required status checks are added after the first green run on `main` (§3.5) |
 | 5 | ADR-0001..0005, 0002–0005 Accepted; ADR-0004 records the grep-insufficiency rationale | **met** | [`docs/adr/`](../adr/) |
 | 6 | `docs/eval-plan.md` on `main`, `DRAFT — NOT FROZEN` | **met** | PR #6 |
-| 7 | **Kill-switch live-fired**, evidence archived, billing re-attached | **open** | Configuration and procedure ready: [`runbooks/kill-switch.md`](../runbooks/kill-switch.md). §4 of that file is empty and says so |
+| 7 | **Kill-switch live-fired**, evidence archived, billing re-attached | **open** (#17) | Configuration and procedure ready: [`runbooks/kill-switch.md`](../runbooks/kill-switch.md). §4 of that file is empty and says so |
 | 8 | CI green on `main` via WIF; provider carries the repository+owner condition; zero exported SA keys | **partly met** | Pipeline green on PR #15 (run [32282075482](https://github.com/arslan-kursad/plumbline/actions/runs/32282075482)); WIF configuration written with the attribute condition; **no authenticated run has happened**, because the identity does not exist yet |
 | 9 | Gates A–E active **and each proven to fail** | **met** | [`evidence/f0-gate-proofs.md`](../evidence/f0-gate-proofs.md); `prove-gates.sh` runs in CI on every build |
-| 10 | `terraform plan` clean; state in the GCS backend | **open** | `fmt`/`validate` pass in CI; `plan` needs the project |
-| 11 | GCP bill for the period: **$0.00** | **open** | No project, no bill. Not the same as a verified $0.00 |
+| 10 | `terraform plan` clean; state in the GCS backend | **open** (#17) | `fmt`/`validate` pass in CI; `plan` needs the project |
+| 11 | GCP bill for the period: **$0.00** | **open** (#17) | No project, no bill. Not the same as a verified $0.00 |
 
 ## 2. What the phase produced beyond the checklist
 
@@ -72,7 +72,8 @@ the repository.
    run's URL in criterion 8 above. Closes criterion 8.
 6. **Check the bill** at the end of the billing period. Closes criterion 11.
 
-Tracked as an issue so it does not live only in this file.
+Tracked as [issue #17](https://github.com/arslan-kursad/plumbline/issues/17), so the
+remaining work does not live only in this file.
 
 ## 4. Notes for whoever closes this
 
