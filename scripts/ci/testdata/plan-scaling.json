@@ -1,0 +1,19 @@
+{
+  "format_version": "1.2",
+  "_comment": "Cloud Run service that never scales to zero and scales past two instances.",
+  "resource_changes": [
+    {
+      "address": "google_cloud_run_v2_service.collector",
+      "type": "google_cloud_run_v2_service",
+      "name": "collector",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "name": "collector",
+          "location": "us-central1",
+          "template": [ { "scaling": [ { "min_instance_count": 1, "max_instance_count": 5 } ] } ]
+        }
+      }
+    }
+  ]
+}

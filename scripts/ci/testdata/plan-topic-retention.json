@@ -1,0 +1,15 @@
+{
+  "format_version": "1.2",
+  "_comment": "Topic-level retention is a paid feature; the DLQ path relies on subscription retention instead (architecture §2.2, §3.4).",
+  "resource_changes": [
+    {
+      "address": "google_pubsub_topic.traces",
+      "type": "google_pubsub_topic",
+      "name": "traces",
+      "change": {
+        "actions": ["create"],
+        "after": { "name": "traces", "message_retention_duration": "604800s" }
+      }
+    }
+  ]
+}

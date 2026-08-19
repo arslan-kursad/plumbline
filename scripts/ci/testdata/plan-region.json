@@ -1,0 +1,15 @@
+{
+  "format_version": "1.2",
+  "_comment": "Right resource type, wrong region: everything lives in us-central1 (architecture §8).",
+  "resource_changes": [
+    {
+      "address": "google_storage_bucket.function_source",
+      "type": "google_storage_bucket",
+      "name": "function_source",
+      "change": {
+        "actions": ["create"],
+        "after": { "name": "example-function-source", "location": "us-east1" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.0",
+  "_comment": "Trimmed `terraform show -json` output for the F0 footprint. Fixture for scripts/ci/terraform-plan-guard.sh --self-test.",
+  "resource_changes": [
+    {
+      "address": "google_pubsub_topic.billing_alerts",
+      "type": "google_pubsub_topic",
+      "name": "billing_alerts",
+      "change": {
+        "actions": ["create"],
+        "after": { "name": "billing-alerts", "message_retention_duration": null }
+      }
+    },
+    {
+      "address": "google_storage_bucket.function_source",
+      "type": "google_storage_bucket",
+      "name": "function_source",
+      "change": {
+        "actions": ["create"],
+        "after": { "name": "example-function-source", "location": "us-central1" }
+      }
+    },
+    {
+      "address": "google_cloudfunctions2_function.killswitch",
+      "type": "google_cloudfunctions2_function",
+      "name": "killswitch",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "name": "billing-killswitch",
+          "location": "us-central1",
+          "service_config": [
+            { "min_instance_count": 0, "max_instance_count": 1, "available_memory": "256Mi" }
+          ]
+        }
+      }
+    },
+    {
+      "address": "google_project_iam_member.killswitch_billing_manager",
+      "type": "google_project_iam_member",
+      "name": "killswitch_billing_manager",
+      "change": {
+        "actions": ["create"],
+        "after": { "role": "roles/billing.projectManager" }
+      }
+    },
+    {
+      "address": "google_billing_budget.zero_spend",
+      "type": "google_billing_budget",
+      "name": "zero_spend",
+      "change": { "actions": ["create"], "after": { "display_name": "plumbline zero-spend" } }
+    }
+  ]
+}
