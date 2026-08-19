@@ -47,12 +47,30 @@ charge. Excluding all credits — the first implementation — would make the bu
 report spend during entirely free operation, and this chain detaches billing on
 any reported spend. See ADR-0004 Amendment 1.
 
-**Verification A — documented behaviour. Performed once, at setup. NOT YET DONE.**
+**Currency.** The budget's currency is not set in Terraform. The Budget API
+rejects a create whose currency differs from the billing account's, and this
+account does not bill in the currency the configuration was first written with;
+inheriting the account's currency is both correct and portable. The synthetic
+live-fire message below carries the account's currency for realism only — the
+function compares `costAmount` against zero and never reads `currencyCode`, so a
+mismatch there changes nothing.
+
+**Verification A — documented behaviour. Performed once, after the first apply.
+NOT YET DONE.**
 
 Billing → Reports → clear the savings and credit filters. A non-zero usage cost
-alongside a $0.00 net total confirms that Free Tier is credit-implemented, which
-is the premise the spend basis rests on. Record the date and the observed figures
-here:
+alongside a net total of zero confirms that Free Tier is credit-implemented, which
+is the premise the spend basis rests on.
+
+**Timing matters and is easy to get wrong.** An empty project produces no usage
+line at all, so both figures read zero and the check confirms nothing. Run it
+*after* `terraform apply`, once the kill-switch function has been built and
+deployed — the Cloud Build run, the Artifact Registry storage and the function's
+own invocations are free-tier usage, which is exactly the shape this verification
+needs. Billing data lags by up to a day, so this is a next-morning step, not a
+same-minute one.
+
+Record the date and the observed figures here:
 
 > Not yet executed. There is no billing account yet. Until this is recorded, the
 > spend basis rests on Google's documentation alone — which states that free-tier
@@ -106,7 +124,7 @@ gcloud beta billing projects describe "$PROJECT_ID"
 # 1. Publish a synthetic notification carrying non-zero cost.
 gcloud pubsub topics publish billing-alerts \
   --project "$PROJECT_ID" \
-  --message '{"budgetDisplayName":"plumbline zero-spend","alertThresholdExceeded":1.0,"costAmount":0.01,"budgetAmount":1.0,"currencyCode":"USD","costIntervalStart":"LIVE-FIRE"}'
+  --message '{"budgetDisplayName":"plumbline zero-spend","alertThresholdExceeded":1.0,"costAmount":0.01,"budgetAmount":1.0,"currencyCode":"TRY","costIntervalStart":"LIVE-FIRE"}'
 
 # 2. Watch the function decide.
 gcloud functions logs read billing-killswitch \
