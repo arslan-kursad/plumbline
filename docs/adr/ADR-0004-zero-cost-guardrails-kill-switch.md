@@ -58,10 +58,11 @@ Its job is to bound the loss, not to be the control.
 - **Gate A (load-bearing, prevent):** no `Google.Cloud.BigQuery.V2` reference in any
   `*.csproj` or `Directory.Packages.props`. If the package is absent, the forbidden API
   surface is unreachable regardless of what the symbols are called.
-- **Gate B (secondary, report):** path-scoped symbol scan over `collector/**/*.go`,
-  `worker/**/*.cs`, `analytics/**/*.cs` for the streaming-insert symbol set. Scoped by a
-  path allowlist, not a file denylist — documentation will keep naming these symbols and
-  must never need an exclusion entry.
+- **Gate B (secondary, report):** path-scoped symbol scan over the declared source
+  roots for the streaming-insert symbol set. Scoped by a path allowlist, not a file
+  denylist — documentation will keep naming these symbols and must never need an
+  exclusion entry. The root list is declared once in the gate script, and the gate
+  fails if source appears outside it: shrinking coverage has to be a visible decision.
 - **Code review is not an enforcement point** for this invariant and is recorded as such.
 
 ### 4. Pattern notation
