@@ -1,6 +1,6 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.5 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
+**Version:** 0.6 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
 **Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
@@ -229,7 +229,8 @@ relying on default GitHub behavior.
 - No SA key JSON anywhere — enforced by Gate C below, not by convention.
 
 Workflow-level rules:
-- `pull_request_target` is not used anywhere in the repository (Gate D).
+- `pull_request_target` is not used in any workflow file (Gate D, scoped to
+  `.github/workflows/` — the only location GitHub reads workflows from).
 - Top-level `permissions:` is `contents: read`. `id-token: write` is granted only on the
   single job that authenticates to GCP.
 - That job is additionally guarded by
@@ -419,6 +420,44 @@ subset (file-path deny rules, command deny-list). Minimum content:
 ---
 
 ## Changelog
+
+**v0.6 — 2026-08-19** (supersedes v0.5) — W4/W5 implementation.
+
+1. §W6.1 corrected: Gate D's scope was stated as the whole repository there and as
+   `.github/workflows/` in §W6.2. The path-scoped statement is authoritative — the
+   string is a property of workflow files, GitHub reads workflows from that path
+   only, and a mention in documentation is not a defect. Same exemption already
+   granted to Gate B in §W6.2. Closes issue #4, whose blocking condition was that
+   this merge precede W6 implementation.
+2. **W5's plan-diff guard was unimplementable as written and is now implementable.**
+   It asserts "no resource types outside the allowlist (arch §7)"; architecture §7
+   named an allowlist it did not contain, as does `CLAUDE.md`. The list now exists
+   as architecture §7.1 (v0.4), and the guard parses that section rather than
+   keeping a second copy.
+3. The guard carries three assertions beyond the two this spec named — region,
+   Pub/Sub topic retention, and the existing Cloud Run scaling bounds extended to
+   Cloud Functions Gen2, which run on Cloud Run and were otherwise unchecked. Each
+   enforces a `CLAUDE.md` hard invariant that had no mechanical control; recorded
+   in architecture §7.1 rather than left as undocumented strictness.
+4. W4 implementation decisions, recorded because each is a place where the spec's
+   wording and the platform's behaviour do not line up one-to-one:
+   - "Budget threshold: alert at any spend > $0" is implemented as budget
+     `all_updates_rule` — a notification on every cost update — plus a strictly
+     greater than zero comparison in the function. The Budget API has no zero
+     threshold, so the threshold rule alone could not express the requirement.
+   - Credits are excluded from the budget filter: a trial credit must not mask
+     gross spend.
+   - The BigQuery custom query quota value W4 leaves to be chosen and documented
+     is **20480 MiB/day (20 GiB)**, against a 200 TiB/day platform default; the
+     arithmetic against the 1 TiB/month free query tier is in
+     `docs/runbooks/kill-switch.md` §6.
+   - A `bootstrap/` module with local state creates the GCS state bucket, since
+     the root module's backend cannot be a bucket that module has yet to create.
+   - The kill-switch identity can detach billing and cannot re-attach it, making
+     the re-attach procedure human-only by construction rather than by convention.
+5. Acceptance criteria 7, 8, 10 and 11 remain open after this work package by
+   construction: they require a GCP project, a linked billing account, and an
+   observed live-fire, none of which can be produced from the repository.
 
 **v0.5 — 2026-08-19** (supersedes v0.4)
 
