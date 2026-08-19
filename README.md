@@ -33,6 +33,7 @@ Start here:
 | `analytics/` | `Plumbline.Analytics` — .NET 8 analytics and eval API |
 | `normalization/mappings/` | Versioned normalization mapping YAML (F1) |
 | `infra/terraform/` | Terraform (F0: state backend, kill-switch, quotas) |
+| `infra/functions/` | Cloud Function sources deployed by Terraform |
 | `scripts/ci/` | Invariant gate scripts (W6) |
 | `docs/` | Source of truth — see above |
 
