@@ -23,6 +23,8 @@ drift is a bug. This file is the inventory, not a log of one work package.
 | Actions: fork PR approval | `all_external_contributors` | 2026-08-19 | W6.1 |
 | Actions: default workflow permissions | `read` | pre-existing | W6.1 posture |
 | `main` branch protection | enabled | pre-existing, documented 2026-08-19 | W6.5 → `branch-protection.md` |
+| Environment `gcp-production` | **created**, 1 required reviewer, `main`-only deployments | 2026-08-21 | F2 W0a → `F2-minimal-gcp-footprint.md` §2 |
+| Actions secret `ALERT_EMAIL` | **set** | 2026-08-21 | F2 Wave 1 — destination for the dead-letter depth alert |
 
 ## Evidence (2026-08-19, after the W6.4 changes)
 
@@ -39,6 +41,32 @@ $ gh api repos/arslan-kursad/plumbline/actions/permissions/fork-pr-contributor-a
 $ gh api repos/arslan-kursad/plumbline/actions/permissions/workflow
 {"default_workflow_permissions":"read","can_approve_pull_request_reviews":false}
 ```
+
+## Evidence — the F2 deploy gate (2026-08-21)
+
+```
+$ ./scripts/ci/environment-guard.sh <(gh api repos/arslan-kursad/plumbline/environments/gcp-production)
+environment guard: gcp-production protected by 1 required reviewer(s)
+
+$ gh api repos/arslan-kursad/plumbline/environments/gcp-production/deployment-branch-policies \
+    --jq '.branch_policies[] | "\(.name) (\(.type))"'
+main (branch)
+```
+
+The read-back is run through `scripts/ci/environment-guard.sh` rather than eyeballed,
+because that script is the same control the deploy workflow refuses on — checking the
+setting with the thing that enforces it is worth more than checking it with a person.
+
+**`prevent_self_review` is `false`, and that is not an accident to leave undocumented.**
+The reviewer is the maintainer, who is also the only person who can dispatch a deploy, so
+a self-review prohibition would make every wave unapprovable. What this gate provides is
+therefore a deliberate pause with an auditable timestamp, not an independent second
+opinion — the same honest distinction ADR-0004 draws when it refuses to count code review
+as an enforcement point in a single-author repository.
+
+**`ALERT_EMAIL` holds a personal email address.** It is a secret rather than a variable
+for that reason alone: this repository is public, and Actions masks secret values in
+workflow logs. It is not a credential.
 
 The F0-start baseline, recorded in the spec on 2026-08-18, was `disabled` for
 secret scanning, push protection and validity checks, and `404` (disabled) for

@@ -273,6 +273,29 @@ that changed the DDL. Added, with the reason next to it — the README already w
 filter must cover a job's *inputs*, not its own directory.
 **Exit review:** no.
 
+### W0.3 — Wave 0's apply is targeted, because Lane A merges ahead of the waves
+**Made:** 2026-08-21 · **Work item:** Wave 0 · **Reversibility:** cheap
+**Decision:** Wave 0 plans and applies with
+`-target=google_billing_account_iam_member.killswitch_billing_admin`.
+**What forced it:** Lane A authorizes merging Terraform source for later waves, on the
+argument that merging mutates nothing and only `apply` does. That argument holds, and it
+has a consequence nobody wrote down: `main` now describes more infrastructure than Wave 0
+is allowed to create. Measured, not supposed — an unqualified plan on `main` today reports
+`5 to add`: the four BigQuery resources from the Wave 1 branch plus Wave 0's grant. An
+untargeted apply from a laptop would therefore create Wave 1 resources outside the gated
+path, which is precisely what the phase forbids from Wave 1 on.
+**Alternatives:** hold Wave 1's Terraform out of `main` until Wave 0 has applied — it
+would idle the whole repository lane behind one human step, and it contradicts Lane A's
+own reasoning; apply everything and call Wave 0 "Wave 0 and 1" — it would put the first
+BigQuery objects into the project through an unreviewed local apply, on the day the
+kill-switch is still known inert.
+**Rationale:** `-target` is normally a smell because it produces a state that matches no
+configuration. Here it is the opposite: it is how one deliberately chosen resource is
+applied while the rest of the configuration waits for the gate that does not exist yet.
+Terraform's `Resource targeting is in effect` warning is the wave's receipt.
+**Exit review:** no, but it belongs in the completion note as a property of the governance
+model rather than an incident: any phase that merges ahead of its applies inherits it.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
