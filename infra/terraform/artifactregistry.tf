@@ -22,12 +22,20 @@ resource "google_artifact_registry_repository" "plumbline" {
     }
   }
 
+  # Everything the KEEP policy did not claim, once it has had a day to be wrong in.
+  #
+  # `older_than` was "0s" first, which reads as "no grace period" and is what the
+  # intent actually was. Artifact Registry does not store a zero duration, so every
+  # plan after the apply proposed re-adding a condition the API had dropped — a diff
+  # that never converges. A day is the smallest value that both persists and buys
+  # something real: an image is never eligible for deletion on the day it is pushed,
+  # so a deploy cannot prune the artefact it just created.
   cleanup_policies {
     id     = "delete-the-rest"
     action = "DELETE"
 
     condition {
-      older_than = "0s"
+      older_than = "86400s"
     }
   }
 
@@ -83,12 +91,20 @@ resource "google_artifact_registry_repository" "gcf_artifacts" {
     }
   }
 
+  # Everything the KEEP policy did not claim, once it has had a day to be wrong in.
+  #
+  # `older_than` was "0s" first, which reads as "no grace period" and is what the
+  # intent actually was. Artifact Registry does not store a zero duration, so every
+  # plan after the apply proposed re-adding a condition the API had dropped — a diff
+  # that never converges. A day is the smallest value that both persists and buys
+  # something real: an image is never eligible for deletion on the day it is pushed,
+  # so a deploy cannot prune the artefact it just created.
   cleanup_policies {
     id     = "delete-the-rest"
     action = "DELETE"
 
     condition {
-      older_than = "0s"
+      older_than = "86400s"
     }
   }
 

@@ -83,7 +83,12 @@ resource "google_monitoring_notification_channel" "alerts" {
   type         = "email"
 
   labels = {
-    email_address = var.alert_email
+    # Lowercased here rather than trusted as typed. Monitoring normalises the address
+    # it stores, so a value entered with capitals comes back different from what was
+    # sent and every subsequent plan proposes changing it back — a diff that never
+    # converges and that a drift check is right to fail on. Normalising at the source
+    # makes the configuration independent of how the secret was typed.
+    email_address = lower(var.alert_email)
   }
 
   depends_on = [google_project_service.required]
