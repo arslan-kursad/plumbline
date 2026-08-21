@@ -68,11 +68,14 @@ Four properties are worth stating because each was a choice:
 - **The apply refuses a diff the reviewer did not see.** It re-plans, recomputes the
   fingerprint, and stops if it moved. Re-dispatching produces a fresh diff and a fresh
   approval; that is the correct response to a moved plan, not an obstacle to route around.
-- **The environment check is load-bearing.** Naming an environment that does not exist
-  creates it on first use *without* protection rules, so the gate this whole workflow is
-  built around would silently not be there. `preflight` refuses when it cannot see a
-  required reviewer — including when it cannot read the environment at all, because an
-  unverified gate is not a gate.
+- **The environment check is load-bearing, and is proven able to fail.** Naming an
+  environment that does not exist creates it on first use *without* protection rules, so
+  the gate this whole workflow is built around would silently not be there. `preflight`
+  refuses when it cannot see a required reviewer — including when it cannot read the
+  environment at all, because an unverified gate is not a gate. The assertions live in
+  `scripts/ci/environment-guard.sh` and run against six fixtures in the `invariant gates`
+  job on every CI run: once the environment is configured correctly the check passes
+  forever, so the only place it can be observed failing is against a fixture.
 
 Branch protection requires `ci complete` only — see
 `docs/runbooks/branch-protection.md` for why the aggregate exists and how to

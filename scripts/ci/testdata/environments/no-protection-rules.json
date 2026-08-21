@@ -1,0 +1,5 @@
+{
+  "name": "gcp-production",
+  "protection_rules": [],
+  "deployment_branch_policy": null
+}
