@@ -477,6 +477,37 @@ belongs to a key some agent may still be presenting; overwriting the hash would 
 silently at the next collector start, with no error anywhere near the person who caused it.
 **Exit review:** the maintainer runs this tool, so its UX is theirs to accept.
 
+### W1.8 — Wave 1 applied; the post-apply drift check failed the wave, correctly
+**Made:** 2026-08-22 · **Work item:** Wave 1 · **Reversibility:** cheap
+**What happened:** the first gated apply succeeded —
+`Apply complete! Resources: 1 imported, 11 added, 1 changed, 0 destroyed` — and then
+`deploy.yml`'s post-apply step failed the run with *changes remain after apply; the wave is
+not finished*. Three resources still proposed changes, all of the same class: **values the
+API normalises and the configuration insists on rewriting.**
+
+| Resource | The loop |
+| --- | --- |
+| `google_monitoring_notification_channel.alerts` | Monitoring lowercases the address; the secret was typed with capitals, so every plan proposed changing it back |
+| both Artifact Registry repositories | `older_than = "0s"` is not stored, so every plan proposed re-adding a condition the API had dropped |
+
+**Fixes:** `lower(var.alert_email)`, so the configuration is independent of how the secret
+was typed; and `older_than = "86400s"`, the smallest value that both persists and buys
+something — an image is never eligible for deletion on the day it is pushed, so a deploy
+cannot prune the artefact it just created.
+
+**The check earned its place on its first run, which is the part worth recording.** Without
+it the wave would have reported success while leaving a diff that never converges — and the
+next wave's plan would have carried three unexplained changes that someone would have
+approved as noise, which is exactly how a plan-diff review stops being a review. Failing a
+wave whose apply succeeded looks harsh and is the correct reading of "drift is a bug"
+(architecture §8).
+
+**Not a stop-rule event.** The spec halts the phase on a kill-switch live-fire failure and
+on billed cost. A wave that applied cleanly and then reported an unconverged configuration
+is neither; it is a wave that is not finished, and it finishes with a second apply.
+**Exit review:** no, but the completion note should carry it — the first use of the gated
+path found a real defect, and that is evidence about the gate rather than about the defect.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
