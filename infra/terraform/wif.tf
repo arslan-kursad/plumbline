@@ -229,6 +229,10 @@ resource "google_project_iam_member" "ci_deploy" {
     # growth is what these two lines make possible — at the price named above.
     "roles/iam.serviceAccountAdmin",
     "roles/resourcemanager.projectIamAdmin",
+    # Wave 2: the two Cloud Run services and their invoker policies. actAs on the
+    # runtime identities is *not* here — it is granted per service account in
+    # cloudrun.tf, so this identity cannot impersonate the kill-switch's.
+    "roles/run.admin",
   ])
 
   project = var.project_id

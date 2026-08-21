@@ -153,6 +153,35 @@ jobs:
       - name: Plan guard
         run: ./scripts/ci/terraform-plan-guard.sh infra/terraform/plan.tfplan
 
+      # Cloud Run resolves an image tag when it starts a revision, not when
+      # Terraform plans one, so a tag naming images that were never pushed plans
+      # perfectly and fails at apply — after the reviewer has approved it. Asked
+      # here instead, while refusing still costs nothing.
+      - name: Refuse image tags that are not in Artifact Registry
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          tag=$(echo 'var.image_tag' | terraform console -input=false | tr -d '"')
+          echo "pinned image tag: $tag"
+
+          missing=""
+          for component in collector worker; do
+            image="${{ vars.GCP_PROJECT_ID }}/plumbline/${component}:${tag}"
+            if gcloud artifacts docker images describe "us-central1-docker.pkg.dev/${image}" > /dev/null 2>&1; then
+              echo "  found ${component}:${tag}"
+            else
+              missing="$missing ${component}"
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::no image tagged ${tag} in Artifact Registry for:${missing}. The images job builds on every push to main that touches image inputs; pin image_tag to a commit it actually built."
+            exit 1
+          fi
+
       - name: Fingerprint and summary
         id: fingerprint
         working-directory: infra/terraform

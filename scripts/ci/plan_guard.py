@@ -63,7 +63,17 @@ def nested(mapping, path):
 
 
 def check(plan, allowed):
+    """Returns (violations, checked).
+
+    `checked` records the scaling assertions that actually ran, by address. A
+    guard that only reports silence cannot be shown to have evaluated anything:
+    "clean" reads identically whether it examined a Cloud Run service or skipped
+    it because the plan nested `scaling` somewhere this code does not look. F2
+    DoD 6 asks for evidence that these resources were evaluated, so the evidence
+    is the guard's own output rather than an assumption about its reach.
+    """
     violations = []
+    checked = []
 
     for change in plan.get("resource_changes", []):
         actions = change.get("change", {}).get("actions", [])
@@ -84,6 +94,11 @@ def check(plan, allowed):
             scaling = nested(after, SCALING_PATHS[rtype]) or {}
             minimum = scaling.get("min_instance_count") or 0
             maximum = scaling.get("max_instance_count")
+
+            checked.append(
+                f"{address}: min_instance_count={minimum}, "
+                f"max_instance_count={maximum if maximum is not None else 'unset'}"
+            )
 
             if minimum != 0:
                 violations.append(
@@ -108,7 +123,7 @@ def check(plan, allowed):
                 "retention is a paid feature and is forbidden on every topic"
             )
 
-    return violations
+    return violations, checked
 
 
 def main():
@@ -121,7 +136,17 @@ def main():
     with open(plan_path, encoding="utf-8") as handle:
         plan = json.load(handle)
 
-    violations = check(plan, allowed)
+    violations, checked = check(plan, allowed)
+
+    # Printed on both paths: on a failure it says what else was examined, and on a
+    # clean run it is the only evidence that anything was.
+    if checked:
+        print("plan guard: scaling asserted on")
+        for entry in checked:
+            print(f"  {entry}")
+    else:
+        print("plan guard: no scalable resource in this plan")
+
     if violations:
         print(f"plan guard: {len(violations)} violation(s)")
         for violation in violations:

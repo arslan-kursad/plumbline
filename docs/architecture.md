@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.8 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
+**Version:** 0.9 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-22
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -253,7 +253,8 @@ never API keys, customer data, or internal hostnames.
 | Agent → Collector | API key (header), validated against hashed registry in Firestore; per-key rate limit |
 | Collector → Pub/Sub | Collector service account, `roles/pubsub.publisher` on `traces` only |
 | Pub/Sub → Worker | **OIDC push**: push SA is sole `roles/run.invoker` on the worker; worker ingress `internal-and-cloud-load-balancing` equivalent for Cloud Run (`ingress=all` avoided; unauthenticated invocations disabled) |
-| Worker → BigQuery/Firestore | Dedicated SA, table/collection-scoped least privilege |
+| Worker → BigQuery | Dedicated SA, **table-scoped** grant on `spans` (`roles/bigquery.dataEditor` on the table, not the dataset) |
+| Collector → Firestore | Dedicated SA, `roles/datastore.viewer` at **project scope** — Firestore grants IAM at project (conditionally, database) scope only; per-collection access exists solely through Security Rules, which govern mobile/web clients rather than server client libraries. The narrowest grant that reads `api_keys` therefore reads all Firestore data in the project. Stated because it is wider than least privilege would like, and no configuration can narrow it (F2 decision log W2.5) |
 | GitHub Actions → GCP | **Workload Identity Federation**; no exported SA keys anywhere in the project |
 | Analytics API → public | Not exposed in v0.1 (static export path, §3.5) |
 
@@ -324,6 +325,9 @@ balancer, a reserved IP, a VM) all arrive as a resource type nobody argued about
 | `google_bigquery_table` | F2 | `spans`, views, `eval_results` (§4.1) |
 | `google_firestore_database` | F2 | Metadata store (§4.2) |
 | `google_cloud_run_v2_service` | F2 | `collector`, `ingestion-worker`, `analytics-api` |
+| `google_cloud_run_v2_service_iam_member` | F2 | Invoker grants on v2 services: `allUsers` on the public collector, the push identity as sole invoker on the worker (§6.1) |
+| `google_pubsub_topic_iam_member` | F2 | Publish scoped to `traces` alone, so no data-plane identity can reach `billing-alerts` |
+| `google_bigquery_table_iam_member` | F2 | Worker write scoped to the `spans` table rather than the dataset (§6.1) |
 | `google_artifact_registry_repository` | F2 | Distroless images, keep-last-2 cleanup policy (§8) |
 | `google_cloud_scheduler_job` | F3 | Nightly eval batch (§2.5) |
 | `google_monitoring_alert_policy` | F2 | DLQ depth alert (§3.4) |
@@ -406,6 +410,19 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.9 — 2026-08-22** — F2 Wave 2.
+
+1. §7.1 gains three IAM types the two services need, per D6:
+   `google_cloud_run_v2_service_iam_member` (the v2 name; the list carried only the v1
+   `google_cloud_run_service_iam_member`, which does not manage a v2 service's policy),
+   `google_pubsub_topic_iam_member` and `google_bigquery_table_iam_member`. All three
+   exist to *narrow* a grant the project would otherwise have to make at project scope.
+2. §6.1 splits the "Worker → BigQuery/Firestore" row and corrects it. The row promised
+   "table/collection-scoped least privilege"; table-scoped is achievable and is now
+   implemented, collection-scoped is not a thing Firestore has. The corrected row says
+   what the platform allows and names the residual width, rather than describing a
+   control nobody can build (F2 decision log W2.5).
 
 **v0.8 — 2026-08-21** — F2 Wave 0. §7.1 gains `google_project_iam_custom_role`: the
 second kill-switch live-fire found the function unable to *read* the billing state it was

@@ -126,6 +126,42 @@ variable "state_bucket" {
   default     = null
 }
 
+variable "image_tag" {
+  description = <<-EOT
+    Commit SHA tagging the collector and worker images Cloud Run runs. CI pushes
+    both images tagged by commit and never as `latest`, so this value answers
+    "which code is running" exactly.
+
+    It lives in the repository rather than arriving at dispatch time on purpose.
+    The approval gate binds the reviewer to a fingerprint of addresses and actions
+    (decision log W1.1), which cannot see an attribute value — so a tag chosen
+    outside the repository would be invisible to the one control that is supposed
+    to make a deploy deliberate. Here, bumping it is a reviewed pull request.
+
+    Consequence, accepted: the deployed image lags the merge that produced it by
+    one commit, because the images for a commit exist only after CI has built it.
+
+    **Bumping it is part of arming a wave, not an afterthought.** The default below
+    must name a commit whose images CI has actually pushed *and* whose code carries
+    what the wave deploys — the plan job verifies the first half against Artifact
+    Registry and refuses if the images are absent; the second half is the reviewer's.
+  EOT
+  type        = string
+
+  # Merge commit of #62, the change that first pushed both images (recorded in
+  # issue #63 with the push time). Bumped by the wave pull request to the commit
+  # carrying the OIDC validator and the Firestore registry before Wave 2 is armed.
+  default = "0a0993da1e1453b28b5b9dc6e93a4c82824db676"
+
+  validation {
+    # A full commit SHA, not a moving tag: `latest` or a branch name would make
+    # "which image is running" unanswerable and would silently redeploy on the
+    # next apply.
+    condition     = can(regex("^[0-9a-f]{40}$", var.image_tag))
+    error_message = "image_tag must be a full 40-character commit SHA — the tag CI pushes. Moving tags are refused."
+  }
+}
+
 variable "alert_email" {
   description = <<-EOT
     Destination for the dead-letter depth alert (architecture §3.4). An email
