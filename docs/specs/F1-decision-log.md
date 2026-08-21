@@ -396,3 +396,75 @@ exhaustion. A test asserts no bucket exists after fifty unauthenticated requests
 Splitting comes last because it is the expensive step, and an over-quota caller should
 not be able to buy CPU with a large payload.
 **C2:** no.
+
+### W4.1 — Mappings are embedded as resources, not generated into C#
+**Made:** 2026-08-21 · **Work item:** W4 · **Reversibility:** cheap
+**Decision:** the mapping and redaction YAML are `EmbeddedResource` items with fixed
+logical names, parsed at first use.
+**Alternatives:** a source generator turning the YAML into C# at build time — faster to
+load and typed at compile time, and it puts a translation step between the reviewable
+artefact and what runs. ADR-0003's Consequences want `normalization/mappings/v1.41/`
+publishable on its own; a generator makes the YAML an input to code rather than the thing
+itself.
+**Rationale:** the load happens once per process and the file is a few kilobytes. There is
+no problem to optimise.
+**C2:** no.
+
+### W4.2 — The unknown-dialect mapping is generated from the column set
+**Made:** 2026-08-21 · **Work item:** W4 · **Reversibility:** cheap
+**Decision:** no `unknown.yaml`. `MappingCatalog.Generic` is built in code from
+`GenAiColumns`, one rule per column reading the v1.41 attribute that column stands for.
+**Alternatives:** a fourth YAML file. It would be readable in the same place as the
+others, and it would be a second list of the typed columns that can fall out of step with
+the first — the drift being invisible exactly when a column is added.
+**Rationale:** the generic path is *defined* as "the columns, filled from their own
+names". Writing that out by hand is a copy, not a decision.
+**C2:** no.
+
+### W4.3 — Detection runs per scope, not per payload
+**Made:** 2026-08-21 · **Work item:** W4 · **Reversibility:** cheap
+**Decision:** the dialect is decided for each `ScopeSpans`, not once per export request.
+**Rationale:** one export can carry two instrumentations, and `source_dialect` is a column
+on a row. Deciding once per payload would label every span in a mixed export with whatever
+the first scope happened to be.
+**C2:** no.
+
+### W4.4 — The collector hint breaks ties and introduces nothing
+**Made:** 2026-08-21 · **Work item:** W4 · **Reversibility:** cheap
+**Decision:** detection is scope name first, then resource markers, and the hint is
+consulted **only** when resource markers match more than one dialect. A hint never
+supplies a dialect the payload gave no evidence for; a mismatch is reported and the
+detected value wins.
+**Alternatives:** fall back to the hint when nothing matches. It reads as helpful and
+makes detection a function of key registration — the label would then say what the
+operator claimed at issuance rather than what the emitter sent, which is the failure
+`docs/evidence/claude-code-otel-capture.md` §6 ranks the hint last to avoid.
+**Rationale:** architecture §5 calls the hint a tiebreaker. A tie is the only situation
+where one is needed.
+**C2:** no.
+
+### W4.5 — A value outside a rule's map yields null, not a pass-through
+**Made:** 2026-08-21 · **Work item:** W4 · **Reversibility:** cheap
+**Decision:** when a rule translates values and the emitter's value is not in the map, the
+column stays null and a note is raised.
+**Alternatives:** pass the raw value through. It fills the column, and it fills it with a
+string that is not a v1.41 enum member while looking like one — which the eval engine and
+every dashboard would read as conformant.
+**Rationale:** a null column is a visible absence; a wrong value is an invisible one. ADR-0003's
+Context is exactly this: a wrong mapping produces rows that are well-formed, queryable,
+and quietly incorrect.
+**C2:** no.
+
+### W4.6 — ADR-0006 authored as Proposed, with the DLQ consequence stated
+**Made:** 2026-08-21 · **Work item:** W4 · **Reversibility:** cheap by construction
+**Decision:** `docs/adr/ADR-0006-pii-redaction-boundary.md` at status `Proposed`, and
+architecture §10's index gains the row so the status is discoverable without reading the
+stage. The ADR accepts, in writing, that unredacted personal data transits Pub/Sub and
+persists in `traces-dlq` until a human drains it, and names two F2 obligations that follow.
+**Alternatives considered inside the ADR:** emitter-side suppression only (partial by
+construction), the collector (retires ADR-0001), not ingesting claude-code at all (changes
+a success criterion, and is the option to take if review rejects the boundary), redaction
+at query time (moves the question).
+**Rationale:** the transit exposure was going to happen by default. The point of the ADR
+is that it is now a decision someone signed rather than a consequence nobody noticed.
+**C2:** yes — accept or reject.

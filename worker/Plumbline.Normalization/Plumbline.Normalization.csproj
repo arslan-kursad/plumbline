@@ -22,6 +22,20 @@
     like the semconv registry. GrpcServices="None" — the worker is a Pub/Sub push
     endpoint and never serves the OTLP gRPC service; that is the collector's job.
   -->
+  <!--
+    Mapping and redaction YAML embedded at build time (ADR-0003 §1). LogicalName fixes
+    the resource id so it does not depend on the directory layout, and Link keeps the
+    files visible in an IDE at the path they really live at.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\normalization\mappings\v1.41\*.yaml"
+                      LogicalName="Plumbline.Normalization.mappings.%(Filename).yaml"
+                      Link="normalization/mappings/v1.41/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\normalization\redaction\v1\*.yaml"
+                      LogicalName="Plumbline.Normalization.redaction.%(Filename).yaml"
+                      Link="normalization/redaction/v1/%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <Protobuf Include="..\..\third_party\opentelemetry-proto\v1.11.0\opentelemetry\proto\**\*.proto"
               ProtoRoot="..\..\third_party\opentelemetry-proto\v1.11.0"

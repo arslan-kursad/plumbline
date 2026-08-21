@@ -1,0 +1,90 @@
+# Mapping — langgraph-python → GenAI semconv v1.41
+#
+# Emitter vocabulary: OpenInference span conventions, as emitted by the LangChain-family
+# instrumentation. It is not a semconv vocabulary at all: no attribute this dialect sends
+# is a `gen_ai.*` name, which is why the dialect layer exists.
+
+dialect: langgraph-python
+semconv_version: "1.41.0"
+
+detection:
+  # Primary key. The instrumentation sets its own scope name, so it is the marker an
+  # operator cannot accidentally override.
+  scope_names:
+    - openinference.instrumentation.langchain
+
+  # Corroborating only. `service.name` is settable through OTEL_RESOURCE_ATTRIBUTES,
+  # so it is never the primary signal — it breaks ties, and only in the company of the
+  # collector's registration hint.
+  resource_markers:
+    telemetry.sdk.language: [python]
+
+columns:
+  - column: gen_ai_provider_name
+    semconv: gen_ai.provider.name
+    type: string
+    rules:
+      - from: llm.provider
+      - from: llm.system
+
+  - column: gen_ai_operation_name
+    semconv: gen_ai.operation.name
+    type: string
+    rules:
+      # OpenInference states the span's role in its own vocabulary. The map is the
+      # dialect layer doing its job: three emitter values become three v1.41 operation
+      # names, and a value not in the map yields nothing rather than a guess.
+      - from: openinference.span.kind
+        map:
+          LLM: chat
+          TOOL: execute_tool
+          CHAIN: invoke_workflow
+          AGENT: invoke_agent
+          RETRIEVER: retrieval
+          EMBEDDING: embeddings
+
+  - column: gen_ai_request_model
+    semconv: gen_ai.request.model
+    type: string
+    rules:
+      - from: llm.model_name
+
+  - column: gen_ai_response_model
+    semconv: gen_ai.response.model
+    type: string
+    rules:
+      - from: llm.response.model
+
+  - column: gen_ai_usage_input_tokens
+    semconv: gen_ai.usage.input_tokens
+    type: int
+    rules:
+      - from: llm.token_count.prompt
+
+  - column: gen_ai_usage_output_tokens
+    semconv: gen_ai.usage.output_tokens
+    type: int
+    rules:
+      - from: llm.token_count.completion
+
+  - column: gen_ai_tool_name
+    semconv: gen_ai.tool.name
+    type: string
+    rules:
+      - from: tool.name
+
+  - column: gen_ai_conversation_id
+    semconv: gen_ai.conversation.id
+    type: string
+    rules:
+      - from: session.id
+
+# Not mapped, deliberately:
+#
+# `llm.invocation_parameters` is a JSON *string* carrying temperature and max_tokens.
+# The normalizer does not parse embedded JSON — a mapping that reaches inside an opaque
+# string value is no longer a mapping table, it is a parser with a configuration file —
+# so those two typed columns stay null and the string survives verbatim in the lossless
+# attributes. Extracting them is a mapping-schema change, not a value fix.
+#
+# `llm.token_count.total` is derivable from the two counts and has no v1.41 column.

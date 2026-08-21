@@ -1,0 +1,75 @@
+# Mapping — claude-code → GenAI semconv v1.41
+#
+# Emitter vocabulary: overwhelmingly emitter-private. Measured against a real emitter
+# (docs/evidence/claude-code-otel-capture.md), exactly two attributes are semconv-shaped
+# — `gen_ai.system` and `gen_ai.request.model` — and everything else is either a bare
+# un-namespaced key (`model`, `speed`, `success`, `attempt`) or a private namespace
+# (`span.type`, `llm_request.*`, `interaction.*`).
+#
+# The dialect declares **no schemaUrl at any level**, so its convention version cannot be
+# read off the payload. That is measured, not assumed.
+
+dialect: claude-code
+semconv_version: "1.41.0"
+
+detection:
+  # The answer to architecture §10 open question 4. Vendor-namespaced, identical across
+  # two emitter builds, and versioned independently of the application — `service.version`
+  # moved while the scope stayed at 1.0.0.
+  scope_names:
+    - com.anthropic.claude_code.tracing
+
+  # Corroborating only, and weaker than it looks: `service.name` is settable through
+  # OTEL_RESOURCE_ATTRIBUTES, so an operator can move it.
+  resource_markers:
+    service.name: [claude-code]
+
+columns:
+  - column: gen_ai_provider_name
+    semconv: gen_ai.provider.name
+    type: string
+    rules:
+      - from: gen_ai.provider.name
+      # v1.41 deprecates `gen_ai.system` in favour of the name above. The emitter sends
+      # the deprecated one; the row carries the current one. This rule is why the
+      # deprecated model files are vendored: a mapping that rewrites a deprecated name
+      # has to be able to show the source was a real deprecated attribute.
+      - from: gen_ai.system
+
+  - column: gen_ai_request_model
+    semconv: gen_ai.request.model
+    type: string
+    rules:
+      - from: gen_ai.request.model
+      # The emitter repeats the model under a bare key as well. Listed second so the
+      # semconv-shaped attribute wins when both are present, which is every observed span.
+      - from: model
+
+  - column: gen_ai_operation_name
+    semconv: gen_ai.operation.name
+    type: string
+    rules:
+      - from: gen_ai.operation.name
+      # The dialect states a span's role in its own vocabulary and nowhere else, so the
+      # operation comes from the span name. Only the two span types that were actually
+      # observed are mapped: `claude_code.tool` and `claude_code.hook` are documented but
+      # were never seen (evidence §3), and mapping a shape nobody has measured would put
+      # an invented operation name into a column the eval engine will read.
+      - from_span_name:
+          claude_code.interaction: invoke_agent
+          claude_code.llm_request: chat
+
+# Not mapped, deliberately:
+#
+# `session.id` is not mapped to `gen_ai_conversation_id`. It is a redaction target
+# (normalization/redaction/v1/claude-code.yaml), and a typed column carrying a hash
+# marker is worse than a null one: it looks joinable and is not comparable across
+# dialects.
+#
+# There are no token counts. The emitter sends none at the captured version, so
+# `gen_ai_usage_input_tokens` and `gen_ai_usage_output_tokens` are null in every
+# claude-code row. That is a measured property of the emitter, not a gap in this file.
+#
+# `duration_ms`, `speed`, `success`, `error`, `attempt`, `terminal.type`,
+# `interaction.*`, `llm_request.*`, `user_prompt_length` have no v1.41 equivalent and
+# stay in the lossless attributes.

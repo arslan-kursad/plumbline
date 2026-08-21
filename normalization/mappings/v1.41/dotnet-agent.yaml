@@ -1,0 +1,121 @@
+# Mapping — dotnet-agent → GenAI semconv v1.41
+#
+# Emitter vocabulary: semconv-shaped, at an *older* convention version. This dialect is
+# the version-drift case: it declares schema 1.28.0 and emits `gen_ai.system`, which
+# v1.41 deprecates in favour of `gen_ai.provider.name`. Architecture §5 — drift is mapped
+# to the pin, never the reverse — so the row carries the v1.41 column and the original
+# name survives untouched in the lossless attributes as what the emitter actually sent.
+
+dialect: dotnet-agent
+semconv_version: "1.41.0"
+
+detection:
+  scope_names:
+    - Experimental.Microsoft.Extensions.AI
+
+  resource_markers:
+    telemetry.sdk.language: [dotnet]
+
+columns:
+  - column: gen_ai_provider_name
+    semconv: gen_ai.provider.name
+    type: string
+    rules:
+      # Current name first: when the emitter upgrades, the mapping needs no change and
+      # the deprecated fallback simply stops firing.
+      - from: gen_ai.provider.name
+      - from: gen_ai.system
+
+  - column: gen_ai_operation_name
+    semconv: gen_ai.operation.name
+    type: string
+    rules:
+      - from: gen_ai.operation.name
+
+  - column: gen_ai_request_model
+    semconv: gen_ai.request.model
+    type: string
+    rules:
+      - from: gen_ai.request.model
+
+  - column: gen_ai_response_model
+    semconv: gen_ai.response.model
+    type: string
+    rules:
+      - from: gen_ai.response.model
+
+  - column: gen_ai_response_id
+    semconv: gen_ai.response.id
+    type: string
+    rules:
+      - from: gen_ai.response.id
+
+  - column: gen_ai_conversation_id
+    semconv: gen_ai.conversation.id
+    type: string
+    rules:
+      - from: gen_ai.conversation.id
+
+  - column: gen_ai_agent_name
+    semconv: gen_ai.agent.name
+    type: string
+    rules:
+      - from: gen_ai.agent.name
+
+  - column: gen_ai_tool_name
+    semconv: gen_ai.tool.name
+    type: string
+    rules:
+      - from: gen_ai.tool.name
+
+  - column: gen_ai_tool_call_id
+    semconv: gen_ai.tool.call.id
+    type: string
+    rules:
+      - from: gen_ai.tool.call.id
+
+  - column: gen_ai_usage_input_tokens
+    semconv: gen_ai.usage.input_tokens
+    type: int
+    rules:
+      - from: gen_ai.usage.input_tokens
+      - from: gen_ai.usage.prompt_tokens
+
+  - column: gen_ai_usage_output_tokens
+    semconv: gen_ai.usage.output_tokens
+    type: int
+    rules:
+      - from: gen_ai.usage.output_tokens
+      - from: gen_ai.usage.completion_tokens
+
+  - column: gen_ai_request_max_tokens
+    semconv: gen_ai.request.max_tokens
+    type: int
+    rules:
+      - from: gen_ai.request.max_tokens
+
+  - column: gen_ai_request_temperature
+    semconv: gen_ai.request.temperature
+    type: double
+    rules:
+      - from: gen_ai.request.temperature
+
+  - column: gen_ai_request_top_p
+    semconv: gen_ai.request.top_p
+    type: double
+    rules:
+      - from: gen_ai.request.top_p
+
+  - column: gen_ai_output_type
+    semconv: gen_ai.output.type
+    type: string
+    rules:
+      - from: gen_ai.output.type
+
+# Not mapped, deliberately:
+#
+# `gen_ai.response.finish_reasons` is an array and the typed column set is scalars only
+# (decision log W2.4); it stays lossless in the attributes JSON.
+# `server.address` / `server.port` are semconv attributes from outside the gen_ai
+# namespace — recorded in normalization/semconv/v1.41/external-allowlist.yaml — and have
+# no column in the `spans` table.
