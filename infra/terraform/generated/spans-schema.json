@@ -1,0 +1,167 @@
+[
+  {
+    "name": "start_time",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "end_time",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "trace_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "span_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "parent_span_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "name",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "kind",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "status_code",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "status_message",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "service_name",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "source_dialect",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "api_key_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "schema_url",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "synthetic",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "gen_ai_provider_name",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_operation_name",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_request_model",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_response_model",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_response_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_conversation_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_agent_name",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_tool_name",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_tool_call_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_usage_input_tokens",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_usage_output_tokens",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_request_max_tokens",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_request_temperature",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_request_top_p",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "gen_ai_output_type",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "attributes",
+    "type": "JSON",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "events",
+    "type": "JSON",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "links",
+    "type": "JSON",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "ingest_time",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

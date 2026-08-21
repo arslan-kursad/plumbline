@@ -13,7 +13,7 @@ gates, aggregated into a single `ci complete` status check.
 | `collector (go)` | `collector/`, `testdata/` | build, vet, `go test -race` |
 | `worker and analytics (.net)` | `worker/`, `analytics/`, `normalization/`, `testdata/`, `third_party/` | build and `dotnet test` — golden files included |
 | `local end-to-end` | anything the pipeline is made of | `make e2e`: fixtures in, rows out through the views, poison in the DLQ |
-| `terraform static checks` | `infra/terraform/`, `scripts/ci/`, `docs/architecture.md` | fmt, validate, plan-guard self-test |
+| `terraform static checks` | `infra/terraform/`, `scripts/ci/`, `docs/architecture.md`, `analytics/sql/` | fmt, validate, plan-guard self-test, and the generated BigQuery schema against the DDL it came from |
 | `terraform plan (wif)` | same, and only with the GCP variables set | an authenticated plan, guarded |
 
 Each path filter covers the job's *inputs*, not just its own directory. A fixture
