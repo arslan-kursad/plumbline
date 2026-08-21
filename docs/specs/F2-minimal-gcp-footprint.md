@@ -200,6 +200,21 @@ Lane A, armed by the maintainer once, then verified and recorded.
   drift if the live filter differed from the configuration. The wave applies **one
   resource**, not two. Anything else appearing in the plan is investigated before it is
   applied, never applied around.
+
+  **The plan is `-target`ed, and that is a consequence of Lane A rather than a shortcut.**
+  Lane A merges Terraform for later waves into `main` because merging mutates nothing —
+  and it means `main` now describes more infrastructure than Wave 0 applies. An untargeted
+  apply from a laptop would create Wave 1's BigQuery resources outside the gated path, which
+  is the one thing the phase forbids from Wave 1 on. So Wave 0 names its single resource:
+
+  ```
+  terraform plan -target=google_billing_account_iam_member.killswitch_billing_admin -out plan.tfplan
+  ```
+
+  Targeting is normally a smell, and this is the case it exists for: applying one
+  deliberately chosen resource while later waves sit merged in the same configuration.
+  Terraform prints `Resource targeting is in effect` — that warning is the wave's receipt,
+  not a problem to suppress.
 - **W0c** — Apply, from the maintainer's own credentials, in `infra/terraform` — the path
   #33 already specifies, and the only path that exists before `ci-deploy` does (§2). The
   pending change is billing-account-scoped, which is the one scope the CI identity is
