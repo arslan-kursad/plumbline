@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.7 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
+**Version:** 0.8 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -310,6 +310,7 @@ balancer, a reserved IP, a VM) all arrive as a resource type nobody argued about
 | `google_service_account` | F0 | Per-component identities |
 | `google_service_account_iam_member` | F0 | Workload Identity Federation binding to a service account |
 | `google_project_iam_member` | F0 | Project-scoped role grants |
+| `google_project_iam_custom_role` | F2 | One-permission roles where a predefined role would grant more than the caller needs (ADR-0004 Amendment 3) |
 | `google_billing_account_iam_member` | F0 | Billing-account read for the CI identity, so `terraform plan` can refresh the budget |
 | `google_cloud_run_service_iam_member` | F0 | Invoker grants scoped to one service |
 | `google_pubsub_topic` | F0 | `billing-alerts`; F2 adds `traces` and `traces-dlq` |
@@ -405,6 +406,11 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.8 — 2026-08-21** — F2 Wave 0. §7.1 gains `google_project_iam_custom_role`: the
+second kill-switch live-fire found the function unable to *read* the billing state it was
+about to change, and the narrowest fix is a role carrying one permission rather than a
+predefined role carrying six (ADR-0004 Amendment 3).
 
 **v0.7 — 2026-08-21** — F1 exit review.
 

@@ -330,6 +330,45 @@ it because the console shows it as configured.
 personal data. The variable keeps the control mandatory and the address out of the repo.
 **Exit review:** no.
 
+### W0.4 — Attempt 2 failed; the phase is halted and the fix is one permission
+**Made:** 2026-08-21 · **Work item:** Wave 0 · **Reversibility:** cheap
+**What happened:** the second live-fire failed with the same 403 as the first, and the
+Amendment 2 grant was live on the billing account at the time — verified against the
+billing account's IAM policy rather than against Terraform state. Cause: the function's
+first call is `Projects.GetBillingInfo`, which needs `resourcemanager.projects.get` on the
+**project**, and the identity's entire project-level permission set was six permissions
+that did not include it. Full analysis in ADR-0004 Amendment 3; transcript in
+[`kill-switch.md`](../runbooks/kill-switch.md) §4.
+**Stop rule, applied:** spec §2 halts the phase on a second live-fire failure. Wave
+preparation stopped at the moment the logs were read. Wave 1's remaining Lane A items —
+Firestore, Artifact Registry, `keyctl` — are **not** being built until a live-fire has
+succeeded and been archived. What continues is this fix and its record, which the stop rule
+exists to make room for.
+**Decision:** a custom role carrying exactly `resourcemanager.projects.get`, rather than
+`roles/browser` — the narrowest predefined role containing it, which also grants project
+IAM policy reads, project listing, and folder and organization reads. This identity already
+holds administrator rights over the billing account (Amendment 2); it is the last one in
+the project that should collect incidental reads. Cost: `google_project_iam_custom_role`
+added to the architecture §7.1 allowlist, which is what that list is for, and an
+architecture version bump.
+**Alternatives:** `roles/browser` — one line, five permissions this identity has no use
+for, on the most powerful identity in the project; drop the read from the function and call
+`UpdateBillingInfo` unconditionally — it removes the permission requirement and also
+removes the `billing already detached; nothing to do` path that the runbook documents as
+contract and that the redelivery test exercises, so a control would lose a behaviour to
+avoid an IAM line.
+**Diagnosis was not measured, and that is stated:** the claim that `GetBillingInfo`
+requires `resourcemanager.projects.get` comes from Google's API reference, not from an
+observation on this account. Data-access audit logging is off, so the denial names no
+permission, and impersonating the function's identity to reproduce the call was itself
+refused — the maintainer's Owner role does not carry
+`iam.serviceAccounts.getAccessToken`. What *is* measured: the failing call, from the
+function's source and its log line; and the identity's complete permission set, from the
+project policy and the role definitions. The third live-fire is the test of the remaining
+inference, and it is cheap to run.
+**Exit review:** yes. Two live-fires, two permission defects, both invisible to
+configuration review.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
