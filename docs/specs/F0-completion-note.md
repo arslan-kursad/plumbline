@@ -1,9 +1,10 @@
 # F0 — Completion note
 
-**Date:** 2026-08-19 · **Spec:** [`F0-foundations.md`](F0-foundations.md) v0.7
-**Status: F0 is not complete.** Nine of eleven acceptance criteria are met. The
-two that remain are the kill-switch live-fire and a billing period's bill — one
-needs a human to watch billing detach, the other needs time to pass.
+**Date:** 2026-08-19, updated 2026-08-21 · **Spec:** [`F0-foundations.md`](F0-foundations.md) v0.7
+**Status: nine of eleven acceptance criteria met.** One — the kill-switch
+live-fire — is **deferred to the F2 entry gate** by maintainer decision (§2.1),
+not met and not dropped. One waits on a billing period ending. F1 may start; F2
+may not, until the deferred criterion is closed.
 
 This note exists because the spec asks for one (§6): the gate proofs and the CI
 run link are recorded here. It states what is done, what is not, and what the
@@ -20,7 +21,7 @@ is open is the failure this project is written against.
 | 4 | Repository public; `main` protection enabled **and** its scope recorded | **met** | Public; PR required, force-push denied, `enforce_admins`; required check `ci complete` (strict) added 2026-08-21 after the first green `main` run, with the read-back and the log entry in [`runbooks/branch-protection.md`](../runbooks/branch-protection.md) |
 | 5 | ADR-0001..0005, 0002–0005 Accepted; ADR-0004 records the grep-insufficiency rationale | **met** | [`docs/adr/`](../adr/) |
 | 6 | `docs/eval-plan.md` on `main`, `DRAFT — NOT FROZEN` | **met** | PR #6 |
-| 7 | **Kill-switch live-fired**, evidence archived, billing re-attached | **open** (#17) | Everything it needs is deployed and planning clean. What is missing is the act itself: a human publishing the notification and watching billing detach |
+| 7 | **Kill-switch live-fired**, evidence archived, billing re-attached | **deferred to the F2 entry gate** (2026-08-21, maintainer decision) | Attempt 1 failed and is archived in [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §4; the permission fix is merged. Deferred rather than dropped — see §2.1. F1 is local-first and creates no cloud exposure; F2 must not deploy a service until this has fired |
 | 8 | CI green on `main` via WIF; provider carries the repository+owner condition; zero exported SA keys | **met** | Run [32474458433](https://github.com/arslan-kursad/plumbline/actions/runs/32474458433) on `main`: all eight jobs green, `terraform plan (wif)` among them — authenticated through the pool, not skipped. Provider carries the repository+owner attribute condition; no service account key exists to export |
 | 9 | Gates A–E active **and each proven to fail** | **met** | [`evidence/f0-gate-proofs.md`](../evidence/f0-gate-proofs.md); `prove-gates.sh` runs in CI on every build |
 | 10 | `terraform plan` clean; state in the GCS backend | **met** | `No changes. Your infrastructure matches the configuration.` State in `plumbline-19458-tfstate`, prefix `f0`; 41 resources. Quota applied and granted at 20480 MiB/day, read back from the API |
@@ -131,30 +132,58 @@ is worth naming as such rather than presenting as diligence.
    the live-fire mandatory over it. That requirement is the only reason this was
    found on a Tuesday morning instead of during the incident it exists for.
 
+## 2.1 Criterion 7 is deferred, and this is the record of it
+
+**Decision, 2026-08-21:** the kill-switch live-fire moves from an F0 acceptance
+criterion to the **F2 entry gate**. F1 does not deploy anything to the cloud —
+it is a Go collector, a .NET worker and docker-compose — so an unfired
+kill-switch creates no exposure during it. F2 is where services begin running on
+billable infrastructure, and that is where the control has to have been observed
+working.
+
+Stated plainly, because a deferral that reads as a completion is the failure this
+note exists to prevent:
+
+- **The kill-switch is currently inert**, and known to be. Attempt 1 was refused
+  by the billing API (ADR-0004 Amendment 2), and while the fix is merged, a merged
+  fix is not a deployed one.
+- **F0 therefore closes with an acceptance criterion unmet**, not with all of them
+  met. Nine met, one deferred with this record, one waiting on a billing period.
+- **The gate is binding:** no F2 work deploys a Cloud Run service until the
+  live-fire has succeeded and §4 of the runbook carries its evidence. Tracked as
+  its own issue so it outlives #17.
+
+What was *not* deferred is the permission fix itself. Applying it costs one
+`terraform apply`, detaches nothing, and keeps configuration and project in the
+same state — which criterion 10's evidence depends on.
+
 ## 3. What is left, in order
 
 Already done: the F0 pull requests are merged, `main` is green with every job
 running and authenticating, the required status check is in place, the GCP
-project exists with billing linked, and the infrastructure is applied and
-planning clean.
+project exists with billing linked, and the infrastructure is applied.
 
-Two criteria remain, plus one verification that could not be run any earlier.
+Three items, none of which blocks F1.
 
-1. **Live-fire the kill-switch** — publish the synthetic notification, watch
-   billing detach, archive the log output and the billing page in
-   [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §4, publish a second
-   time to confirm idempotence under redelivery, then re-attach billing. Closes
-   **criterion 7**. Note what it does not cover: the budget → notification
-   segment is checked in F2 (#18), not here.
-2. **Record Verification A**, the morning after the apply: Billing → Reports with
+1. **Apply the kill-switch permission fix** — `terraform apply` in
+   `infra/terraform`, one resource, detaches nothing. Until it runs, the
+   repository and the project disagree and criterion 10's "plan clean" evidence
+   is stale. This is the one item worth doing today.
+2. **Record Verification A**, any morning after the apply: Billing → Reports with
    the credit filters cleared, confirming a non-zero usage cost against a zero net
    total. It is the premise the budget's spend basis rests on (ADR-0004
    Amendment 1) and is currently supported by Google's documentation alone. It
-   comes after the apply because an empty project produces no usage line, so the
+   comes after an apply because an empty project produces no usage line, so the
    check would confirm nothing. The function's build and Artifact Registry storage
    are now that usage.
 3. **Check the bill** at the end of the billing period. Closes **criterion 11**,
    and it is the one criterion that cannot be hurried.
+
+Deferred to the F2 entry gate, per §2.1: the kill-switch live-fire
+(**criterion 7**). Publish the synthetic notification, watch billing detach,
+archive the evidence in [`runbooks/kill-switch.md`](../runbooks/kill-switch.md)
+§4, publish a second time for idempotence, re-attach. What it does not cover —
+the budget → notification segment — is #18, also F2.
 
 ## 4. Notes for whoever closes this
 
