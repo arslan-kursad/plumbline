@@ -92,6 +92,15 @@ resource "google_billing_account_iam_member" "ci_readonly_billing" {
   member             = "serviceAccount:${google_service_account.ci_readonly.email}"
 }
 
+# Required because the provider sends X-Goog-User-Project on every request
+# (user_project_override in versions.tf). Without it CI authenticates, then fails
+# on `caller does not have serviceusage.services.use`.
+resource "google_project_iam_member" "ci_readonly_service_usage" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = "serviceAccount:${google_service_account.ci_readonly.email}"
+}
+
 # Cloud Quotas is recent enough that the basic Viewer role cannot be relied on to
 # carry its read permissions. Granting the service's own viewer role is explicit
 # and costs nothing.
