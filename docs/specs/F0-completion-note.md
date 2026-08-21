@@ -96,6 +96,19 @@ is worth naming as such rather than presenting as diligence.
    It does not remove the ones that live in how credentials are attributed, and
    the first apply was always going to be the thing that found those.
 
+7. **The first authenticated CI run found the next layer of the same thing.** The
+   plan job ran instead of skipping, and failed: refreshing an IAM-member resource
+   reads the policy it belongs to, and basic Viewer carries `getIamPolicy` for the
+   project, service accounts and Cloud Run — but not for storage buckets. Fixed
+   with Security Reviewer, the read-only role for exactly that; the storage roles
+   that can read a bucket policy can also write one.
+
+   Three rounds, each finding what the previous one could not see: reading the
+   configuration, applying it, and authenticating as the identity that will
+   actually run it. Worth stating because the criterion was never "the pipeline is
+   green" — it was "a run that authenticated is green", and those are different
+   claims.
+
 ## 3. What is left, in order
 
 Already done, and recorded here so the list below is only what is left: the F0
