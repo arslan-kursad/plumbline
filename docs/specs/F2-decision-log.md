@@ -390,6 +390,35 @@ is in the record; a screenshot is the same fact one layer further away. The requ
 was written before the API check was.
 **Exit review:** yes — the three-attempt sequence is the phase's most transferable finding.
 
+### W1.6 — `gcf-artifacts` is adopted, and its cleanup policy starts in dry run
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** costly (the adoption),
+cheap (the dry run)
+**Decision:** Terraform adopts the `gcf-artifacts` repository through an `import` block
+and gives it the same keep-last-2 policy as `plumbline` — with
+`cleanup_policy_dry_run = true` until what it would delete has been observed (#57).
+**Why adopt something this project did not create:** a Gen2 function is built by Cloud
+Build into an auto-created repository that nothing owned, that accumulates an image per
+deploy, and that already holds ~93 MB of a project-wide 0.5 GB free allowance from a
+handful of kill-switch deploys. `docs/runbooks/kill-switch.md` §7 assigns bounding it to
+F2. "Not ours" is not a size limit.
+**Why dry run, which is the part worth arguing:** the images in there include the one the
+kill-switch function runs. A Gen2 function scales to zero, so every invocation is a
+potential cold start and a potential image pull; deleting a version a deployed function
+still references breaks the last cost control in the project, at the moment it is needed,
+and nothing reports it until then. keep-last-2 *should* never select a running image — the
+current one is the most recent by construction. This phase has already watched that
+control be inert twice on reasoning that read correctly, so the policy runs in dry run,
+its decisions are read out of the logs, and it goes live in Wave 2.
+**Verified before committing:** the import plans as `will be updated in-place`, not as a
+replacement — an adoption that destroyed and recreated the repository would delete every
+image in it, including the running one. `1 to import, 12 to add, 1 to change, 0 to
+destroy`.
+**Small thing, done on purpose:** the repository's existing description — Cloud Functions'
+own words — is carried into the configuration rather than blanked. Adopting a resource is
+not a licence to erase the metadata of the system that still writes to it, and a diff that
+nulls a field nobody asked to change costs a reviewer attention for nothing.
+**Exit review:** no, but #57 must not close silently.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the

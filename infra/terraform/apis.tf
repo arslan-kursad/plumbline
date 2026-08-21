@@ -24,6 +24,7 @@ resource "google_project_service" "required" {
     "cloudquotas.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "eventarc.googleapis.com",
+    "firestore.googleapis.com",
     "iam.googleapis.com",
     # iamcredentials and sts are the two halves of what Workload Identity
     # Federation does at run time: sts exchanges the GitHub OIDC assertion for a
