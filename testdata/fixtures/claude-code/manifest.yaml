@@ -1,0 +1,104 @@
+# Fixture manifest — claude-code
+# Field semantics: see testdata/fixtures/langgraph-python/manifest.yaml.
+
+dialect: claude-code
+provenance: derived-from-measured-evidence
+construction_basis: >
+  Assembled from the redacted marker inventory in
+  docs/evidence/claude-code-otel-capture.md §4, which was measured against a real
+  emitter on 2026-08-19 across three captures and two builds (2.1.197, 2.1.229). The
+  resource attribute set, the instrumentation scope name and version, both observed span
+  names, their attribute keys, the one observed event name and the status shapes are
+  measured. Values are synthetic throughout — see `synthetic_values` below.
+constructed_on: 2026-08-21
+evidence: docs/evidence/claude-code-otel-capture.md (v0.2, capture date 2026-08-19)
+emitter: Claude Code native OTel emission
+emitter_version: "2.1.229"             # measured; 2.1.197 emitted the identical marker shape
+otel_sdk_version: unknown              # only the exporter version is on the wire (OTel-OTLP-Exporter-JavaScript/0.208.0)
+instrumentation_scope:
+  name: com.anthropic.claude_code.tracing
+  version: "1.0.0"
+semconv_version_emitted: undeclared    # measured: no schemaUrl at any level, 0 occurrences
+schema_url_emitted: absent
+otel_semconv_stability_opt_in: unset   # measured: not exported into the capture environment
+
+# Why this is not `provenance: captured`.
+#
+# The F1 directive (D3) asks for promotion of the P11 evidence to a fixture if it holds
+# usable ExportTraceServiceRequest-level data including tool and hook spans. It does not:
+# the evidence file records that the raw capture was deliberately never committed (§5.1)
+# and that no `claude_code.tool` or `claude_code.hook` span was ever produced, because
+# every captured run failed authentication before reaching a tool call (§3). Calling this
+# `captured` would claim bytes that do not exist in this repository.
+#
+# Checkpoint C1 is therefore open: docs/runbooks/claude-code-capture.md is written for
+# the maintainer to run on an interactively authenticated session. When a real capture
+# lands, this fixture is replaced and this manifest's provenance becomes `captured`.
+
+synthetic_values: >
+  Every identity value is invented and belongs to no person: user ids and account ids
+  are `synthetic-*`, the email uses the RFC 2606 `.invalid` TLD, the account UUID is the
+  all-zero UUIDv4 shape, and `os.version` is `00.0.0` rather than a real host kernel
+  version. The one `success: true` llm_request span is constructed: every captured
+  llm_request failed, because the nested session could not authenticate, so a successful
+  request was never observed. It is included so that both status paths are exercised by
+  one fixture, and it is flagged here rather than passed off as measured.
+
+# Two-source redaction, which the evidence file warns must not be conflated.
+#
+# `user_prompt: "<REDACTED>"` in the twin is the *emitter's own* placeholder: Claude Code
+# gates prompt text behind OTEL_LOG_USER_PROMPTS and emits the literal string by default.
+# The `[REDACTED:sha256:…]` markers in expected-rows.json are *this pipeline's* redaction
+# stage (ADR-0006, normalization/redaction/v1/claude-code.yaml) running between
+# normalization and the write. The twin therefore shows what arrives on the wire; the
+# expected rows show what is stored.
+redacted_fields:
+  - user.id
+  - user.email
+  - user.account_uuid
+  - user.account_id
+  - organization.id
+  - session.id
+  - client_request_id
+  - workspace.host_paths
+  - user_prompt
+redaction_rules: normalization/redaction/v1/claude-code.yaml
+synthetic_resource_attribute: absent
+
+validation_status: markers-measured-payload-derived
+
+# What is measured and what is not (evidence §3). Detection conclusions rest on resource
+# and scope, which are fully measured across three captures and two builds. Mapping
+# conclusions rest on two span types only: `claude_code.tool`, `claude_code.tool.execution`,
+# `claude_code.tool.blocked_on_user` and `claude_code.hook` spans, and every documented
+# `claude_code.*` event, remain unobserved and are absent from this corpus rather than
+# invented.
+
+cases:
+  happy-path:
+    description: >
+      Three-span trace: a `claude_code.interaction` root and two `claude_code.llm_request`
+      children, one successful and one failing with an OAuth error. Exercises span-name
+      driven operation defaults, the deprecated `gen_ai.system` → `gen_ai.provider.name`
+      rewrite, redaction across span *and* event attributes, and the identity block that
+      the emitter repeats on every span rather than placing on the resource.
+    spans: 3
+    notes: >
+      This dialect emits no token counts at the captured version, so
+      `gen_ai_usage_input_tokens` and `gen_ai_usage_output_tokens` are null in every row.
+      That is a measured property of the emitter, not a mapping gap.
+      `session.id` is deliberately *not* mapped to `gen_ai_conversation_id`: it is a
+      redaction target, and a typed column carrying a hash marker would be worse than a
+      null one.
+  unmapped-attributes:
+    description: >
+      One `llm_request` span carrying `workspace.host_paths` — the documented-but-never-
+      observed event attribute that issue #11 requires be treated as present until a
+      capture shows otherwise. It is included here at span level so the redaction rule
+      for it is exercised by a test rather than only asserted in the rule file.
+    spans: 1
+  poison:
+    description: >
+      The first 96 bytes of happy-path/request.pb; see the langgraph-python manifest for
+      the shared rationale.
+    spans: 0

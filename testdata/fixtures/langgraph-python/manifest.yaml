@@ -1,0 +1,72 @@
+# Fixture manifest — langgraph-python
+#
+# Manifest fields follow docs/eval-plan.md SC-1 row 1.2: a fixture without provenance,
+# emitter version, the semconv version actually emitted, and the stability opt-in value
+# is not evidence. `unknown` means measured-and-not-determinable; `not-applicable` means
+# the field cannot exist for this provenance class.
+
+dialect: langgraph-python
+provenance: constructed
+construction_basis: >
+  OpenInference-style LangChain/LangGraph instrumentation shape. The attribute
+  vocabulary (openinference.span.kind, llm.model_name, llm.provider,
+  llm.token_count.prompt / .completion / .total, llm.invocation_parameters,
+  tool.name, session.id, input.value, output.value) is the published OpenInference
+  span convention for LangChain-family emitters. No payload from the Anomaly
+  Adjudicator was used: that project is outside the F1 handoff scope, and no capture
+  from it exists.
+constructed_on: 2026-08-21
+emitter: LangGraph agent instrumented by OpenInference LangChain instrumentation
+emitter_version: not-applicable        # constructed; no build was measured
+otel_sdk_version: "1.29.0"             # asserted in the fixture's resource attributes
+instrumentation_scope:
+  name: openinference.instrumentation.langchain
+  version: "0.1.29"
+semconv_version_emitted: none          # OpenInference is not a semconv vocabulary
+schema_url_emitted: absent             # the field is not emitted at all
+otel_semconv_stability_opt_in: not-applicable
+redacted_fields: []                    # constructed content; nothing to redact
+synthetic_resource_attribute: absent
+
+validation_status: unvalidated-against-a-real-emitter
+
+# What these fixtures prove, and what they do not (F1 directive D2).
+#
+# Prove: the normalization contract. Given this payload, the mapping produces exactly
+# the rows in expected-rows.json, and every attribute survives in the lossless
+# `attributes` JSON.
+#
+# Do not prove: detection fidelity. The resource and scope markers here are taken from
+# documentation, not from a capture, so a real Anomaly Adjudicator may present a
+# different scope name or version and be detected as `unknown`. That is a real risk, it
+# is accepted for F1, and it is closed in F4 (dogfooding) by re-validating against a
+# real capture — tracked in the F4 re-validation issue.
+
+cases:
+  happy-path:
+    description: >
+      Three-span trace: a CHAIN root, an LLM child carrying model and token counts, and
+      a TOOL child that fails with an exception event. Exercises value-mapped operation
+      names, token-count renaming, status mapping, and events.
+    spans: 3
+    notes: >
+      The tool span's end timestamp carries a sub-microsecond remainder
+      (…612345678 ns) so that the documented truncation to BigQuery TIMESTAMP
+      microseconds is visible in the expected rows rather than only asserted in prose.
+      `llm.invocation_parameters` is a JSON *string*: the normalizer does not parse
+      embedded JSON, so temperature and max_tokens stay in the lossless attributes and
+      the typed columns are null. That is a stated limit of the mapping, not an
+      oversight.
+  unmapped-attributes:
+    description: >
+      One LLM span carrying five emitter-private attributes across every AnyValue type
+      (string, double, int, bool, array). Proof of losslessness: none is mapped to a
+      typed column, all five appear verbatim in `attributes.span`.
+    spans: 1
+  poison:
+    description: >
+      The first 96 bytes of happy-path/request.pb. Truncated inside a length-delimited
+      field, so protobuf parsing fails rather than yielding a shorter valid message.
+      Feeds the worker NACK → redelivery → DLQ path; it has no twin and no expected rows
+      because it must never produce a row.
+    spans: 0

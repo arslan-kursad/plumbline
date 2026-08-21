@@ -1,0 +1,92 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "anomaly-adjudicator" } },
+          { "key": "service.version", "value": { "stringValue": "0.4.1" } },
+          { "key": "telemetry.sdk.language", "value": { "stringValue": "python" } },
+          { "key": "telemetry.sdk.name", "value": { "stringValue": "opentelemetry" } },
+          { "key": "telemetry.sdk.version", "value": { "stringValue": "1.29.0" } },
+          { "key": "deployment.environment.name", "value": { "stringValue": "local" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "openinference.instrumentation.langchain",
+            "version": "0.1.29"
+          },
+          "spans": [
+            {
+              "traceId": "4f1a0c9d2b7e48a3915c6d0e7fb2a341",
+              "spanId": "a1b2c3d4e5f60718",
+              "name": "AnomalyAdjudicator.workflow",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1787133600000000000",
+              "endTimeUnixNano": "1787133601940000000",
+              "attributes": [
+                { "key": "openinference.span.kind", "value": { "stringValue": "CHAIN" } },
+                { "key": "session.id", "value": { "stringValue": "adj-session-0f21" } },
+                { "key": "input.value", "value": { "stringValue": "synthetic sample incident batch 7" } },
+                { "key": "output.value", "value": { "stringValue": "2 anomalies adjudicated" } },
+                { "key": "metadata", "value": { "stringValue": "{\"run_id\":\"batch-7\",\"graph\":\"adjudicate\"}" } }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "4f1a0c9d2b7e48a3915c6d0e7fb2a341",
+              "spanId": "b2c3d4e5f6071829",
+              "parentSpanId": "a1b2c3d4e5f60718",
+              "name": "ChatAnthropic",
+              "kind": "SPAN_KIND_CLIENT",
+              "startTimeUnixNano": "1787133600120000000",
+              "endTimeUnixNano": "1787133601284000000",
+              "attributes": [
+                { "key": "openinference.span.kind", "value": { "stringValue": "LLM" } },
+                { "key": "llm.provider", "value": { "stringValue": "anthropic" } },
+                { "key": "llm.system", "value": { "stringValue": "anthropic" } },
+                { "key": "llm.model_name", "value": { "stringValue": "claude-sonnet-4-5" } },
+                { "key": "llm.token_count.prompt", "value": { "intValue": "1843" } },
+                { "key": "llm.token_count.completion", "value": { "intValue": "212" } },
+                { "key": "llm.token_count.total", "value": { "intValue": "2055" } },
+                { "key": "llm.invocation_parameters", "value": { "stringValue": "{\"temperature\":0.2,\"max_tokens\":1024}" } },
+                { "key": "session.id", "value": { "stringValue": "adj-session-0f21" } }
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "4f1a0c9d2b7e48a3915c6d0e7fb2a341",
+              "spanId": "c3d4e5f60718293a",
+              "parentSpanId": "a1b2c3d4e5f60718",
+              "name": "lookup_incident_history",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1787133601290000000",
+              "endTimeUnixNano": "1787133601612345678",
+              "attributes": [
+                { "key": "openinference.span.kind", "value": { "stringValue": "TOOL" } },
+                { "key": "tool.name", "value": { "stringValue": "lookup_incident_history" } },
+                { "key": "tool.description", "value": { "stringValue": "Fetch prior incidents for a device id" } },
+                { "key": "session.id", "value": { "stringValue": "adj-session-0f21" } }
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1787133601610000000",
+                  "name": "exception",
+                  "attributes": [
+                    { "key": "exception.type", "value": { "stringValue": "TimeoutError" } },
+                    { "key": "exception.message", "value": { "stringValue": "incident history backend did not respond" } }
+                  ]
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_ERROR",
+                "message": "incident history backend did not respond"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

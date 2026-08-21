@@ -1,0 +1,54 @@
+[
+  {
+    "start_time": "2026-08-19T10:00:00.000000Z",
+    "end_time": "2026-08-19T10:00:00.500000Z",
+    "trace_id": "1112131415161718191a1b1c1d1e1f20",
+    "span_id": "2122232425262728",
+    "parent_span_id": null,
+    "name": "chat gpt-4o-mini",
+    "kind": "SPAN_KIND_CLIENT",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "apartment-triage",
+    "source_dialect": "dotnet-agent",
+    "api_key_id": "local-test",
+    "schema_url": "https://opentelemetry.io/schemas/1.28.0",
+    "synthetic": false,
+    "gen_ai_provider_name": null,
+    "gen_ai_operation_name": "chat",
+    "gen_ai_request_model": "gpt-4o-mini",
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": null,
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "apartment-triage",
+        "telemetry.sdk.language": "dotnet"
+      },
+      "scope": {
+        "name": "Experimental.Microsoft.Extensions.AI",
+        "version": "9.3.0",
+        "attributes": {}
+      },
+      "span": {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.request.model": "gpt-4o-mini",
+        "triage.property_class": "residential",
+        "triage.queue_depth": 17,
+        "triage.sla_hours": 4.5,
+        "triage.after_hours": true
+      }
+    },
+    "events": [],
+    "links": []
+  }
+]

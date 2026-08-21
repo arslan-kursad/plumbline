@@ -1,0 +1,59 @@
+[
+  {
+    "start_time": "2026-08-19T10:00:00.000000Z",
+    "end_time": "2026-08-19T10:00:00.500000Z",
+    "trace_id": "2122232425262728292a2b2c2d2e2f30",
+    "span_id": "3132333435363738",
+    "parent_span_id": null,
+    "name": "claude_code.llm_request",
+    "kind": "SPAN_KIND_INTERNAL",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "claude-code",
+    "source_dialect": "claude-code",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": "anthropic",
+    "gen_ai_operation_name": "chat",
+    "gen_ai_request_model": "claude-sonnet-4-5",
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": null,
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "claude-code",
+        "service.version": "2.1.229"
+      },
+      "scope": {
+        "name": "com.anthropic.claude_code.tracing",
+        "version": "1.0.0",
+        "attributes": {}
+      },
+      "span": {
+        "span.type": "llm_request",
+        "user.id": "[REDACTED:sha256:02a88619]",
+        "user.email": "[REDACTED:sha256:edf7623e]",
+        "gen_ai.system": "anthropic",
+        "gen_ai.request.model": "claude-sonnet-4-5",
+        "speed": "normal",
+        "attempt": 1,
+        "success": true,
+        "workspace.host_paths": [
+          "[REDACTED:sha256:8b89e10c]"
+        ]
+      }
+    },
+    "events": [],
+    "links": []
+  }
+]

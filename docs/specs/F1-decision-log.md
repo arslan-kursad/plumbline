@@ -168,3 +168,159 @@ good reason, since the plan is a pre-registration document.
 **Rationale:** the directive says W8 closes #8, and the standing prohibition says part of
 #8 cannot be done. Both hold; what gives is the assumption that the issue is indivisible.
 **C2:** yes, briefly — it is a scope-gap fix against the directive's own wording.
+
+### W2.1 — The human-readable twin is OTLP/JSON, not textproto
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** each fixture's readable form is `request.otlp.json` in OTLP/JSON — the
+protobuf JSON mapping with trace and span ids in lowercase hex — rather than the
+protobuf text format the directive named.
+**Alternatives:** textproto, as written. It would mean either adding a Go tool that
+imports the OTLP protos purely to render fixtures — the one import the collector is
+forbidden to have, in a repository where that boundary is the point — or hand-writing
+text format with no parser in the .NET toolchain to check it. `Google.Protobuf` ships a
+JSON formatter and parser and no text-format parser.
+**Rationale:** OTLP/JSON is a specified OTLP encoding rather than a convenience format,
+so the twin is exactly what an OTLP/HTTP JSON exporter would send. Ids are re-encoded
+hex → base64 by the generator so the authored file stays readable without giving up
+canonical parsing.
+**C2:** yes — it is a deviation from the directive's wording, however small.
+
+### W2.2 — The twin is the source of truth; the binary is generated and verified
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** `request.pb` is produced from `request.otlp.json` by
+`worker/Plumbline.Fixtures`, and a test fails if a committed binary no longer matches
+its twin. Poison payloads are the first 96 bytes of the dialect's happy-path binary.
+**Alternatives:** commit the binary as the authored artefact with the JSON as a rendered
+view — inverts which file a reviewer can actually read; or generate the binary at test
+time and not commit it — the Go collector tests and the end-to-end sender both need the
+bytes on disk, and a fixture that only exists inside one language's test run is not a
+corpus.
+**Rationale:** a diff on `request.pb` tells a reviewer nothing. The generated-and-checked
+ordering is what makes review possible without making the binary optional.
+**C2:** no.
+
+### W2.3 — The `attributes` JSON column carries all three attribute levels
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** costly
+**Decision:** the lossless column is shaped
+`{"resource": {...}, "scope": {"name","version","attributes"}, "span": {...}}`.
+**Alternatives:** one flat bag of span attributes — loses every resource attribute that
+has no typed column (`os.version`, `deployment.environment.name`, the whole telemetry.sdk
+block) and lets a resource key silently collide with a span key of the same name; a flat
+bag with prefixed keys — same information, but the prefix becomes part of every query.
+**Rationale:** architecture §4.1 names the column "lossless remainder" and does not fix
+its shape. Losslessness is the requirement; keeping the level a key came from is the only
+way to meet it for a payload that carries the same key at two levels. Costly rather than
+cheap because rows written under one shape are not rewritten — ADR-0001 keeps no bytes to
+reprocess from.
+**C2:** yes — it fills a gap in architecture §4.1 rather than following it.
+
+### W2.4 — Typed `gen_ai_*` columns are the fifteen scalars; arrays stay lossless
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** costly
+**Decision:** provider name, operation name, request/response model, response id,
+conversation id, agent name, tool name, tool call id, input/output tokens, max tokens,
+temperature, top_p, output type. Array-valued GenAI attributes —
+`gen_ai.response.finish_reasons` is the only one this project's dialects emit — stay in
+the `attributes` JSON.
+**Alternatives:** a repeated column for finish reasons. It buys grouping the JSON column
+already supports, and costs a schema shape the local BigQuery stand-in must also agree
+with, in a phase whose stand-in is not yet chosen.
+**Rationale:** architecture §4.1 delegates the exact list to the mapping table and names
+"system, operation, model, token counts, …". Every column here is a v1.41 registry
+attribute; nothing is invented.
+**C2:** no — but the list is quoted in the completion note, since it is the table's shape.
+
+### W2.5 — Timestamps truncate to microseconds, and a fixture proves it
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** OTLP nanosecond timestamps are floored to BigQuery `TIMESTAMP`
+microseconds. The nanosecond remainder is not preserved anywhere.
+**Alternatives:** round rather than floor — an end time that rounds up can land after a
+parent's, which is worse than being three digits short; keep the remainder in the
+attributes JSON — invents a column-shaped attribute nobody queries.
+**Rationale:** the loss is forced by the column type. What is decided here is that it is
+*stated* — in the row model, in the mapping README — and made falsifiable: the
+langgraph-python tool span ends at `…612345678` ns so the truncation appears in a golden
+file rather than only in prose.
+**C2:** no.
+
+### W2.6 — `schema_url` resolves scope first, then resource
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** the column takes the `ScopeSpans.schema_url` when present, else the
+`ResourceSpans.schema_url`, else null.
+**Alternatives:** resource-first. OTLP allows both levels and the scope-level value is
+the narrower claim — it describes the conventions the instrumentation emitted, which is
+what the column audits.
+**Rationale:** architecture §4.1 says "from OTLP resource" without addressing the scope
+level, which the dotnet-agent dialect actually uses.
+**C2:** yes, briefly — same class as W2.3.
+
+### W2.7 — Redaction markers are `[REDACTED:sha256:<8 hex>]`
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** costly
+**Decision:** a redacted value is replaced by the first eight hex characters of the
+SHA-256 of the original, inside a marker that names the algorithm.
+**Alternatives:** a constant marker — collapses every user into one value, so counts and
+joins over redacted keys become meaningless; the full digest — 64 characters per
+occurrence for no additional property at this cardinality; a keyed HMAC — better against
+a dictionary attack on a known small domain, and it needs a key, which is a secret this
+design does not have (architecture §6.3).
+**Rationale:** D6 requires joins and counts to survive redaction, which needs
+determinism, and the fixtures demonstrate it: the same `client_request_id` produces the
+same marker on the span and on its event. The residual weakness — an eight-hex prefix of
+an unkeyed digest is reversible for a guessable value such as an email address — is
+stated in ADR-0006 rather than papered over.
+**C2:** yes — inside the ADR-0006 decision.
+
+### W2.8 — The unknown path fills typed columns from v1.41 names
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** an unrecognised dialect is normalized generically: OTLP structural fields
+plus any attribute already carrying its exact v1.41 registry name populate the typed
+columns; everything else stays in the lossless attributes; `source_dialect='unknown'`.
+**Alternatives:** leave every typed column null for unknown payloads. Simpler, and it
+throws away information the payload states in the project's own pinned vocabulary.
+**Rationale:** architecture §5 says "normalized columns filled where OTLP fields map
+directly". An attribute named exactly as the pin names it maps directly by any reading.
+**C2:** no.
+
+### W2.9 — OTLP protobuf definitions are vendored, not taken from a package
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** `third_party/opentelemetry-proto/v1.11.0/` holds the four `.proto` files
+the worker needs plus the upstream Apache-2.0 license; C# types are generated at build
+by `Grpc.Tools` with `GrpcServices="None"`.
+**Alternatives:** a NuGet package carrying pre-generated OTLP types — one fewer build
+step, and it makes the wire contract a transitive dependency of someone else's release
+cadence in a project whose entire premise is pinning that contract.
+**Rationale:** same reasoning as the semconv registry: the thing being pinned is
+vendored with its checksums. `GrpcServices="None"` because the worker is a Pub/Sub push
+endpoint and never serves the OTLP gRPC service.
+**C2:** no.
+
+### W2.10 — The golden harness lands in two halves
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** W2 delivers the fixture corpus, the expected rows, the row model, the
+field-level diff engine with its own tests, and the corpus integrity tests. The golden
+assertions that run a normalizer against the corpus land in W4, with the normalizer.
+**Alternatives:** hold the whole harness for W4 — leaves the expected rows uncommitted
+while the code that must satisfy them is written, which is the ordering that turns golden
+files into a transcript of whatever the code did.
+**Rationale:** the expectations are the contract and are written first, on purpose. What
+cannot be written before the normalizer exists is only the call into it.
+**C2:** no.
+
+### W2.11 — Fixture manifests carry no checksums
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** manifests record provenance, emitter, semconv version emitted, opt-in
+value and redacted fields — not digests of the fixture files.
+**Alternatives:** a digest per file, as the vendored semconv registry carries. There the
+checksum pins an artefact fetched from elsewhere; here both files are in the same commit
+and the binary is already checked against the twin by a test, so a digest would be a
+third copy of a fact two artefacts already state, and one more thing to forget to update.
+**C2:** no.
+
+### W2.12 — `dotnet test` joins CI now rather than in W7
+**Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
+**Decision:** the existing `.NET` CI job runs `dotnet test` on the worker solution from
+this work item, ahead of the W7 CI extension.
+**Rationale:** W2 is the first work item to add tests, and a test suite CI does not run
+is not a control. Deferring it to W7 would mean the corpus integrity checks are advisory
+for the length of three work items — exactly the "skipped and green" failure the CI job
+design already argues against.
+**C2:** no.

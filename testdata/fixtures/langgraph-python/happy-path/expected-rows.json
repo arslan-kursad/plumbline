@@ -1,0 +1,180 @@
+[
+  {
+    "start_time": "2026-08-19T10:00:00.000000Z",
+    "end_time": "2026-08-19T10:00:01.940000Z",
+    "trace_id": "4f1a0c9d2b7e48a3915c6d0e7fb2a341",
+    "span_id": "a1b2c3d4e5f60718",
+    "parent_span_id": null,
+    "name": "AnomalyAdjudicator.workflow",
+    "kind": "SPAN_KIND_INTERNAL",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "anomaly-adjudicator",
+    "source_dialect": "langgraph-python",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": null,
+    "gen_ai_operation_name": "invoke_workflow",
+    "gen_ai_request_model": null,
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": "adj-session-0f21",
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "anomaly-adjudicator",
+        "service.version": "0.4.1",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.29.0",
+        "deployment.environment.name": "local"
+      },
+      "scope": {
+        "name": "openinference.instrumentation.langchain",
+        "version": "0.1.29",
+        "attributes": {}
+      },
+      "span": {
+        "openinference.span.kind": "CHAIN",
+        "session.id": "adj-session-0f21",
+        "input.value": "synthetic sample incident batch 7",
+        "output.value": "2 anomalies adjudicated",
+        "metadata": "{\"run_id\":\"batch-7\",\"graph\":\"adjudicate\"}"
+      }
+    },
+    "events": [],
+    "links": []
+  },
+  {
+    "start_time": "2026-08-19T10:00:00.120000Z",
+    "end_time": "2026-08-19T10:00:01.284000Z",
+    "trace_id": "4f1a0c9d2b7e48a3915c6d0e7fb2a341",
+    "span_id": "b2c3d4e5f6071829",
+    "parent_span_id": "a1b2c3d4e5f60718",
+    "name": "ChatAnthropic",
+    "kind": "SPAN_KIND_CLIENT",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "anomaly-adjudicator",
+    "source_dialect": "langgraph-python",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": "anthropic",
+    "gen_ai_operation_name": "chat",
+    "gen_ai_request_model": "claude-sonnet-4-5",
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": "adj-session-0f21",
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": 1843,
+    "gen_ai_usage_output_tokens": 212,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "anomaly-adjudicator",
+        "service.version": "0.4.1",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.29.0",
+        "deployment.environment.name": "local"
+      },
+      "scope": {
+        "name": "openinference.instrumentation.langchain",
+        "version": "0.1.29",
+        "attributes": {}
+      },
+      "span": {
+        "openinference.span.kind": "LLM",
+        "llm.provider": "anthropic",
+        "llm.system": "anthropic",
+        "llm.model_name": "claude-sonnet-4-5",
+        "llm.token_count.prompt": 1843,
+        "llm.token_count.completion": 212,
+        "llm.token_count.total": 2055,
+        "llm.invocation_parameters": "{\"temperature\":0.2,\"max_tokens\":1024}",
+        "session.id": "adj-session-0f21"
+      }
+    },
+    "events": [],
+    "links": []
+  },
+  {
+    "start_time": "2026-08-19T10:00:01.290000Z",
+    "end_time": "2026-08-19T10:00:01.612345Z",
+    "trace_id": "4f1a0c9d2b7e48a3915c6d0e7fb2a341",
+    "span_id": "c3d4e5f60718293a",
+    "parent_span_id": "a1b2c3d4e5f60718",
+    "name": "lookup_incident_history",
+    "kind": "SPAN_KIND_INTERNAL",
+    "status_code": "STATUS_CODE_ERROR",
+    "status_message": "incident history backend did not respond",
+    "service_name": "anomaly-adjudicator",
+    "source_dialect": "langgraph-python",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": null,
+    "gen_ai_operation_name": "execute_tool",
+    "gen_ai_request_model": null,
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": "adj-session-0f21",
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": "lookup_incident_history",
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "anomaly-adjudicator",
+        "service.version": "0.4.1",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.29.0",
+        "deployment.environment.name": "local"
+      },
+      "scope": {
+        "name": "openinference.instrumentation.langchain",
+        "version": "0.1.29",
+        "attributes": {}
+      },
+      "span": {
+        "openinference.span.kind": "TOOL",
+        "tool.name": "lookup_incident_history",
+        "tool.description": "Fetch prior incidents for a device id",
+        "session.id": "adj-session-0f21"
+      }
+    },
+    "events": [
+      {
+        "time": "2026-08-19T10:00:01.610000Z",
+        "name": "exception",
+        "attributes": {
+          "exception.type": "TimeoutError",
+          "exception.message": "incident history backend did not respond"
+        },
+        "dropped_attributes_count": 0
+      }
+    ],
+    "links": []
+  }
+]
