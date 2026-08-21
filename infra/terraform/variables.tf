@@ -125,3 +125,22 @@ variable "state_bucket" {
   type        = string
   default     = null
 }
+
+variable "alert_email" {
+  description = <<-EOT
+    Destination for the dead-letter depth alert (architecture §3.4). An email
+    notification channel is free; every other channel type this project could use
+    either costs money or depends on a third-party SaaS.
+
+    Deliberately a variable with no default. The repository is public, so a
+    hard-coded address would be world-readable personal data in a history that is
+    not erasable in practice — and CI supplies it from a secret, which the plan
+    output then masks.
+  EOT
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@[:space:]]+@[^@[:space:]]+$", var.alert_email))
+    error_message = "alert_email must be an email address."
+  }
+}

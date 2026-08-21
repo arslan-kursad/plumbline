@@ -32,6 +32,7 @@ resource "google_project_service" "required" {
     # both, and the failure would land in CI rather than in an apply.
     "iamcredentials.googleapis.com",
     "logging.googleapis.com",
+    "monitoring.googleapis.com",
     "pubsub.googleapis.com",
     "run.googleapis.com",
     "serviceusage.googleapis.com",
