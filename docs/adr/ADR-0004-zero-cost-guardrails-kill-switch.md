@@ -284,6 +284,83 @@ was tested rather than assumed. The decision is taken in F2 against captured pay
 recorded as a further amendment. Until then the residual risk is accepted and stated, not
 mitigated by assumption.
 
+## Amendment 2 (2026-08-21) — The kill-switch could not detach billing
+
+Status unchanged. The decision stands; its permission model was wrong, and the
+live-fire is what proved it.
+
+### What happened
+
+The first live-fire published a synthetic notification and the function did
+everything right up to the act itself:
+
+```
+11:05:13 INFO  budget notification received budget="plumbline zero-spend"
+               cost=0.01 currency=TRY threshold_exceeded=1 interval_start=LIVE-FIRE
+11:05:14 ERROR cannot read billing info and retrying will not help
+               error="googleapi: Error 403: The caller does not have permission"
+```
+
+Billing stayed attached. The control was inert, and had been inert since the day
+it was deployed.
+
+### Cause
+
+Detaching billing is authorized on **both sides** of the project-to-billing-account
+association:
+
+| Permission | Scope | Predefined roles containing it |
+| --- | --- | --- |
+| `resourcemanager.projects.deleteBillingAssignment` | project | Project Billing Manager, Billing Account Administrator |
+| `billing.resourceAssociations.delete` | billing account | **Billing Account Administrator only** |
+
+The design granted Project Billing Manager on the project and nothing on the
+billing account, which covers one side of a two-sided check.
+
+### Decision
+
+Grant `roles/billing.admin` to the kill-switch service account **on the billing
+account**, keeping the project-side grant. This is what Google's own
+disable-billing-with-notifications procedure grants, and there is no narrower
+option: the permission exists in exactly one predefined role, and billing-account
+IAM takes predefined roles.
+
+### What this costs, stated rather than absorbed
+
+**The claim that this identity "can detach and cannot re-attach, by construction"
+is withdrawn.** It was the tidiest sentence in §5 and it was false. The only role
+that can delete the association can also create it. Re-attachment remains a human
+step because of the function's code and the operating procedure — not because the
+identity is incapable of it. That is a weaker guarantee and it is now written as
+one.
+
+**Blast radius.** A service account inside this project holds administrator rights
+over the billing account: it can move billing for any project under that account,
+and close the account. Three things bound it, none of which is a permission
+boundary on the role itself:
+
+- No key exists to steal (§6.1 — Workload Identity Federation, no exported keys).
+- It is invocable only by Eventarc from the `billing-alerts` topic; `run.invoker`
+  is granted on that one service, not project-wide.
+- The function's code never attaches, and never names a project other than
+  `TARGET_PROJECT_ID`. It has exactly one write call, with an empty billing
+  account name.
+
+**Alternative reconsidered.** Alternative C above — disabling the offending
+service instead of detaching billing — becomes more attractive once detaching
+costs this much authority. It is still rejected for the reason given there: it
+requires correctly identifying what is spending, at the moment of failure, in a
+code path exercised roughly never. Revisit it in F2 if the blast radius proves
+unacceptable; that would be a further amendment, not a silent change.
+
+### Why this is the argument for live-firing, not against it
+
+§5 says an untested kill-switch is a comfort object. It was one — for the whole
+period between deploying it and firing it. No amount of reading the configuration
+would have found this: the permission model is plausible, symmetric, and wrong,
+and every layer above it worked. The test that this project made mandatory is the
+only thing that could have caught it, and it caught it on the first attempt.
+
 ## References
 
 - `docs/architecture.md` §2.3, §6.2, §7, §7.1, §8.

@@ -29,14 +29,32 @@ resource "google_service_account" "killswitch" {
   depends_on = [google_project_service.required]
 }
 
-# Detach permission, scoped to this project only. Project Billing Manager on the
-# project grants billing.resourceAssociations.delete here and nowhere else; it
-# cannot re-attach billing (that needs permission on the billing account), which
-# is why re-attachment is a documented human procedure.
+# Detaching billing is authorized on both sides of the association, so both
+# grants are required (ADR-0004 Amendment 2).
+#
+# Project side: resourcemanager.projects.deleteBillingAssignment, which Project
+# Billing Manager carries on this project and nowhere else.
 resource "google_project_iam_member" "killswitch_billing_manager" {
   project = var.project_id
   role    = "roles/billing.projectManager"
   member  = "serviceAccount:${google_service_account.killswitch.email}"
+}
+
+# Billing-account side: billing.resourceAssociations.delete, which exists in
+# exactly one predefined role — Billing Account Administrator — and is grantable
+# only on the billing account.
+#
+# This is more power than the design wanted. The first live-fire failed with a
+# 403 exactly here, and the original claim that this identity "can detach and
+# cannot re-attach" was false at the platform level: no narrower role can delete
+# the association, and the role that can delete it can also create it. What keeps
+# re-attachment human is the function's code and the operating procedure, not a
+# permission boundary. Blast radius and the alternatives considered are in
+# ADR-0004 Amendment 2 rather than left implicit behind a role name.
+resource "google_billing_account_iam_member" "killswitch_billing_admin" {
+  billing_account_id = var.billing_account_id
+  role               = "roles/billing.admin"
+  member             = "serviceAccount:${google_service_account.killswitch.email}"
 }
 
 resource "google_project_iam_member" "killswitch_event_receiver" {

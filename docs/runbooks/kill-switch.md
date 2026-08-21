@@ -193,10 +193,41 @@ details. Crop before committing.
 
 ## 4. Live-fire evidence
 
-> Not yet executed. This section is filled by the operator immediately after the
-> test; F0 acceptance criterion 7 and the F0 completion note both point here.
-> Leaving it empty while claiming F0 complete would be exactly the silent
-> degradation this project rejects.
+### Attempt 1 — 2026-08-21 — **FAILED, and this is the point of the test**
+
+Billing did **not** detach. The function received the notification, decided
+correctly, and was refused by the API:
+
+```
+11:05:13 INFO  budget notification received budget="plumbline zero-spend"
+               cost=0.01 currency=TRY threshold_exceeded=1 interval_start=LIVE-FIRE
+11:05:14 ERROR cannot read billing info and retrying will not help
+               error="googleapi: Error 403: The caller does not have permission"
+```
+
+`gcloud beta billing projects describe plumbline-19458` reported
+`billingEnabled: true` before and after. Earlier in the same log, at 10:52, a real
+budget notification with `cost=0` had logged `no spend reported; billing left
+attached` — the path that never touches the billing API, which is why nothing had
+gone wrong until now.
+
+**Cause:** detaching is authorized on both sides of the association, and the
+identity held only the project side. `billing.resourceAssociations.delete` exists
+in exactly one predefined role, Billing Account Administrator, grantable only on
+the billing account. Fixed and explained in ADR-0004 Amendment 2, including what
+the extra authority costs.
+
+**What the attempt proves, beyond the defect:** the error classification worked —
+a 403 is not retryable, so the function logged the reason and acked instead of
+starting a redelivery loop, and the cause was legible in the first log line
+anyone read. A control that fails loudly is the difference between this being a
+morning's work and a discovery made during an incident.
+
+### Attempt 2 — pending
+
+> Not yet executed. Re-run §3 after the Amendment 2 grant is applied, allowing a
+> minute or two for billing IAM to propagate. F0 acceptance criterion 7 stays open
+> until billing has been observed detaching, and the completion note points here.
 
 **What this test does not cover.** The live-fire publishes a synthetic message and
 exercises Pub/Sub → function → detach. It says nothing about how the budget
@@ -225,9 +256,15 @@ Before re-attaching, establish which case you are in:
 
 ### Re-attaching
 
-The kill-switch identity holds `roles/billing.projectManager` **on the project**
-only. It can detach and cannot re-attach — deliberate: re-attaching spend is a
-decision a human makes.
+Re-attaching is a human step by procedure, not by permission. The kill-switch
+identity holds Billing Account Administrator on the billing account — the only
+role that can delete a billing association, and it can create one too
+(ADR-0004 Amendment 2). What stops the function re-attaching is its code: one
+write call, with an empty billing account name, against one project.
+
+An earlier version of this runbook claimed the identity was incapable of
+re-attaching. It is not, and the difference matters when reasoning about what the
+control actually guarantees.
 
 ```bash
 gcloud beta billing projects link "$PROJECT_ID" --billing-account "$BILLING_ACCOUNT"
