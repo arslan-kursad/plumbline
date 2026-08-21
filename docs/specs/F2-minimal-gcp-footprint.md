@@ -240,6 +240,25 @@ project's life where that is true.
 
 This wave builds the mechanism D1 rests on, because Wave 0 could not use it.
 
+- **W1a — the identity, applied by the maintainer (Lane C, targeted).** The same
+  bootstrapping fact as Wave 0, one step further on: an apply performed *by* `ci-deploy`
+  cannot be the apply that *creates* `ci-deploy`. So the identity, its Workload Identity
+  binding and its role grants are applied locally and targeted at those resources, and
+  every apply after it goes through the gate. This is the last local apply of the phase,
+  and the spec says so here so that a later one has nothing to appeal to.
+
+  ```
+  terraform plan -target=google_service_account.ci_deploy \
+    -target=google_service_account_iam_member.ci_deploy_wif \
+    -target=google_project_iam_member.ci_deploy \
+    -target=google_billing_account_iam_member.ci_deploy_billing_viewer \
+    -target=google_storage_bucket_iam_member.ci_deploy_state -out plan.tfplan
+  ```
+
+  Then the repository variable `GCP_DEPLOY_SERVICE_ACCOUNT` is set to the new identity's
+  email — the deploy workflow's preflight refuses without it, which is how the first
+  dispatch already failed on purpose.
+
 - **`ci-deploy` and the deploy workflow.** The identity `infra/terraform/wif.tf` describes
   and refuses to create: a separate service account whose principalSet requires the branch
   as well as the repository, so a pull request cannot obtain deploy credentials even from
@@ -406,16 +425,19 @@ The complete list. Nothing else mid-phase.
    used in Wave 1, which is the first wave with a CI apply path to protect.
 2. **The Wave 0 apply** — from the maintainer's own credentials, because `ci-deploy` does
    not exist yet and both pending changes are billing-account-scoped (§2, §6).
-3. **Four environment approvals** — Waves 1 through 4.
-4. **Kill-switch live-fire confirmation and billing re-attach** — Wave 0, Lane C.
-5. **Verification A** — any morning after the Wave 0 apply: Billing → Reports with the
+3. **The W1a apply** — the deploy identity, targeted and local, for the same reason as
+   Wave 0: an apply by `ci-deploy` cannot create `ci-deploy`. The last local apply of the
+   phase. Setting `GCP_DEPLOY_SERVICE_ACCOUNT` afterwards is part of it.
+4. **Four environment approvals** — Waves 1 through 4.
+5. **Kill-switch live-fire confirmation and billing re-attach** — Wave 0, Lane C.
+6. **Verification A** — any morning after the Wave 0 apply: Billing → Reports with the
    savings and credit filters cleared, confirming a non-zero usage cost against a zero
    net total. It is the observation the budget's whole spend basis rests on, it has never
    been performed (runbook §1 records it as outstanding, #17 step 2 carries it), and it
    is console-only, so no lane but Lane C can do it. If the observation contradicts the
    premise, stop: ADR-0004 Amendment 1 is withdrawn, not patched.
-6. **First API key provisioning** through `keyctl` — after Wave 1, Lane C.
-7. **C2-style exit review** — completion note, D2's scope statement, Verification B
+7. **First API key provisioning** through `keyctl` — after Wave 1, Lane C.
+8. **C2-style exit review** — completion note, D2's scope statement, Verification B
    evidence, a decision-log skim.
 
 The claude-code capture (#10, F1's C1) stays open and stays non-blocking: it gates F4's
