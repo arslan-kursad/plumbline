@@ -6,6 +6,11 @@ data "google_project" "this" {
 # Firestore, Scheduler) are enabled by F2 alongside the resources that use them;
 # bigquery.googleapis.com is here because the quota override in quota.tf targets
 # it and cannot be applied to a disabled service.
+#
+# The list is sorted, and every entry earns its place by a resource in this
+# module or by a runtime path this module creates. An API that no longer has a
+# reason here is removed rather than kept "just in case": enabling one is free,
+# but an unexplained entry is indistinguishable from a mistake.
 resource "google_project_service" "required" {
   for_each = toset([
     "artifactregistry.googleapis.com",
@@ -14,9 +19,19 @@ resource "google_project_service" "required" {
     "cloudbilling.googleapis.com",
     "cloudbuild.googleapis.com",
     "cloudfunctions.googleapis.com",
+    # quota.tf speaks to the Cloud Quotas API; without this the override is not a
+    # misconfiguration, it is an apply failure.
+    "cloudquotas.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "eventarc.googleapis.com",
     "iam.googleapis.com",
+    # The two halves of what Workload Identity Federation does at run time:
+    # sts exchanges the GitHub OIDC assertion for a federated token, and
+    # iamcredentials mints the service account token that token impersonates
+    # with. Creating the pool needs neither; using it needs both, and the
+    # failure would land in CI rather than in an apply.
+    "iamcredentials.googleapis.com",
+    "sts.googleapis.com",
     "logging.googleapis.com",
     "pubsub.googleapis.com",
     "run.googleapis.com",

@@ -27,3 +27,13 @@ output "ci_service_account" {
   description = "Value for the GCP_CI_SERVICE_ACCOUNT repository variable."
   value       = google_service_account.ci_readonly.email
 }
+
+output "project_id" {
+  description = "Value for the GCP_PROJECT_ID repository variable."
+  value       = var.project_id
+}
+
+output "state_bucket" {
+  description = "Value for the GCP_STATE_BUCKET repository variable; the bucket ./bootstrap created."
+  value       = local.state_bucket
+}
