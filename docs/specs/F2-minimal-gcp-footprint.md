@@ -42,6 +42,15 @@ once, CI applies, Claude Code verifies and records. One click per wave, five wav
 No `terraform apply` from any other path: a local apply by anyone is a process violation,
 and drift suggesting one happened is raised, not absorbed.
 
+**The rule binds from Wave 1, and the reason is a fact rather than a preference.** F0
+shipped exactly one CI identity, `ci-readonly`, and made it provably incapable of
+deploying — `infra/terraform/wif.tf` documents the `ci-deploy` identity as F2's to create
+and deliberately does not create it. So the first mutation of this phase cannot come from
+CI: the identity CI would use does not exist, and creating it is itself a mutation.
+Whatever the governance model says, that first apply comes from a human's own credentials,
+exactly as every F0 apply did. Wave 0 is that apply and is scoped to it (§6). From Wave 1
+onward the CI path exists and the rule is absolute.
+
 **Lane C — human only.** Billing-console actions (confirming the detach, re-attaching,
 the Verification A observation), API key plaintext custody, and anything touching the
 billing account outside Terraform.
@@ -183,8 +192,11 @@ Lane A, armed by the maintainer once, then verified and recorded.
 - **W0b** — Confirm the merged-but-unapplied state: the plan shows the Amendment-2
   permission fix (`google_billing_account_iam_member.killswitch_billing_admin`) and the
   Amendment-1 credit filter as the only pending changes. Anything unexpected in the plan
-  is investigated before approval, never applied around.
-- **W0c** — Apply (human-armed). Live-fire per
+  is investigated before it is applied, never applied around.
+- **W0c** — Apply, from the maintainer's own credentials, in `infra/terraform` — the path
+  #33 already specifies, and the only path that exists before `ci-deploy` does (§2). Both
+  pending changes are billing-account-scoped, which is the one scope the CI identity is
+  argued out of holding in Wave 1. Live-fire per
   [`kill-switch.md`](../runbooks/kill-switch.md) §3: publish the synthetic alert to
   `billing-alerts`, watch the function decide, confirm `billingEnabled: false` **at the
   API and not only in the logs**, publish a second time to prove idempotence under
@@ -194,12 +206,33 @@ Lane A, armed by the maintainer once, then verified and recorded.
 - **W0d** — Runbook updated with the Attempt-2 transcript and the current triage
   sequence.
 
+*Why this wave is not a CI apply:* see §2. The bootstrapping fact is stated where the
+governance rule is, so a reader does not find the rule and this wave contradicting each
+other with no explanation between them.
+
 *Why the live-fire precedes every service:* a detach with services running would disrupt
 them. With none deployed the test has no side effects, which is the only window in the
 project's life where that is true.
 
-### Wave 1 — Data stores, transport skeleton, registry
+### Wave 1 — Deploy path, data stores, transport skeleton, registry
 
+This wave builds the mechanism D1 rests on, because Wave 0 could not use it.
+
+- **`ci-deploy` and the deploy workflow.** The identity `infra/terraform/wif.tf` describes
+  and refuses to create: a separate service account whose principalSet requires the branch
+  as well as the repository, so a pull request cannot obtain deploy credentials even from
+  this repository. The workflow is `workflow_dispatch` only — a wave is armed
+  deliberately, never by a merge — with a plan job whose output is the reviewable diff and
+  an apply job carrying `environment: gcp-production`.
+- **What the deploy identity may hold, decided here and not drifted into.** Two scopes are
+  in question and they are not the same question. *Project scope:* growing the identity's
+  own grants per wave (D6) requires project IAM administration, which makes the identity
+  project-admin-equivalent; the control is then the environment gate and the plan guard,
+  not the role list, and saying otherwise would be the kind of claim ADR-0004 Amendment 2
+  had to withdraw. *Billing-account scope:* `wif.tf` already names the cleaner shape —
+  billing-account-scoped resources in their own state, so no CI identity reads or writes
+  across that boundary — and names F2 as where that conversation happens. It happens in
+  this wave, with the decision and its cost in the log either way.
 - **BigQuery**: dataset `plumbline` and table `spans` exactly per architecture §4.1 —
   daily partitioning on `start_time`, clustering `(trace_id, span_id)`,
   `require_partition_filter = true`. Views per D4. Confirm the F0 project-level query
@@ -339,25 +372,28 @@ Terraform in the wave:
 | --- | --- | --- |
 | Lane A — decide alone, log it | Terraform module layout, Dockerfile details, `keyctl` UX, alert channel choice, e2e-cloud tooling, the DLQ retention value (rationale logged, surfaced at #44's closure) | Claude Code |
 | Lane A — decide alone, log prominently | D3's fallback if a genuine secret appears, any deviation from architecture §6.1, any guard or allowlist change, any unexpected plan diff | Claude Code |
-| Lane B — human-armed | Every `terraform apply` — five waves | Maintainer approves, Claude Code executes and verifies |
-| Lane C — human only | Billing-console confirm and re-attach, Verification A, key plaintext custody, environment protection setup | Maintainer |
+| Lane B — human-armed | Every `terraform apply` from Wave 1 on — four waves | Maintainer approves, Claude Code executes and verifies |
+| Lane C — human only | The Wave 0 apply, billing-console confirm and re-attach, Verification A, key plaintext custody, environment protection setup | Maintainer |
 | **Never** | Local or manual applies; paid features; flipping an ADR to `Accepted`; editing `eval-plan.md`; real-capture traffic to the cloud; weakening branch protection, a gate, or the kill-switch | — |
 
 ## 9. Human touchpoints
 
 The complete list. Nothing else mid-phase.
 
-1. **W0a** — environment protection setup, once.
-2. **Five environment approvals** — Waves 0 through 4.
-3. **Kill-switch live-fire confirmation and billing re-attach** — Wave 0, Lane C.
-4. **Verification A** — any morning after the Wave 0 apply: Billing → Reports with the
+1. **W0a** — environment protection setup, once. It is configured in Wave 0 and first
+   used in Wave 1, which is the first wave with a CI apply path to protect.
+2. **The Wave 0 apply** — from the maintainer's own credentials, because `ci-deploy` does
+   not exist yet and both pending changes are billing-account-scoped (§2, §6).
+3. **Four environment approvals** — Waves 1 through 4.
+4. **Kill-switch live-fire confirmation and billing re-attach** — Wave 0, Lane C.
+5. **Verification A** — any morning after the Wave 0 apply: Billing → Reports with the
    savings and credit filters cleared, confirming a non-zero usage cost against a zero
    net total. It is the observation the budget's whole spend basis rests on, it has never
    been performed (runbook §1 records it as outstanding, #17 step 2 carries it), and it
    is console-only, so no lane but Lane C can do it. If the observation contradicts the
    premise, stop: ADR-0004 Amendment 1 is withdrawn, not patched.
-5. **First API key provisioning** through `keyctl` — after Wave 1, Lane C.
-6. **C2-style exit review** — completion note, D2's scope statement, Verification B
+6. **First API key provisioning** through `keyctl` — after Wave 1, Lane C.
+7. **C2-style exit review** — completion note, D2's scope statement, Verification B
    evidence, a decision-log skim.
 
 The claude-code capture (#10, F1's C1) stays open and stays non-blocking: it gates F4's
@@ -390,7 +426,7 @@ detection-fidelity claim, not anything in F2.
 ## 12. Changelog
 
 **v0.1 — 2026-08-21** — the handoff directive rendered into the repository as the phase's
-source of truth. Content follows the directive. Seven things are stated here that the
+source of truth. Content follows the directive. Eight things are stated here that the
 directive left implicit or stated against an earlier state of the repository, each one
 recorded rather than silently applied:
 
@@ -416,6 +452,13 @@ recorded rather than silently applied:
    and the Terraform view resource takes a query body, so `file()` alone does not carry
    the decision. What is fixed is the invariant — one place states the rule — and the
    mechanism is chosen in Wave 1.
-7. **D6 is read against architecture §7.1 as it already stands.** The allowlist already
+7. **Wave 0 is not a CI apply, and Wave 1 builds the path.** The directive routes all
+   five waves through the gated CI workflow. F0 shipped one CI identity and made it
+   provably unable to deploy; `wif.tf` documents `ci-deploy` as F2's to create and does not
+   create it. The first mutation of the phase therefore comes from the maintainer's own
+   credentials whatever the model says — which is also what #33 specifies — and the rule
+   binds absolutely from Wave 1. §2 and §6 state it in both places rather than leaving a
+   reader to find the rule and the wave contradicting each other.
+8. **D6 is read against architecture §7.1 as it already stands.** The allowlist already
    contains every F2 resource type. Per-wave growth therefore binds IAM grants and any
    unlisted type, and two allowlist rows describe resources F3 owns.

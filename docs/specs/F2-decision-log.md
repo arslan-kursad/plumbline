@@ -145,6 +145,49 @@ check cannot catch F2 creating them, so it is written down here where a reader c
 
 ## W-level — decisions made during the phase
 
+### W0.1 — Wave 0 applies from the maintainer's credentials; the CI path is Wave 1's
+**Made:** 2026-08-21 · **Work item:** Wave 0 · **Reversibility:** one-way (the apply
+itself); cheap (the sequencing)
+**Decision:** Wave 0's two pending changes are applied by the maintainer in
+`infra/terraform`, as #33 specifies. The gated CI apply path is built in Wave 1 and binds
+absolutely from there.
+**Why this is not a relaxation of D1:** F0 shipped one CI identity and made it provably
+incapable of deploying. `infra/terraform/wif.tf` describes `ci-deploy` in a comment and
+deliberately does not create it, so that F0's identity is *demonstrably* unable to mutate
+anything. The first mutation of F2 therefore cannot be a CI apply under any governance
+model: the identity does not exist, and creating it is itself a mutation requiring
+credentials CI does not have. This is a fact about the bootstrap, not a preference about
+process, and pretending otherwise would put a sentence in the spec that no wave could
+satisfy.
+**Alternatives:** create `ci-deploy` first in a wave of its own — it needs a human-run
+apply too, so it relocates the bootstrapping step without removing it, and it delays G1
+while the kill-switch is known inert; hand-create the identity with `gcloud` and import it
+— hand-created resources are drift by architecture §8, and the import would be the
+project's first.
+**Rationale:** the kill-switch is inert *now*. The shortest correct path to G1 is the one
+#33 already describes, and every day it is not taken is a day the last cost control does
+not work. The governance model loses nothing: Wave 0's apply is two billing-account-scoped
+changes, which is the scope Wave 1 argues the CI identity out of holding anyway.
+**Exit review:** yes — it is a deviation from the directive's five-gated-waves shape, even
+though the deviation was forced.
+
+### W0.2 — The deploy identity's two scopes are separate questions
+**Made:** 2026-08-21 · **Work item:** Wave 0 (recorded), Wave 1 (decided)
+**Reversibility:** costly
+**Decision:** recorded now, resolved in Wave 1 with its cost either way. *Project scope:*
+growing the deploy identity's own grants per wave (D6) requires project IAM
+administration, which makes that identity project-admin-equivalent; the honest consequence
+is that the control is the environment gate and the plan guard, not the role list.
+*Billing-account scope:* `wif.tf` already names the cleaner shape — billing-scoped
+resources in their own state, so no CI identity crosses that boundary — and names F2 as
+where the conversation happens.
+**Rationale for recording it here rather than in Wave 1:** Wave 0's apply is exactly the
+billing-account-scoped mutation the second question is about. Deciding it after that apply
+would be deciding it after the only evidence arrives, which is the right order; writing it
+down before is what stops the question from being answered by default when Wave 1 is busy.
+**Exit review:** yes — ADR-0004 Amendment 2 had to withdraw a claim about what an identity
+could not do. This is the same class of claim, made in advance.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
