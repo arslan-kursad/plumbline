@@ -324,3 +324,75 @@ is not a control. Deferring it to W7 would mean the corpus integrity checks are 
 for the length of three work items — exactly the "skipped and green" failure the CI job
 design already argues against.
 **C2:** no.
+
+### W3.1 — The gRPC receiver runs a raw-bytes codec
+**Made:** 2026-08-21 · **Work item:** W3 · **Reversibility:** cheap
+**Decision:** the OTLP gRPC service is registered by hand with a codec whose only
+message type is `[]byte`, so the handler receives wire bytes and the collector has no
+OTLP message type to deserialize into.
+**Alternatives:** import the generated `ExportTraceServiceRequest` and use the standard
+proto codec, as every OTLP receiver does. It is less code and it puts the OTLP semantic
+types inside the component that architecture §2.1 defines by their absence — and it
+means the bytes are decoded and re-encoded on the way to Pub/Sub, so ADR-0001's "never
+mutated" would rest on the round trip being faithful rather than on nothing having
+happened.
+**Rationale:** the boundary becomes structural instead of aspirational. A contributor
+cannot read a span here because there is no type to read it into.
+**C2:** no.
+
+### W3.2 — Splitting is envelope-only, and refuses rather than truncates
+**Made:** 2026-08-21 · **Work item:** W3 · **Reversibility:** cheap
+**Decision:** `internal/otlpwire` knows the protobuf wire format and six field numbers:
+the repeated member and the context fields of `ExportTraceServiceRequest`,
+`ResourceSpans` and `ScopeSpans`. It regroups spans across three levels and copies
+everything else verbatim. When one span plus its context still exceeds the budget, the
+export is refused (HTTP 413, gRPC `InvalidArgument`).
+**Alternatives:** parse with the OTLP types and re-serialize — see W3.1; or publish the
+oversized message anyway — it would be rejected by Pub/Sub, converting a refusal the
+client can act on into a 200 followed by a failure nobody sees.
+**Rationale:** §3.2 says oversized batches are split, never truncated. "Never truncated"
+has to include the case where splitting runs out of room, and the only honest answer
+there is a refusal.
+**C2:** no.
+
+### W3.3 — OTLP/JSON is refused at the collector
+**Made:** 2026-08-21 · **Work item:** W3 · **Reversibility:** cheap
+**Decision:** `POST /v1/traces` accepts `application/x-protobuf` only; a JSON body is
+`415`.
+**Alternatives:** accept it and forward the bytes. The collector cannot tell the
+difference — it does not read payloads — so the JSON would reach the topic and fail in
+the worker's deserializer, landing in the DLQ. That is a poison message manufactured by
+the collector rather than sent by a client.
+**Rationale:** ADR-0001 makes protobuf the interchange format along the whole wire path.
+The one Content-Type check is where that becomes enforcement rather than intent, and it
+is a header check, not a payload parse.
+**C2:** no.
+
+### W3.4 — The API key format is fixed now, and Gate F enforces it (issue #19)
+**Made:** 2026-08-21 · **Work item:** W3 · **Reversibility:** one-way *after* keys are
+issued; cheap today, which is the entire argument for doing it now
+**Decision:** keys are `plb_<environment>_<32 lowercase hex>`. Issued environments are
+`local` and `live`; `test` is reserved and never issued. `scripts/ci/invariant-gates.sh`
+gains **Gate F**, matching `plb_(local|live)_<32 hex>` over the whole repository, with a
+failure proof in `prove-gates.sh` alongside the other six.
+**Alternatives:** leave #19 for a later phase — the issue's own argument is that
+retrofitting a prefix after keys are issued is a migration, and W3 is where the format
+is born; or ship the prefix without the gate — a detection scheme with no detector.
+**Rationale on the reserved marker:** tests and documentation need realistic key-shaped
+strings. The alternative to reserving `test` is a gate with an exclusion list for the
+test files, which is the shape this repository refuses on principle.
+**Scope note:** the F1 directive's W3 does not mention #19, and W7 says Gates A–E stay
+untouched. This adds a gate rather than changing one, and it is done here because the
+key format is decided here and nowhere else.
+**C2:** yes — it is scope the directive did not name.
+
+### W3.5 — Authentication precedes rate limiting
+**Made:** 2026-08-21 · **Work item:** W3 · **Reversibility:** cheap
+**Decision:** the pipeline authenticates, then rate limits, then splits.
+**Rationale:** a bucket is a per-key resource, and the limiter's map is keyed by strings
+the caller influences. Limiting before authenticating would let an anonymous caller grow
+that map at will — a memory-exhaustion path opened by a control meant to prevent
+exhaustion. A test asserts no bucket exists after fifty unauthenticated requests.
+Splitting comes last because it is the expensive step, and an over-quota caller should
+not be able to buy CPU with a large payload.
+**C2:** no.

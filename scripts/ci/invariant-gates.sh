@@ -207,13 +207,40 @@ gate_e() {
   fi
 }
 
-printf 'invariant gates (F0 spec §W6.2)\n\n'
+# ---------------------------------------------------------------------------
+# Gate F — no issued API key in the repository. Whole repository, no exclusions.
+#
+# GitHub's non-provider secret-scanning patterns need a paid plan, which the
+# zero-cost invariant forbids, and its provider patterns would never match a
+# plumbline key because the key carries no vendor signature (issue #19). A
+# prefix this project chose makes a leaked key matchable by this project's own
+# gates instead, at no cost and with no plan dependency.
+#
+# The pattern names the two environment markers a real key can carry. `test` is
+# reserved and never issued (collector/internal/auth: IssuedEnvironments), which
+# is what lets tests and documentation hold realistic key-shaped strings without
+# this gate needing an exclusion list — and an exclusion list is how a gate
+# stops covering the file that matters.
+#
+# Detection, not prevention: this finds a key that has already been written
+# down. Hashed storage is what keeps the registry safe (architecture §6.3).
+# ---------------------------------------------------------------------------
+gate_f() {
+  if scan "issued API key" 'plb[_](local|live)[_][0-9a-f]{32}'; then
+    pass "Gate F — no issued API key in the repository"
+  else
+    fail "Gate F — issued API key present"
+  fi
+}
+
+printf 'invariant gates (F0 spec §W6.2; Gate F from F1 W3, issue #19)\n\n'
 
 gate_a
 gate_b
 gate_c
 gate_d
 gate_e
+gate_f
 
 printf '\n'
 if [ "${#failed_gates[@]}" -gt 0 ]; then

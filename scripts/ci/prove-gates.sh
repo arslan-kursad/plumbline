@@ -156,6 +156,13 @@ violate "docs/stale-snapshot.md" \
 "$(printf '# Stale snapshot\n\nBigQuery dataset: %s_dataset (pre-rename)\n' "$(printf 'agent%slens' "$U")")"
 expect_failure "Gate E: retired project name" "Gate E"
 
+# Gate F — an issued key, in the shape a leak really takes: a developer pasting
+# a working local key into a compose file or a note. Assembled at runtime so this
+# script does not itself contain a matching string.
+violate "docs/scratch-notes.md" \
+"$(printf '# Notes\n\nlocal collector key: plb%slocal%s%s\n' "$U" "$U" "$(printf 'a%.0s' $(seq 32))")"
+expect_failure "Gate F: an issued API key in a document" "Gate F"
+
 printf '\n'
 if [ "$failures" -gt 0 ]; then
   printf '%d proof(s) failed\n' "$failures"
