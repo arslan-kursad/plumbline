@@ -189,13 +189,20 @@ Lane A, armed by the maintainer once, then verified and recorded.
 - **W0a** — Environment `gcp-production` protection configured by the maintainer from the
   checklist in the wave issue, then recorded in `repository-settings.md` with read-back
   evidence.
-- **W0b** — Confirm the merged-but-unapplied state: the plan shows the Amendment-2
-  permission fix (`google_billing_account_iam_member.killswitch_billing_admin`) and the
-  Amendment-1 credit filter as the only pending changes. Anything unexpected in the plan
-  is investigated before it is applied, never applied around.
+- **W0b** — Confirm the merged-but-unapplied state. **Measured rather than assumed:** the
+  authenticated CI plan of 2026-08-21
+  ([run 32518317749](https://github.com/arslan-kursad/plumbline/actions/runs/32518317749),
+  job `terraform plan (wif)`) reports **1 to add, 0 to change, 0 to destroy** — only
+  `google_billing_account_iam_member.killswitch_billing_admin`, granting
+  `roles/billing.admin` to `killswitch-fn@`. The directive expected the Amendment-1 credit
+  filter to be pending as well; it is not, because it is already applied, and a plan that
+  refreshes the budget through the CI identity's `billing.viewer` grant would have shown
+  drift if the live filter differed from the configuration. The wave applies **one
+  resource**, not two. Anything else appearing in the plan is investigated before it is
+  applied, never applied around.
 - **W0c** — Apply, from the maintainer's own credentials, in `infra/terraform` — the path
-  #33 already specifies, and the only path that exists before `ci-deploy` does (§2). Both
-  pending changes are billing-account-scoped, which is the one scope the CI identity is
+  #33 already specifies, and the only path that exists before `ci-deploy` does (§2). The
+  pending change is billing-account-scoped, which is the one scope the CI identity is
   argued out of holding in Wave 1. Live-fire per
   [`kill-switch.md`](../runbooks/kill-switch.md) §3: publish the synthetic alert to
   `billing-alerts`, watch the function decide, confirm `billingEnabled: false` **at the
@@ -426,7 +433,7 @@ detection-fidelity claim, not anything in F2.
 ## 12. Changelog
 
 **v0.1 — 2026-08-21** — the handoff directive rendered into the repository as the phase's
-source of truth. Content follows the directive. Eight things are stated here that the
+source of truth. Content follows the directive. Nine things are stated here that the
 directive left implicit or stated against an earlier state of the repository, each one
 recorded rather than silently applied:
 
@@ -459,6 +466,11 @@ recorded rather than silently applied:
    credentials whatever the model says — which is also what #33 specifies — and the rule
    binds absolutely from Wave 1. §2 and §6 state it in both places rather than leaving a
    reader to find the rule and the wave contradicting each other.
-8. **D6 is read against architecture §7.1 as it already stands.** The allowlist already
+8. **Wave 0 applies one resource, not two.** The directive expects the Amendment-1 credit
+   filter to be pending alongside the Amendment-2 permission fix. The authenticated plan
+   says otherwise — 1 to add, 0 to change — so the filter is already live. The correction
+   matters because W0b tells the operator to stop on an unexpected plan, and an
+   expectation of two changes would have stopped this wave on the good news.
+9. **D6 is read against architecture §7.1 as it already stands.** The allowlist already
    contains every F2 resource type. Per-wave growth therefore binds IAM grants and any
    unlisted type, and two allowlist rows describe resources F3 owns.
