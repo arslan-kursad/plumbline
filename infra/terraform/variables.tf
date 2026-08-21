@@ -87,13 +87,21 @@ variable "killswitch_runtime" {
   description = <<-EOT
     Cloud Functions Gen2 runtime for the kill-switch. Pinned rather than tracking
     "latest": a runtime deprecation must be a visible change to this file, not a
-    surprise on the day the function is needed. Confirm the value is still
-    supported with `gcloud functions runtimes list --region us-central1` before
-    the first apply. The value is coupled to the function's go.mod: the resolved
-    dependency set requires Go 1.25, so a lower runtime will not build.
+    surprise on the day the function is needed.
+
+    `go126` rather than `go125`, though both are generally available and the
+    function's dependency set only requires Go 1.25: go125 is deprecated on
+    2026-10-01 and decommissioned on 2027-04-01, while go126 runs to Feb/Mar 2027
+    and Aug/Sep 2027. Same code, a year more runway, and the kill-switch is the
+    component least worth rebuilding under time pressure.
+
+    Confirm the value is still supported with
+    `gcloud functions runtimes list --region us-central1` before the first apply.
+    Raising it past the language version in the function's go.mod is safe; lowering
+    it below is not.
   EOT
   type        = string
-  default     = "go125"
+  default     = "go126"
 }
 
 variable "github_owner" {

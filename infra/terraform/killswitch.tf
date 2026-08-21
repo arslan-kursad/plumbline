@@ -62,22 +62,42 @@ resource "google_project_iam_member" "pubsub_token_creator" {
   depends_on = [google_project_service.required]
 }
 
-# Gen2 functions are built by Cloud Build running as the default compute service
-# account. Without these roles the first deploy fails with a build-permission
-# error that reads like a bug in this configuration; it is a project default.
-resource "google_project_iam_member" "compute_default_build" {
-  for_each = toset([
-    "roles/cloudbuild.builds.builder",
-    "roles/artifactregistry.writer",
-    "roles/logging.logWriter",
-    "roles/storage.objectViewer",
-  ])
-
-  project = var.project_id
-  role    = each.key
-  member  = "serviceAccount:${data.google_project.this.number}-compute@developer.gserviceaccount.com"
+# Build identity, owned rather than inherited.
+#
+# A Gen2 function is built by Cloud Build, which since mid-2024 defaults to the
+# project's default compute service account. That account only exists once the
+# Compute Engine API has been enabled, so on a project like this one — which will
+# never run a VM and has no reason to enable that API — the default is a principal
+# that does not exist. Granting roles to it fails the apply, and the error names a
+# service account nobody in this configuration created.
+#
+# Naming our own build identity removes the dependency entirely, and matches how
+# every other component here gets an identity: explicitly.
+resource "google_service_account" "killswitch_build" {
+  project      = var.project_id
+  account_id   = "killswitch-build"
+  display_name = "Kill-switch function build"
+  description  = "Cloud Build identity for building the billing kill-switch container."
 
   depends_on = [google_project_service.required]
+}
+
+# The umbrella build role: push to Artifact Registry, write build logs, read the
+# source. Granular equivalents exist, but this is the role Google's own
+# custom-build-service-account procedure names, and a build identity that fails
+# obscurely is worse than one scoped by a documented role.
+resource "google_project_iam_member" "killswitch_build_builder" {
+  project = var.project_id
+  role    = "roles/cloudbuild.builds.builder"
+  member  = "serviceAccount:${google_service_account.killswitch_build.email}"
+}
+
+# Source access scoped to the one bucket that holds it, rather than relying on
+# whatever the umbrella role happens to include for storage.
+resource "google_storage_bucket_iam_member" "killswitch_build_source" {
+  bucket = google_storage_bucket.function_source.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.killswitch_build.email}"
 }
 
 resource "google_storage_bucket" "function_source" {
@@ -125,8 +145,9 @@ resource "google_cloudfunctions2_function" "killswitch" {
   description = "Detaches billing from this project on any reported spend (ADR-0004 §5)."
 
   build_config {
-    runtime     = var.killswitch_runtime
-    entry_point = "HandleBudgetNotification"
+    runtime         = var.killswitch_runtime
+    entry_point     = "HandleBudgetNotification"
+    service_account = google_service_account.killswitch_build.id
 
     source {
       storage_source {
@@ -165,7 +186,8 @@ resource "google_cloudfunctions2_function" "killswitch" {
 
   depends_on = [
     google_project_service.required,
-    google_project_iam_member.compute_default_build,
+    google_project_iam_member.killswitch_build_builder,
+    google_storage_bucket_iam_member.killswitch_build_source,
   ]
 }
 

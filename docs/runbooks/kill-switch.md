@@ -106,7 +106,24 @@ F2 acceptance criterion.
    (see [`infra/terraform/README.md`](../../infra/terraform/README.md)).
 5. Before the first apply, confirm the pinned function runtime still exists:
    `gcloud functions runtimes list --region us-central1`. The value is
-   `var.killswitch_runtime` and is coupled to the function's `go.mod`.
+   `var.killswitch_runtime`, currently `go126`; the function's `go.mod` requires
+   Go 1.25, so raising the runtime is safe and lowering it below that is not.
+   Support window as published: `go126` deprecates Feb/Mar 2027 and is
+   decommissioned Aug/Sep 2027 — the calendar this pin has to be revisited by.
+
+### If the first apply fails
+
+Three failures are predictable enough to name, because each one's error message
+points somewhere other than its cause.
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `Service account ...-compute@developer.gserviceaccount.com was not found` | Cloud Build's default identity is the default *compute* service account, which only exists once the Compute Engine API has been enabled. This configuration avoids it by naming its own build identity (`killswitch-build`); if the error still appears, something is falling back to the default. | Confirm `build_config.service_account` is set on the function. Enabling `compute.googleapis.com` also fixes it, at the price of a default VPC this project has no use for — prefer the named identity. |
+| Build fails on permissions after the identity exists | The build identity was created in the same apply that used it, and IAM propagation lags. | Re-run `terraform apply`. The configuration already orders the grants before the function; propagation delay is not something ordering can fix. |
+| `The caller does not have permission` on `google_billing_budget` | The budget is a billing-account-level resource, and project Owner does not reach it. | The operator needs Billing Account Administrator on the billing account, not only on the project (§2). |
+
+None of these are cost events. They are first-apply friction, and they are written
+down so the first apply is not also a research session.
 
 ## 3. Live-fire procedure (mandatory before F0 closes)
 
