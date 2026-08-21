@@ -57,6 +57,35 @@ resource "google_billing_account_iam_member" "killswitch_billing_admin" {
   member             = "serviceAccount:${google_service_account.killswitch.email}"
 }
 
+# The permission the second live-fire found missing (ADR-0004 Amendment 3).
+#
+# The function's first call is Projects.GetBillingInfo, and reading a project's
+# billing info needs `resourcemanager.projects.get` **on the project**. Project
+# Billing Manager does not carry it — that role grants exactly two permissions,
+# createBillingAssignment and deleteBillingAssignment — and Billing Account
+# Administrator carries it against the *billing account*, which is a different
+# resource. So the identity could detach billing and could not find out whether it
+# needed to.
+#
+# A custom role with one permission rather than `roles/browser`, which would also
+# hand over project IAM policy reads, folder and organization reads. This identity
+# already holds administrator rights on the billing account (Amendment 2); it is
+# the last one in the project that should collect incidental reads.
+resource "google_project_iam_custom_role" "killswitch_billing_reader" {
+  project     = var.project_id
+  role_id     = "killswitchBillingReader"
+  title       = "Kill-switch billing reader"
+  description = "resourcemanager.projects.get, so the kill-switch can read the billing state it is about to change. Nothing else."
+
+  permissions = ["resourcemanager.projects.get"]
+}
+
+resource "google_project_iam_member" "killswitch_billing_reader" {
+  project = var.project_id
+  role    = google_project_iam_custom_role.killswitch_billing_reader.id
+  member  = "serviceAccount:${google_service_account.killswitch.email}"
+}
+
 resource "google_project_iam_member" "killswitch_event_receiver" {
   project = var.project_id
   role    = "roles/eventarc.eventReceiver"

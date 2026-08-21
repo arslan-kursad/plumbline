@@ -1,0 +1,96 @@
+# Artifact Registry (architecture §7, §8).
+#
+# The free allowance is 0.5 GB across the project, which is small enough that an
+# image per deploy reaches it — this is a cost invariant with a real, near horizon
+# rather than a theoretical one.
+
+resource "google_artifact_registry_repository" "plumbline" {
+  project       = var.project_id
+  location      = var.region
+  repository_id = "plumbline"
+  format        = "DOCKER"
+  description   = "Distroless collector and ingestion-worker images, built in CI and pushed through Workload Identity Federation."
+
+  # Keep the last two versions per package: the one running and the one to roll
+  # back to. Anything older is a copy of a commit that is still in git.
+  cleanup_policies {
+    id     = "keep-last-2"
+    action = "KEEP"
+
+    most_recent_versions {
+      keep_count = 2
+    }
+  }
+
+  cleanup_policies {
+    id     = "delete-the-rest"
+    action = "DELETE"
+
+    condition {
+      older_than = "0s"
+    }
+  }
+
+  depends_on = [google_project_service.required]
+}
+
+# The repository this project did not create and has to bound anyway.
+#
+# A Gen2 Cloud Function is built by Cloud Build into an auto-created `gcf-artifacts`
+# repository. Nothing in F0 owned it, it accumulates an image per function deploy,
+# and it already holds ~93 MB of the 0.5 GB allowance from a handful of kill-switch
+# deploys. `docs/runbooks/kill-switch.md` §7 assigns it to F2 explicitly.
+#
+# Adopted rather than left alone, because "not ours" is not a size limit.
+import {
+  to = google_artifact_registry_repository.gcf_artifacts
+  id = "projects/${var.project_id}/locations/${var.region}/repositories/gcf-artifacts"
+}
+
+resource "google_artifact_registry_repository" "gcf_artifacts" {
+  project       = var.project_id
+  location      = var.region
+  repository_id = "gcf-artifacts"
+  format        = "DOCKER"
+
+  # Cloud Functions' own words, preserved. Adopting a repository is not a licence
+  # to erase the metadata of the system that still writes to it — and a plan that
+  # blanks a description nobody asked to change is a diff a reviewer has to think
+  # about for no reason.
+  description = "This repository is created and used by Cloud Functions for storing function docker images."
+
+  # **Dry run, deliberately, and this is not timidity.**
+  #
+  # The images in here include the one the kill-switch function runs. A Gen2
+  # function scales to zero, so every invocation is a potential cold start and a
+  # potential image pull: deleting the version a deployed function still
+  # references breaks the last cost control in the project, at the moment it is
+  # needed, in a way nothing would report until then.
+  #
+  # keep-last-2 should never select a running image — the current one is the most
+  # recent by construction. "Should" is the word this project treats as a warning.
+  # The policy runs in dry-run first, its decisions are read out of the Artifact
+  # Registry logs, and it is switched live in Wave 2 once what it would delete has
+  # been seen rather than reasoned about. Follow-up: #57.
+  cleanup_policy_dry_run = true
+
+  cleanup_policies {
+    id     = "keep-last-2"
+    action = "KEEP"
+
+    most_recent_versions {
+      keep_count = 2
+    }
+  }
+
+  cleanup_policies {
+    id     = "delete-the-rest"
+    action = "DELETE"
+
+    condition {
+      older_than = "0s"
+    }
+  }
+
+  depends_on = [google_project_service.required]
+}

@@ -366,6 +366,94 @@ bound here and the repository stays in the provider's `attribute_condition`.
 it is applied. The first deploy dispatch after W1a is the test, and its failure mode is
 loud — `google-github-actions/auth` fails before Terraform runs.
 **Exit review:** yes. This is the largest standing authority created in the phase.
+### W0.4 — Attempt 2 failed; the phase is halted and the fix is one permission
+**Made:** 2026-08-21 · **Work item:** Wave 0 · **Reversibility:** cheap
+**What happened:** the second live-fire failed with the same 403 as the first, and the
+Amendment 2 grant was live on the billing account at the time — verified against the
+billing account's IAM policy rather than against Terraform state. Cause: the function's
+first call is `Projects.GetBillingInfo`, which needs `resourcemanager.projects.get` on the
+**project**, and the identity's entire project-level permission set was six permissions
+that did not include it. Full analysis in ADR-0004 Amendment 3; transcript in
+[`kill-switch.md`](../runbooks/kill-switch.md) §4.
+**Stop rule, applied:** spec §2 halts the phase on a second live-fire failure. Wave
+preparation stopped at the moment the logs were read. Wave 1's remaining Lane A items —
+Firestore, Artifact Registry, `keyctl` — are **not** being built until a live-fire has
+succeeded and been archived. What continues is this fix and its record, which the stop rule
+exists to make room for.
+**Decision:** a custom role carrying exactly `resourcemanager.projects.get`, rather than
+`roles/browser` — the narrowest predefined role containing it, which also grants project
+IAM policy reads, project listing, and folder and organization reads. This identity already
+holds administrator rights over the billing account (Amendment 2); it is the last one in
+the project that should collect incidental reads. Cost: `google_project_iam_custom_role`
+added to the architecture §7.1 allowlist, which is what that list is for, and an
+architecture version bump.
+**Alternatives:** `roles/browser` — one line, five permissions this identity has no use
+for, on the most powerful identity in the project; drop the read from the function and call
+`UpdateBillingInfo` unconditionally — it removes the permission requirement and also
+removes the `billing already detached; nothing to do` path that the runbook documents as
+contract and that the redelivery test exercises, so a control would lose a behaviour to
+avoid an IAM line.
+**Diagnosis was not measured, and that is stated:** the claim that `GetBillingInfo`
+requires `resourcemanager.projects.get` comes from Google's API reference, not from an
+observation on this account. Data-access audit logging is off, so the denial names no
+permission, and impersonating the function's identity to reproduce the call was itself
+refused — the maintainer's Owner role does not carry
+`iam.serviceAccounts.getAccessToken`. What *is* measured: the failing call, from the
+function's source and its log line; and the identity's complete permission set, from the
+project policy and the role definitions. The third live-fire is the test of the remaining
+inference, and it is cheap to run.
+**Exit review:** yes. Two live-fires, two permission defects, both invisible to
+configuration review.
+
+### W0.5 — G1 is satisfied; the halt is lifted
+**Made:** 2026-08-21 · **Work item:** Wave 0 · **Reversibility:** one-way (the test
+happened)
+**Decision:** the third live-fire passed — notification, detach, API-confirmed
+`billingEnabled: false`, an idempotent redelivery, and a clean re-attach. Evidence in
+[`kill-switch.md`](../runbooks/kill-switch.md) §4, #33 closed. The stop rule invoked in
+W0.4 is lifted and Wave 1's remaining Lane A work resumes.
+**What the phase learned, kept because it is the reusable part:** two permission defects in
+one identity, in a control whose configuration had been reviewed twice and read correct
+both times. Neither was visible in Terraform, in the role names, or in the architecture's
+identity table. Configuration review found nothing; firing it found both.
+**And a second-order lesson:** after Attempt 1's fix the control was believed working for
+an hour, on the strength of a correct diagnosis of a real defect. It was still inert. A
+control is not tested by being fixed — which is exactly why the stop rule counts *failures
+to fire*, not *unexplained failures*.
+**Deliberate omission, logged rather than skipped:** no console screenshot is archived. §3
+requires confirming the detach at the API rather than only in the logs, and the API output
+is in the record; a screenshot is the same fact one layer further away. The requirement
+was written before the API check was.
+**Exit review:** yes — the three-attempt sequence is the phase's most transferable finding.
+
+### W1.6 — `gcf-artifacts` is adopted, and its cleanup policy starts in dry run
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** costly (the adoption),
+cheap (the dry run)
+**Decision:** Terraform adopts the `gcf-artifacts` repository through an `import` block
+and gives it the same keep-last-2 policy as `plumbline` — with
+`cleanup_policy_dry_run = true` until what it would delete has been observed (#57).
+**Why adopt something this project did not create:** a Gen2 function is built by Cloud
+Build into an auto-created repository that nothing owned, that accumulates an image per
+deploy, and that already holds ~93 MB of a project-wide 0.5 GB free allowance from a
+handful of kill-switch deploys. `docs/runbooks/kill-switch.md` §7 assigns bounding it to
+F2. "Not ours" is not a size limit.
+**Why dry run, which is the part worth arguing:** the images in there include the one the
+kill-switch function runs. A Gen2 function scales to zero, so every invocation is a
+potential cold start and a potential image pull; deleting a version a deployed function
+still references breaks the last cost control in the project, at the moment it is needed,
+and nothing reports it until then. keep-last-2 *should* never select a running image — the
+current one is the most recent by construction. This phase has already watched that
+control be inert twice on reasoning that read correctly, so the policy runs in dry run,
+its decisions are read out of the logs, and it goes live in Wave 2.
+**Verified before committing:** the import plans as `will be updated in-place`, not as a
+replacement — an adoption that destroyed and recreated the repository would delete every
+image in it, including the running one. `1 to import, 12 to add, 1 to change, 0 to
+destroy`.
+**Small thing, done on purpose:** the repository's existing description — Cloud Functions'
+own words — is carried into the configuration rather than blanked. Adopting a resource is
+not a licence to erase the metadata of the system that still writes to it, and a diff that
+nulls a field nobody asked to change costs a reviewer attention for nothing.
+**Exit review:** no, but #57 must not close silently.
 
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
