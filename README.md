@@ -4,8 +4,10 @@ OTel-native observability and evaluation platform for AI agents: a Go OTLP colle
 a .NET ingestion worker, and a .NET analytics/eval API on GCP, running inside a
 zero-cost envelope with enforced guardrails.
 
-Stub (F0). See [`docs/specs/F0-foundations.md`](docs/specs/F0-foundations.md) for the
-active work package and [`CLAUDE.md`](CLAUDE.md) for the project contract.
+Active work package: [`docs/specs/F1-local-first-core.md`](docs/specs/F1-local-first-core.md)
+(local-first core; F0 is complete — see its
+[completion note](docs/specs/F0-completion-note.md)). [`CLAUDE.md`](CLAUDE.md) is the
+project contract.
 
 ## Documentation precedence
 
@@ -32,6 +34,7 @@ Start here:
 | `worker/` | `Plumbline.Worker` — .NET 8 ingestion worker |
 | `analytics/` | `Plumbline.Analytics` — .NET 8 analytics and eval API |
 | `normalization/mappings/` | Versioned normalization mapping YAML (F1) |
+| `normalization/semconv/` | Vendored GenAI semantic conventions at the pin, with provenance and checksums |
 | `infra/terraform/` | Terraform (F0: state backend, kill-switch, quotas) |
 | `infra/functions/` | Cloud Function sources deployed by Terraform |
 | `scripts/ci/` | Invariant gate scripts (W6) |

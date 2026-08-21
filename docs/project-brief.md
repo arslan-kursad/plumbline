@@ -64,7 +64,7 @@ OTLP protobuf is preserved end-to-end (ADR-0001); no invented canonical schema.
   series (semconv pinning; $0 on GCP with billing screenshots; local-vs-Gemini judge
   agreement); TR+EN LinkedIn posts. DoD: published; bill still 0.00.
 
-## Success criteria (draft — to be frozen in docs/eval-plan.md before F1 code)
+## Success criteria (draft — frozen in docs/eval-plan.md at the F3 entry gate)
 - >=3 heterogeneous dialects normalized with golden tests.
 - 14-day uninterrupted live ingest from 3 real sources.
 - Seeded-regression experiment caught by the gate at pre-registered thresholds.
@@ -75,6 +75,16 @@ claude.ai Project = design/ADR/spec/review layer (no implementation).
 Claude Code = implementation layer, governed by CLAUDE.md (advisory) +
 .claude/settings.json (enforced). docs/ in the repo is the single source of truth;
 Project Knowledge holds snapshots and loses ties to the repo.
+
+## Amendment note (2026-08-21, F1 directive D1)
+
+The success-criteria heading above read "to be frozen in docs/eval-plan.md before F1
+code". Freeze A now happens at the **F3 entry gate**: F1's code reads no evaluation
+criterion, and what the freeze protects is the seeded-regression experiment in F3.
+Freeze B is unchanged. `docs/specs/F0-foundations.md` v0.8 carries the same amendment
+with its reasoning, `docs/specs/F1-decision-log.md` records the decision, and
+`docs/eval-plan.md` is not edited during F1 — so it still says "F1 entry gate" and is
+stale on that line until Freeze A is performed.
 
 ## Import note (2026-08-18, F0 spec W1.1)
 

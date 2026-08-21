@@ -1,6 +1,6 @@
 # F0 — Foundations: Work Package Spec
 
-**Version:** 0.7 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-19
+**Version:** 0.8 · **Status:** Proposed (awaiting sign-off) · **Date:** 2026-08-21
 **Phase budget:** ~8 h · **Executor:** Claude Code (implementation) + human (billing/manual steps)
 **Repo target:** `docs/specs/F0-foundations.md` (replaces v0.1 in place)
 
@@ -78,8 +78,8 @@ Federation (no exported SA keys).
 - Terraform for Pub/Sub, BigQuery, Firestore, Cloud Run application services (F2).
   F0 Terraform covers only: state backend, provider pinning, kill-switch resources,
   project-level quota/guardrail settings.
-- Freezing `eval-plan.md` (draft in F0; Freeze A is the F1 entry gate, Freeze B is at F3
-  — see W3).
+- Freezing `eval-plan.md` (draft in F0; **Freeze A is the F3 entry gate**, Freeze B is at
+  F3 before the first seeded-regression run — see W3 and the v0.8 amendment note).
 - Dashboards, SPA, load generator (F4).
 - A deploy-capable CI identity. F0 CI authenticates read-only (build, validate, plan).
   The deploy service account and its branch-scoped binding land in F2; only the binding
@@ -169,9 +169,11 @@ Draft only; freezing is a separate, explicit human action, and it is **two-stage
 thresholds are functions of a baseline variance estimate, and no agent data exists at the
 F1 entry gate. Freezing constants there would produce arbitrary numbers presented as
 pre-registration.
-- **Freeze A** — human action at the F1 entry gate, gating F1 code. Fixes criteria,
-  metrics, endpoints, statistical tests, decision rules, threshold *formulas*, rubric
-  text, dataset spec and splits, degradation catalog, experiment design.
+- **Freeze A** — human action at the **F3 entry gate**, gating the seeded-regression
+  experiment (amended 2026-08-21, F1 directive D1; it read "F1 entry gate, gating F1
+  code" through v0.7). Fixes criteria, metrics, endpoints, statistical tests, decision
+  rules, threshold *formulas*, rubric text, dataset spec and splits, degradation catalog,
+  experiment design.
 - **Freeze B** — at F3, before the first seeded-regression run. Fills **only** the numeric
   constants that the Freeze-A formulas produce from the baseline calibration run. It may
   not add or remove endpoints, change tests or decision rules, alter the rubric, or
@@ -429,6 +431,23 @@ subset (file-path deny rules, command deny-list). Minimum content:
 ---
 
 ## Changelog
+
+**v0.8 — 2026-08-21** (supersedes v0.7) — F1 directive D1, amendment only.
+
+1. **Freeze A moves from the F1 entry gate to the F3 entry gate** (§2 out-of-scope entry,
+   W3 first bullet). F1 code — collector, worker, normalization — reads no evaluation
+   criterion; what Freeze A protects is the integrity of the seeded-regression experiment,
+   which begins in F3. Gating F1 on it held ~25 h of work behind an unresolved question
+   about Adjudicator ground truth that F1 cannot answer. Freeze B is unchanged, at F3
+   before the first run. Decided in the F1 handoff directive (D1) and recorded in
+   `docs/specs/F1-decision-log.md`; ratification is a human item at the F1 exit review.
+2. **`docs/eval-plan.md` §2 still reads "F1 entry gate" and is deliberately not edited.**
+   Editing the pre-registration document is prohibited for the whole of F1
+   (`docs/specs/F1-local-first-core.md` §4), so the two documents disagree until the
+   human who performs Freeze A reconciles them. Recording the disagreement here is the
+   point: an amendment that silently left the eval plan behind would leave the repository
+   asserting two different gates with nothing saying which is current. This one is
+   current; the eval plan is stale on this line and on no other.
 
 **v0.7 — 2026-08-19** (supersedes v0.6) — W6 implementation.
 
