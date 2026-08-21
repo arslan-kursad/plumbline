@@ -51,6 +51,28 @@ specific, not secret.
 Then run the kill-switch live-fire — the F0 acceptance criterion that cannot be
 satisfied on paper: `docs/runbooks/kill-switch.md`.
 
+## After the first apply — wiring CI to the project
+
+The `terraform plan (wif)` job in `.github/workflows/ci.yml` skips until these
+exist. Set them from the module's own outputs, so the values are read rather than
+retyped:
+
+```bash
+gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --body "$(terraform output -raw workload_identity_provider)"
+gh variable set GCP_CI_SERVICE_ACCOUNT         --body "$(terraform output -raw ci_service_account)"
+gh variable set GCP_PROJECT_ID                 --body "$(terraform output -raw project_id)"
+gh variable set GCP_STATE_BUCKET               --body "$(terraform output -raw state_bucket)"
+gh secret   set GCP_BILLING_ACCOUNT_ID         --body "<billing account id>"
+```
+
+The billing account ID is a secret rather than a variable — not because it is a
+credential, it is not, but because a workflow log is a public artifact on a public
+repository and there is no reason to publish an account identifier in one.
+
+Then re-run CI on `main` and confirm the plan job runs instead of skipping. **A
+skipped job is not a passing job**: F0 acceptance criterion 8 is closed by a run
+that actually authenticated.
+
 ## Pinning
 
 `.terraform.lock.hcl` is committed in both modules. It records the registry's
