@@ -1,7 +1,8 @@
 # Redaction rules — claude-code, version 1
 #
-# Status: implements ADR-0006, which is **Proposed** and not accepted. If review moves
-# the boundary, this file moves with it; nothing outside the redaction stage reads it.
+# Status: implements ADR-0006, **Accepted** at the F1 exit review on 2026-08-21. The
+# isolation stays: nothing outside the redaction stage reads this file, so moving the
+# boundary later remains a small change rather than a rewrite.
 #
 # Why this exists at all: Claude Code emits personal data by default and this repository
 # is public, so no fixture and no stored row may carry it (CLAUDE.md). Two findings from

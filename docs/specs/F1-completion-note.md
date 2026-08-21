@@ -1,6 +1,6 @@
 # F1 — Completion note
 
-**Phase:** F1, Local-First Core · **Status:** complete, pending the C2 review batch (§5)
+**Phase:** F1, Local-First Core · **Status:** complete; C2 reviewed and closed (§8)
 **Date:** 2026-08-21 · **Spec:** [`F1-local-first-core.md`](F1-local-first-core.md)
 **Decisions:** [`F1-decision-log.md`](F1-decision-log.md) — D1–D6 and 26 W-level entries
 
@@ -19,7 +19,7 @@ asserts the second of those rather than promising it.
 | 2 | One command runs the end-to-end path green: rows through the views, poison in the DLQ | met | `make e2e`; CI job `local end-to-end`, **1 m 54 s** |
 | 3 | Collector byte-identity test green | met | `TestPayloadBytesInEqualPayloadBytesOut` — both transports, four dialects |
 | 4 | Mappings embedded at build; redaction rules versioned; semconv vendored (#8) | met | `normalization/{mappings,redaction,semconv}/` |
-| 5 | ADR-0006 exists as `Proposed`, redaction implemented and isolated | met | [ADR-0006](../adr/ADR-0006-pii-redaction-boundary.md) |
+| 5 | ADR-0006 exists as `Proposed`, redaction implemented and isolated | met — and **since accepted**, see §8 | [ADR-0006](../adr/ADR-0006-pii-redaction-boundary.md) |
 | 6 | Decision log complete, every decision with rationale and reversibility class | met | [`F1-decision-log.md`](F1-decision-log.md) |
 | 7 | CI green on `main`; gates passing; zero GCP mutations | met | Gates A–F + their failure proofs; the run refuses a stack that references a credential |
 | 8 | Fixture manifests state provenance honestly; F4 re-validation issue open | met | four manifests; issue #42 |
@@ -142,3 +142,62 @@ were never observed.
 | Fixtures | 10 payloads across 4 dialect directories, every one synthetic in content |
 | Mapped columns | 15 typed `gen_ai_*`, all validated against the vendored v1.41 registry |
 | GCP resources created | 0 |
+
+## 8. C2 outcome — 2026-08-21
+
+The maintainer reviewed the batch in §5 and accepted all four items. What each acceptance
+changed:
+
+### 1. ADR-0006 — accepted
+
+`Proposed` → `Accepted`, and architecture §10's index with it (v0.7). The status was not
+a formality: an ADR written under autonomous governance could not flip its own status, and
+the index carried `Proposed` for exactly as long as that was true.
+
+What was accepted is the consequence, not the code's location: **unredacted personal data
+transits Pub/Sub and persists in `traces-dlq` until a human drains it.** Two F2
+obligations were advisory while the ADR was `Proposed` and are now binding — the DLQ
+runbook must state that a dead-lettered message may carry personal data, and DLQ retention
+must be set deliberately rather than left at the default. Tracked in
+[#44](https://github.com/arslan-kursad/plumbline/issues/44), and F2 should not deploy a
+subscription before they are met.
+
+The stage stays isolated. That was the argument for isolation while the decision was open,
+and it remains the argument for it now: a later boundary change should cost one class and
+its call site.
+
+Issue #11 is closed.
+
+### 2. D1 — ratified
+
+Freeze A is the F3 entry gate. The amendment notes in `F0-foundations.md` and
+`project-brief.md` now record the ratification rather than describing it as pending.
+Issue #35 is closed.
+
+`docs/eval-plan.md` is still stale on this line, deliberately: it is a pre-registration
+document, and the human performing Freeze A reconciles it in the same action
+([#36](https://github.com/arslan-kursad/plumbline/issues/36)), which also carries the
+row-1.1 path and the row-1.2 threshold this phase raised.
+
+### 3. Constructed-fixture risk — acknowledged
+
+The maintainer accepted that F1's golden tests are evidence about the **normalization
+contract** and not about **detection fidelity against a real emitter**, and that SC-1 row
+1.2 is therefore unmet until real captures exist. This changes no artefact — every
+manifest already said so — and it does change what may be claimed from SC-1 before F4.
+[#42](https://github.com/arslan-kursad/plumbline/issues/42) is the path to meeting it;
+C1 remains available for claude-code at any time.
+
+### 4. Autonomous scope calls — approved
+
+Gate F and the API-key format (W3.4), the OTLP/JSON twin instead of textproto (W2.1), the
+three-level `attributes` column shape (W2.3), `ROW_NUMBER` instead of `QUALIFY` (W5.4),
+and W7 folded into the work items that created each test suite (§2). All five stand as
+made.
+
+### What C2 did not close
+
+**C1.** `docs/runbooks/claude-code-capture.md` is still waiting on an interactively
+authenticated session. It blocked nothing during the phase and blocks nothing now; what it
+changes when it lands is the claude-code fixture's provenance, and the evidence file's §3
+statement that tool and hook spans have never been observed.

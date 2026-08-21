@@ -439,8 +439,9 @@ subset (file-path deny rules, command deny-list). Minimum content:
    criterion; what Freeze A protects is the integrity of the seeded-regression experiment,
    which begins in F3. Gating F1 on it held ~25 h of work behind an unresolved question
    about Adjudicator ground truth that F1 cannot answer. Freeze B is unchanged, at F3
-   before the first run. Decided in the F1 handoff directive (D1) and recorded in
-   `docs/specs/F1-decision-log.md`; ratification is a human item at the F1 exit review.
+   before the first run. Decided in the F1 handoff directive (D1), recorded in
+   `docs/specs/F1-decision-log.md`, and **ratified by the maintainer at the F1 exit review
+   on 2026-08-21** (issue #35).
 2. **`docs/eval-plan.md` §2 still reads "F1 entry gate" and is deliberately not edited.**
    Editing the pre-registration document is prohibited for the whole of F1
    (`docs/specs/F1-local-first-core.md` §4), so the two documents disagree until the

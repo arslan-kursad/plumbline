@@ -1,14 +1,16 @@
 # ADR-0006 — PII redaction happens in the worker, after deserialization
 
-**Status:** Proposed · **Date:** 2026-08-21 · **Work package:** F1 / W4
+**Status:** Accepted · **Date:** 2026-08-21 · **Accepted:** 2026-08-21 (F1 C2) · **Work package:** F1 / W4
 **Architecture:** §2.1, §2.3, §3.2, §3.4, §5, §6.3
 **Supersedes:** — · **Superseded by:** —
 
-> **Proposed, not accepted.** This ADR was authored by Claude Code under the F1
-> autonomous governance mode, which explicitly excludes flipping an ADR to `Accepted`
-> (F1 spec §7). The redaction stage it describes is implemented and tested, and it is
-> implemented in isolation precisely so that a rejection at the F1 exit review is a
-> small change rather than a rewrite. Issue #11 owns the question.
+> **Authored autonomously, accepted by the maintainer.** This ADR was written by Claude
+> Code under the F1 autonomous governance mode, which excludes flipping an ADR to
+> `Accepted` (F1 spec §7), and it stood at `Proposed` until the maintainer accepted it in
+> the F1 exit review on 2026-08-21. What was accepted is not the code's location but the
+> consequence under **Negative / accepted costs**: unredacted personal data transits
+> Pub/Sub and persists in `traces-dlq` until a human drains it. The two F2 obligations
+> that follow are now binding and are tracked in issue #44.
 
 ## Context
 
@@ -111,10 +113,11 @@ question without answering it.
 - **The dead-letter topic holds it durably.** Architecture §3.4 gives `traces-dlq` a pull
   subscription with no consumer by default and manual replay, so a poison message carrying
   personal data sits there until a human drains it, with a depth alert as the only signal.
-  This is the sharpest edge of the decision. Two obligations follow, and F2 owns both: the
-  DLQ runbook states that a dead-lettered message may contain personal data and must be
-  inspected on a workstation, not pasted into an issue; and DLQ retention is set
-  deliberately rather than left at the default.
+  This is the sharpest edge of the decision, and it is the part the maintainer accepted
+  explicitly. Two obligations follow, F2 owns both, and acceptance makes them binding
+  rather than advisory (issue #44): the DLQ runbook states that a dead-lettered message
+  may contain personal data and must be inspected on a workstation, not pasted into an
+  issue; and DLQ retention is set deliberately rather than left at the default.
 - **The marker is reversible for guessable values.** Eight hex characters of an unkeyed
   SHA-256 over an email address is recoverable by anyone willing to hash a candidate list.
   A keyed HMAC would fix it and needs a key, which is a secret this design does not have
