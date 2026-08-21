@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.4 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-19
+**Version:** 0.5 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -310,6 +310,7 @@ balancer, a reserved IP, a VM) all arrive as a resource type nobody argued about
 | `google_service_account` | F0 | Per-component identities |
 | `google_service_account_iam_member` | F0 | Workload Identity Federation binding to a service account |
 | `google_project_iam_member` | F0 | Project-scoped role grants |
+| `google_billing_account_iam_member` | F0 | Billing-account read for the CI identity, so `terraform plan` can refresh the budget |
 | `google_cloud_run_service_iam_member` | F0 | Invoker grants scoped to one service |
 | `google_pubsub_topic` | F0 | `billing-alerts`; F2 adds `traces` and `traces-dlq` |
 | `google_cloudfunctions2_function` | F0 | Billing kill-switch only |
@@ -403,6 +404,16 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.5 — 2026-08-21** — F0 W6, CI plan scope.
+
+1. §7.1 allowlist gains `google_billing_account_iam_member`. `terraform plan`
+   refreshes every resource in state, the budget is a billing-account resource,
+   and neither project Owner nor project Viewer reaches it — so the read-only CI
+   identity needs a grant at that scope or acceptance criterion 8 is unreachable.
+   Adding a type to the allowlist is a change to this document by construction:
+   the plan guard refuses anything absent from it, which is the mechanism working
+   rather than an obstacle to route around.
 
 **v0.4 — 2026-08-19** — F0 spec W4/W5, W6.
 
