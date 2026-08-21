@@ -83,6 +83,19 @@ None of item 5 was found by a test. They were found by reading what each resourc
 actually calls — which is the only method available before a project exists, and
 is worth naming as such rather than presenting as diligence.
 
+6. **The first real apply found what reading could not.** Thirty-eight of forty
+   resources created; the budget and the quota preference failed with a 403
+   saying the quota project "is not set by default" and naming a consumer project
+   belonging to Google's shared gcloud OAuth client. The ADC quota project *was*
+   set — but the provider only sends it when `user_project_override` is
+   configured, which it was not. Fixed in the provider block, with the callers'
+   `serviceusage.services.use` grant that follows from it.
+
+   This is the honest counterweight to item 5: a pre-flight pass over the
+   configuration removes the failures that are visible in what the code calls.
+   It does not remove the ones that live in how credentials are attributed, and
+   the first apply was always going to be the thing that found those.
+
 ## 3. What is left, in order
 
 Already done, and recorded here so the list below is only what is left: the F0
