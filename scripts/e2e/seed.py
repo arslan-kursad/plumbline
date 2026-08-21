@@ -11,6 +11,7 @@ re-seeded rather than torn down.
 import argparse
 import json
 import pathlib
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -62,18 +63,83 @@ def pubsub(base: str, worker_push_url: str) -> int:
     return 0
 
 
-def bigquery(base: str, sql_dir: pathlib.Path) -> int:
-    """Applies analytics/sql/*.sql in order — the same files Terraform will own in F2."""
-    url = f"{base}/bigquery/v2/projects/{PROJECT}/queries"
+SQL_TO_BIGQUERY = {
+    "TIMESTAMP": "TIMESTAMP",
+    "STRING": "STRING",
+    "BOOL": "BOOLEAN",
+    "INT64": "INTEGER",
+    "FLOAT64": "FLOAT",
+    "JSON": "JSON",
+}
 
+
+def table_schema(ddl: str) -> list[dict]:
+    """Derives the table's field list from analytics/sql/001_spans_table.sql.
+
+    The SQL file stays the single definition of the table. The local stand-in cannot
+    execute `CREATE TABLE ... PARTITION BY`, so the table is created here through the
+    REST API instead — from the same file, parsed, rather than from a second schema
+    written by hand that would drift from it the first time a column is added.
+    """
+    fields = []
+    for match in re.finditer(
+        r"^  ([a-z][a-z0-9_]*)\s+(TIMESTAMP|STRING|BOOL|INT64|FLOAT64|JSON)(\s+NOT NULL)?",
+        ddl,
+        re.MULTILINE,
+    ):
+        name, sql_type, not_null = match.groups()
+        fields.append({
+            "name": name,
+            "type": SQL_TO_BIGQUERY[sql_type],
+            "mode": "REQUIRED" if not_null else "NULLABLE",
+        })
+    return fields
+
+
+def bigquery(base: str, sql_dir: pathlib.Path) -> int:
+    """Creates the table from 001_spans_table.sql, then applies the view DDL."""
+    tables = f"{base}/bigquery/v2/projects/{PROJECT}/datasets/{DATASET}/tables"
+    queries = f"{base}/bigquery/v2/projects/{PROJECT}/queries"
+
+    ddl = (sql_dir / "001_spans_table.sql").read_text()
+    fields = table_schema(ddl)
+    if not fields:
+        print("  FAILED  could not parse a schema out of 001_spans_table.sql", file=sys.stderr)
+        return 1
+
+    resource = {
+        "tableReference": {"projectId": PROJECT, "datasetId": DATASET, "tableId": "spans"},
+        "schema": {"fields": fields},
+        "timePartitioning": {"type": "DAY", "field": "start_time", "requirePartitionFilter": True},
+        "clustering": {"fields": ["trace_id", "span_id"]},
+    }
+
+    status, body = request("POST", tables, resource)
+    if status >= 400 and status != 409 and "already exists" not in body.lower():
+        # The stand-in may refuse partitioning or clustering outright. Retry without them
+        # and say so: a local table that is not partitioned is a difference between this
+        # stack and the cloud, and a difference nobody was told about is the kind that
+        # gets discovered in F2.
+        print(f"  note    partitioned table refused by the stand-in; creating an unpartitioned one\n"
+              f"          ({body[:200]})")
+        resource.pop("timePartitioning")
+        resource.pop("clustering")
+        status, body = request("POST", tables, resource)
+
+    report(f"table {DATASET}.spans ({len(fields)} columns)", status, body)
+    if status >= 400 and status != 409 and "already exists" not in body.lower():
+        return 1
+
+    failures = 0
     for path in sorted(sql_dir.glob("*.sql")):
-        statement = path.read_text()
-        status, body = request("POST", url, {"query": statement, "useLegacySql": False})
+        if path.name.startswith("001_"):
+            continue  # created above, through the API the stand-in supports
+        status, body = request("POST", queries, {"query": path.read_text(), "useLegacySql": False})
         report(f"sql {path.name}", status, body)
         if status >= 400:
-            return 1
+            failures += 1
 
-    return 0
+    return failures
 
 
 def report(what: str, status: int, body: str) -> None:
