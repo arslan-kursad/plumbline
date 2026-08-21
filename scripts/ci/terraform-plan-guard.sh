@@ -34,21 +34,47 @@ analyse() {
   python3 scripts/ci/plan_guard.py docs/architecture.md "$1"
 }
 
-to_json() {
-  # Accepts either a JSON plan or a binary plan file; binary plans are converted
-  # with `terraform show -json`, run in the directory that produced them.
+workdir=""
+plan_json=""
+
+cleanup() {
+  # An `if` rather than a `[ ... ] && ...` chain: the latter returns 1 when the
+  # variable is empty, and an EXIT trap's status becomes the script's status.
+  if [ -n "$workdir" ]; then
+    rm -rf "$workdir"
+  fi
+}
+trap cleanup EXIT
+
+convert_plan() {
+  # Sets plan_json. Deliberately not a function that prints a path: it also
+  # allocates a temporary directory, and a command substitution would allocate it
+  # in a subshell the caller cannot clean up.
   local plan="$1"
 
   if head -c 1 "$plan" | grep -q '{'; then
-    printf '%s' "$plan"
+    plan_json="$plan"
     return
   fi
 
-  local dir json
+  local dir
   dir="$(cd "$(dirname "$plan")" && pwd)"
-  json="$(mktemp "${TMPDIR:-/tmp}/plan.XXXXXX.json")"
-  (cd "$dir" && terraform show -json "$(basename "$plan")") > "$json"
-  printf '%s' "$json"
+
+  # A directory with a fixed filename inside, rather than a template with a
+  # suffix: mktemp only substitutes trailing X's, so "plan.XXXXXX.json" is a
+  # literal name. It works once and collides on every run after that — a failure
+  # that only appears the second time anyone uses this.
+  workdir="$(mktemp -d "${TMPDIR:-/tmp}/plan-guard.XXXXXX")"
+  plan_json="${workdir}/plan.json"
+
+  if ! (cd "$dir" && terraform show -json "$(basename "$plan")") > "$plan_json"; then
+    printf 'could not convert %s with terraform show -json\n' "$plan" >&2
+    exit 2
+  fi
+  if [ ! -s "$plan_json" ]; then
+    printf 'terraform show -json produced nothing for %s\n' "$plan" >&2
+    exit 2
+  fi
 }
 
 self_test() {
@@ -100,4 +126,6 @@ if [ "$1" = "--self-test" ]; then
 fi
 
 [ -f "$1" ] || { printf 'no such plan file: %s\n' "$1" >&2; exit 2; }
-analyse "$(to_json "$1")"
+
+convert_plan "$1"
+analyse "$plan_json"
