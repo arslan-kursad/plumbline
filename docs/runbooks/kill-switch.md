@@ -271,7 +271,13 @@ This is a prevent-class control (ADR-0004 §1): the query is refused, no bytes a
 billed, nobody has to notice. The kill-switch is report-and-stop, and it is later
 in the chain.
 
-Verify after apply, and record what the console reports:
+**Applied and verified on 2026-08-21.** The Cloud Quotas API reports
+`granted_value = 20480` against `preferred_value = 20480` for `QueryUsagePerDay`,
+with `reconciling = false` — so the unit assumption above holds: the value is MiB
+per day, and the effective limit is 20 GiB/day rather than 20 GiB in some other
+unit or a request still being processed.
+
+Re-verify after any change, and record what the console reports:
 
 ```bash
 gcloud services quota list \
