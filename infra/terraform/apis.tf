@@ -25,18 +25,18 @@ resource "google_project_service" "required" {
     "cloudresourcemanager.googleapis.com",
     "eventarc.googleapis.com",
     "iam.googleapis.com",
-    # The two halves of what Workload Identity Federation does at run time:
-    # sts exchanges the GitHub OIDC assertion for a federated token, and
-    # iamcredentials mints the service account token that token impersonates
-    # with. Creating the pool needs neither; using it needs both, and the
-    # failure would land in CI rather than in an apply.
+    # iamcredentials and sts are the two halves of what Workload Identity
+    # Federation does at run time: sts exchanges the GitHub OIDC assertion for a
+    # federated token, iamcredentials mints the service account token that
+    # identity impersonates with. Creating the pool needs neither; using it needs
+    # both, and the failure would land in CI rather than in an apply.
     "iamcredentials.googleapis.com",
-    "sts.googleapis.com",
     "logging.googleapis.com",
     "pubsub.googleapis.com",
     "run.googleapis.com",
     "serviceusage.googleapis.com",
     "storage.googleapis.com",
+    "sts.googleapis.com",
   ])
 
   project = var.project_id
