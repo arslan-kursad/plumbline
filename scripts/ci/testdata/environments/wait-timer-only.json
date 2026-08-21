@@ -1,0 +1,5 @@
+{
+  "name": "gcp-production",
+  "protection_rules": [{"id": 1, "type": "wait_timer", "wait_timer": 5}],
+  "deployment_branch_policy": null
+}

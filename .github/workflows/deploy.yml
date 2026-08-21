@@ -88,31 +88,32 @@ jobs:
       # creates it on first use *without* protection rules, so the approval gate
       # this workflow is built around would silently not be there. The check runs
       # before any credential is minted.
+      # Load-bearing, not decoration. Naming an environment that does not exist
+      # creates it on first use *without* protection rules, so the approval gate
+      # this workflow is built around would silently not be there. The check runs
+      # before any credential is minted, and its assertions live in
+      # scripts/ci/environment-guard.sh, which is exercised against violating
+      # fixtures on every CI run — a check nobody has seen fail is not a check.
       - name: Refuse without a required reviewer on the environment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! environment=$(gh api "repos/${{ github.repository }}/environments/${ENVIRONMENT_NAME}" 2>&1); then
-            echo "::error::cannot read the ${ENVIRONMENT_NAME} environment. Either it does not exist \
-          (create it per the Wave 0 issue) or this token cannot read protection rules. \
-          Refusing: an unverified gate is not a gate."
-            echo "$environment"
+          if ! gh api "repos/${{ github.repository }}/environments/${ENVIRONMENT_NAME}" > environment.json; then
+            echo "::error::cannot read the ${ENVIRONMENT_NAME} environment. Either it does not exist (create it per the Wave 0 issue), or this token cannot read protection rules. Refusing: an unverified gate is not a gate."
             exit 1
           fi
 
-          reviewers=$(jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length' <<<"$environment")
-          if [ "${reviewers:-0}" -lt 1 ]; then
-            echo "::error::${ENVIRONMENT_NAME} has no required reviewer; the approval gate D1 depends on is absent"
-            exit 1
-          fi
+          set +e
+          ./scripts/ci/environment-guard.sh environment.json
+          status=$?
+          set -e
+          rm -f environment.json
 
-          branches=$(jq -r '.deployment_branch_policy.protected_branches // false' <<<"$environment")
-          custom=$(jq -r '.deployment_branch_policy.custom_branch_policies // false' <<<"$environment")
-          if [ "$branches" = "false" ] && [ "$custom" = "false" ]; then
-            echo "::warning::${ENVIRONMENT_NAME} has no deployment branch policy; this workflow still refuses any ref but main"
-          fi
-
-          echo "environment ${ENVIRONMENT_NAME}: ${reviewers} required reviewer(s)"
+          case $status in
+            0) : ;;
+            1) echo "::error::${ENVIRONMENT_NAME} is not protected by a required reviewer" ; exit 1 ;;
+            *) echo "::error::could not evaluate ${ENVIRONMENT_NAME}'s protection rules" ; exit 1 ;;
+          esac
 
   plan:
     name: plan

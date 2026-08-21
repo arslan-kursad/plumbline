@@ -1,0 +1,5 @@
+{
+  "name": "gcp-production",
+  "protection_rules": [{"id": 1, "type": "required_reviewers", "reviewers": []}],
+  "deployment_branch_policy": {"protected_branches": true, "custom_branch_policies": false}
+}

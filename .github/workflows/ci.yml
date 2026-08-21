@@ -109,6 +109,12 @@ jobs:
       # A gate verified only against a clean tree is unverified (F0 spec §6).
       # Running the proofs on every build keeps that true as the gates change,
       # which a one-time manual demonstration cannot.
+      # The deploy path's guards are proven here rather than in the path-filtered
+      # terraform job: they protect an apply, so their proof runs on every CI run
+      # regardless of what the change touched.
+      - name: Environment guard self-test
+        run: ./scripts/ci/environment-guard.sh --self-test
+
       - name: Prove every gate can fail
         run: ./scripts/ci/prove-gates.sh
 

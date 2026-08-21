@@ -214,10 +214,26 @@ first use without protection rules, so the gate the workflow is built around wou
 silently not be there — the same failure shape as the two W6.4 settings that returned
 HTTP 200 and changed nothing. Refusing when the environment cannot be read at all is
 deliberate: an unverified gate is not a gate.
-**Verified how:** YAML parse and the invariant gates locally; the workflow's real proof is
-its first refusal. It is dispatched once **before** the environment is configured, and
-must refuse — the same discipline as `prove-gates.sh`, which exists because this project
-has already shipped a gate that could not fail.
+**Verified how:** dispatched once on `main` before any of this was configured, and it
+refused —
+[run 32503826772](https://github.com/arslan-kursad/plumbline/actions/runs/32503826772):
+`missing repository variables: GCP_DEPLOY_SERVICE_ACCOUNT`, with `plan` and `apply`
+skipped. So the deploy path fails closed.
+
+**What that run did not prove, which is the part that matters.** It refused at the
+variables check, two steps before the environment check, so the highest-consequence
+assertion in the workflow was never reached. Waiting for it to be exercised in anger would
+mean trusting it first: once `gcp-production` exists and the variables are set, the check
+passes forever and is never observed failing — the exact shape ADR-0004 §1 calls a comfort
+object. It is therefore extracted into `scripts/ci/environment-guard.sh` and proven against
+six fixtures — no protection rules, a wait timer instead of reviewers, a rule whose
+reviewers were all removed, unparseable input, and two protected shapes — running in the
+`invariant gates` job on every CI run rather than in a path-filtered one, because what it
+protects is an apply.
+
+**Three-valued exit, deliberately:** 0 protected, 1 unprotected, 2 unusable input. Folding
+"cannot tell" into either of the other two is how a gate starts reporting on a question it
+did not answer, and the workflow refuses on all of 1 and 2.
 **Exit review:** no, unless the preflight's environment read turns out to need a token
 permission the default one lacks, which changes the repository's Actions posture.
 
