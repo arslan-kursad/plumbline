@@ -132,13 +132,124 @@ resource "google_storage_bucket_iam_member" "ci_readonly_state" {
   member = "serviceAccount:${google_service_account.ci_readonly.email}"
 }
 
-# The F2 deploy identity, documented here and deliberately not created (F0 spec
-# §2, §W6.1): a separate `ci-deploy` service account whose principalSet requires
-# the branch as well as the repository —
+# The F2 deploy identity. F0 described it in a comment and deliberately did not
+# create it, so that F0's CI identity was *demonstrably* unable to mutate anything
+# (F0 spec §2, §W6.1). This is that identity, built to the shape F0 specified.
+resource "google_service_account" "ci_deploy" {
+  project      = var.project_id
+  account_id   = "ci-deploy"
+  display_name = "CI (deploy)"
+  description  = "GitHub Actions identity for gated applies. Reachable only from main, only behind the gcp-production environment gate."
+
+  depends_on = [google_project_service.required]
+}
+
+# The principalSet is narrower than the read-only identity's by one attribute: the
+# ref. A pull request from this repository can obtain the read-only identity and
+# plan; it cannot obtain this one at all, because its assertion carries a ref that
+# is not refs/heads/main.
 #
-#   principalSet://iam.googleapis.com/${pool}/attribute.repository/${repo}
-#   with an additional attribute condition on attribute.ref == 'refs/heads/main'
+# The restriction lives in the principalSet rather than in an IAM condition on the
+# binding. An IAM condition evaluates request attributes and cannot see the OIDC
+# assertion, so `assertion.ref == '...'` written there would be a condition that
+# reads a variable it has no access to — a control that looks present and grants
+# nothing, or refuses everything. `attribute.ref` is already mapped on the provider
+# (above), and a principalSet keyed on a mapped attribute is the documented
+# mechanism.
 #
-# so a pull request cannot obtain deploy credentials even from this repository.
-# Writing the pattern now and creating it in F2 keeps F0's identity provably
-# incapable of deploying.
+# One attribute per principalSet, so this line carries the ref and the provider's
+# attribute_condition carries the repository. Together they are "this repository,
+# on main". The two are enforced by Google and fail independently of the
+# environment gate, which is enforced by GitHub — a mistake in the workflow file
+# cannot reach this identity from a branch.
+resource "google_service_account_iam_member" "ci_deploy_wif" {
+  service_account_id = google_service_account.ci_deploy.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.ref/refs/heads/main"
+}
+
+# --- What this identity may do, and the part that is not comfortable --------
+#
+# Growing its own grants per wave (F2 D6) requires project IAM administration,
+# which means this identity can grant itself any project-level role. Stating the
+# consequence rather than implying otherwise: **at project scope this identity is
+# administrator-equivalent, and the control is not the role list.**
+#
+# The controls that are real:
+#
+#   - it is unreachable except from main (the condition above, enforced by Google);
+#   - every apply pauses on a required reviewer (the gcp-production environment,
+#     enforced by GitHub);
+#   - every plan is checked by scripts/ci/terraform-plan-guard.sh against the
+#     architecture §7.1 allowlist, so a resource type nobody argued for is refused
+#     even with the permission to create it;
+#   - no key exists to steal (§6.1).
+#
+# ADR-0004 Amendment 2 had to withdraw a claim that an identity "could not" do
+# something. This comment is written so there is nothing to withdraw later.
+#
+# --- And the part that is a real boundary -----------------------------------
+#
+# **Nothing here is granted on the billing account.** wif.tf named the cleaner
+# shape in F0 — billing-scoped resources kept away from the CI identity — and F2
+# is where that was decided (decision log W0.2). The deploy identity gets
+# billing.viewer and nothing else, so `terraform plan` can refresh the budget and
+# no CI run can ever change it. Billing-account writes stay with a human, which is
+# what Wave 0 already demonstrated.
+#
+# A plan that needs a billing-account write therefore fails in CI with a
+# permission error. That is the intended behaviour: it is visible, it names the
+# resource, and it routes the change to the only path allowed to make it.
+
+resource "google_project_iam_member" "ci_deploy" {
+  for_each = toset([
+    # Enabling the APIs each wave needs (google_project_service).
+    "roles/serviceusage.serviceUsageAdmin",
+    # The provider sends X-Goog-User-Project on every request (versions.tf).
+    "roles/serviceusage.serviceUsageConsumer",
+    # Reading state during a plan, across every resource in it.
+    "roles/viewer",
+    # Reading IAM policies that basic Viewer does not reach — the same gap
+    # ci-readonly hit on storage buckets.
+    "roles/iam.securityReviewer",
+    # Wave 1: BigQuery. dataOwner rather than dataEditor, verified against the
+    # role definitions rather than assumed: dataEditor can create a dataset and
+    # cannot update one, so the second apply that changed a description would fail
+    # on a permission the first apply did not need.
+    "roles/bigquery.dataOwner",
+    # Wave 1: Pub/Sub topics and the dead-letter subscription.
+    "roles/pubsub.editor",
+    # Wave 1: the DLQ depth alert and its notification channel.
+    "roles/monitoring.editor",
+    # Wave 1: Firestore in native mode.
+    "roles/datastore.owner",
+    # Wave 1: the image repository and its cleanup policy.
+    "roles/artifactregistry.admin",
+    # Wave 2 creates a service account per component (§6.1), and D6's per-wave
+    # growth is what these two lines make possible — at the price named above.
+    "roles/iam.serviceAccountAdmin",
+    "roles/resourcemanager.projectIamAdmin",
+  ])
+
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.ci_deploy.email}"
+}
+
+# Read-only on the billing account, for the same reason the read-only identity has
+# it: `terraform plan` refreshes the budget, and a plan that cannot see it is a
+# plan blind to drift. Write is deliberately absent — see above.
+resource "google_billing_account_iam_member" "ci_deploy_billing_viewer" {
+  billing_account_id = var.billing_account_id
+  role               = "roles/billing.viewer"
+  member             = "serviceAccount:${google_service_account.ci_deploy.email}"
+}
+
+# State access scoped to the state bucket, not project-wide: this identity must
+# not reach the function-source bucket. objectAdmin because an apply writes state
+# and a lock.
+resource "google_storage_bucket_iam_member" "ci_deploy_state" {
+  bucket = local.state_bucket
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.ci_deploy.email}"
+}

@@ -330,6 +330,42 @@ it because the console shows it as configured.
 personal data. The variable keeps the control mandatory and the address out of the repo.
 **Exit review:** no.
 
+### W1.5 — The deploy identity: project-admin-equivalent, and nothing on the billing account
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** costly
+**Decision:** `ci-deploy` exists, reachable only from `main`, holding project-scoped roles
+that grow per wave — including `resourcemanager.projectIamAdmin`, which is what makes
+per-wave growth possible and also makes the identity administrator-equivalent at project
+scope. On the billing account it holds `roles/billing.viewer` and nothing else. W0.2's
+second question is answered: **billing-account writes never belong to a CI identity.**
+**What the honest version of this sounds like:** the control is not the role list. An
+identity that can grant itself any project role has, in effect, every project role. What
+actually bounds it: it is unreachable except from `main` (enforced by Google), every apply
+pauses on a required reviewer (enforced by GitHub), every plan is checked against the §7.1
+allowlist so a resource type nobody argued for is refused even with permission to create
+it, and there is no key to steal. ADR-0004 Amendment 2 had to withdraw a claim that an
+identity could not do something; this is written so there is nothing to withdraw.
+**Alternatives:** keep the role set in the human-run bootstrap module — then D6's per-wave
+growth costs a local apply per wave, and "one click per wave" becomes "one click and one
+laptop"; grant `roles/owner` and stop pretending — it would be more honest about the
+project scope and would also hand over the billing account, which is the boundary worth
+keeping; billing-scoped resources in their own state, as `wif.tf` proposed in F0 — still
+the cleanest shape, and it costs state surgery on the budget that *is* the kill-switch,
+during the phase where the kill-switch is the entry gate. The viewer-only line gets most
+of the benefit for none of that risk, and the split stays available later.
+**Consequence, stated:** a plan needing a billing-account write fails in CI with a
+permission error. That is intended. It is visible, it names the resource, and it routes
+the change to the only path allowed to make it.
+**Mechanism correction worth recording:** the branch restriction lives in the
+principalSet (`attribute.ref/refs/heads/main`), not in an IAM condition on the binding. An
+IAM condition evaluates request attributes and cannot see the OIDC assertion, so
+`assertion.ref == '...'` written there would read a variable it has no access to — a
+control that looks present and either grants nothing or refuses nothing. `attribute.ref`
+was already mapped on the provider in F0; one attribute per principalSet, so the ref is
+bound here and the repository stays in the provider's `attribute_condition`.
+**Not yet proven:** that the binding issues credentials at all. It cannot be tested before
+it is applied. The first deploy dispatch after W1a is the test, and its failure mode is
+loud — `google-github-actions/auth` fails before Terraform runs.
+**Exit review:** yes. This is the largest standing authority created in the phase.
 ### W0.4 — Attempt 2 failed; the phase is halted and the fix is one permission
 **Made:** 2026-08-21 · **Work item:** Wave 0 · **Reversibility:** cheap
 **What happened:** the second live-fire failed with the same 403 as the first, and the
