@@ -1,8 +1,8 @@
 # Runbook — billing kill-switch
 
-**Status:** configuration delivered (F0 W4/W5); **live-fire not yet executed**.
-F0 acceptance criterion 7 stays open until §4 of this runbook is filled with
-observed evidence.
+**Status:** configuration delivered (F0 W4/W5); **two live-fires attempted, both
+failed, each on a different missing permission** (§4). The F2 entry gate #33 stays
+open until billing has been observed detaching at the API.
 
 The chain, its rationale, and why it is deliberately the *last* control are in
 [ADR-0004](../adr/ADR-0004-zero-cost-guardrails-kill-switch.md) §2 and §5.
@@ -223,11 +223,64 @@ starting a redelivery loop, and the cause was legible in the first log line
 anyone read. A control that fails loudly is the difference between this being a
 morning's work and a discovery made during an incident.
 
-### Attempt 2 — pending
+### Attempt 2 — 2026-08-21 — **FAILED, same error, different cause**
 
-> Not yet executed. Re-run §3 after the Amendment 2 grant is applied, allowing a
-> minute or two for billing IAM to propagate. F0 acceptance criterion 7 stays open
-> until billing has been observed detaching, and the completion note points here.
+The Amendment 2 grant was applied and verified live on the billing account —
+against the billing account's own IAM policy, not against Terraform state:
+
+```
+roles/billing.admin  serviceAccount:killswitch-fn@plumbline-19458.iam.gserviceaccount.com
+```
+
+Billing still did not detach:
+
+```
+20:17:49 INFO  budget notification received budget="plumbline zero-spend"
+               cost=0.01 currency=TRY threshold_exceeded=1 interval_start=LIVE-FIRE-2
+20:17:49 ERROR cannot read billing info and retrying will not help
+               error="googleapi: Error 403: The caller does not have permission"
+20:18:33 INFO  budget notification received ... interval_start=LIVE-FIRE-2-REDELIVERY
+20:18:33 ERROR cannot read billing info and retrying will not help
+               error="googleapi: Error 403: The caller does not have permission"
+```
+
+`gcloud beta billing projects describe plumbline-19458` reported
+`billingEnabled: true` throughout.
+
+**Cause:** the function's *first* call is `Projects.GetBillingInfo`, and reading a
+project's billing info needs `resourcemanager.projects.get` on the project. The
+identity's entire project-level permission set was:
+
+```
+eventarc.events.receiveAuditLogWritten
+eventarc.events.receiveEvent
+logging.logEntries.create
+logging.logEntries.route
+resourcemanager.projects.createBillingAssignment
+resourcemanager.projects.deleteBillingAssignment
+```
+
+Project Billing Manager grants exactly the last two. Billing Account Administrator
+grants `resourcemanager.projects.get` against the **billing account**, which is a
+different resource from the project being read. So the identity could detach
+billing and could not find out whether it needed to.
+
+Fixed by a one-permission custom role (ADR-0004 Amendment 3), not by
+`roles/browser`: this identity already holds administrator rights over the billing
+account and should not also collect project IAM reads.
+
+**What this attempt cost, and what it bought.** Amendment 2 quoted this same error
+line and diagnosed the *detach* rather than the *read* — the two-sided
+authorization story was true and was not the failure in front of it. One live-fire
+per permission defect is an expensive way to find them; it is also the only way
+that has found any of them. Configuration review passed this identity twice.
+
+### Attempt 3 — pending
+
+> Not yet executed. Re-run §3 after the Amendment 3 custom role is applied. Both
+> known permission defects are now fixed: the read (Amendment 3) and the delete
+> (Amendment 2). The F2 entry gate #33 stays open until billing has been observed
+> detaching at the API.
 
 **What this test does not cover.** The live-fire publishes a synthetic message and
 exercises Pub/Sub → function → detach. It says nothing about how the budget

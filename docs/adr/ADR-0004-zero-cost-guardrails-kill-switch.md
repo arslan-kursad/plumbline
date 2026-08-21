@@ -135,9 +135,11 @@ Retained as a secondary, path-scoped signal where the symbol set is known and st
 
 - "Is this invariant actually enforced?" is answerable by reading one table, and the answer
   can be "no, only reviewed" without that being a defect — only without it being hidden.
-- The kill-switch is the one cost control that has been *observed* to work, because it is
-  fire-tested with archived evidence at F0. It is also the acceptance criterion that cannot
-  be satisfied on paper.
+- The kill-switch is the one cost control whose claim rests on observation rather than
+  configuration, because it is fire-tested with archived evidence. It is also the
+  acceptance criterion that cannot be satisfied on paper. *(Written for F0, where the
+  live-fire was deferred to the F2 entry gate. As of Amendment 3 the switch has been fired
+  twice and has not yet worked; the sentence stands as the reason that is known.)*
 - The pattern-notation rule removes the exclusion-list failure mode permanently, rather
   than patch by patch. It was reached the hard way: two gates in this project tripped on
   the documents that defined them.
@@ -360,6 +362,86 @@ period between deploying it and firing it. No amount of reading the configuratio
 would have found this: the permission model is plausible, symmetric, and wrong,
 and every layer above it worked. The test that this project made mandatory is the
 only thing that could have caught it, and it caught it on the first attempt.
+
+## Amendment 3 (2026-08-21) — The permission model was wrong on the other side too
+
+Status unchanged. Amendment 2's fix was necessary, correct, and not sufficient. The
+second live-fire is what proved it, and it failed with the same error as the first.
+
+### What happened
+
+```
+20:17:49 INFO  budget notification received budget="plumbline zero-spend"
+               cost=0.01 currency=TRY threshold_exceeded=1 interval_start=LIVE-FIRE-2
+20:17:49 ERROR cannot read billing info and retrying will not help
+               error="googleapi: Error 403: The caller does not have permission"
+```
+
+Billing stayed attached. `roles/billing.admin` was live on the billing account at the
+time — verified against the billing account's IAM policy, not against Terraform state.
+
+### Cause
+
+The function's first call is `Projects.GetBillingInfo`, and reading a project's billing
+info requires `resourcemanager.projects.get` **on the project**. The kill-switch identity
+did not have it. Its entire project-level permission set was six permissions:
+
+```
+eventarc.events.receiveAuditLogWritten
+eventarc.events.receiveEvent
+logging.logEntries.create
+logging.logEntries.route
+resourcemanager.projects.createBillingAssignment
+resourcemanager.projects.deleteBillingAssignment
+```
+
+Project Billing Manager carries exactly the last two. Billing Account Administrator
+carries `resourcemanager.projects.get`, but against the **billing account** resource,
+which is not the project the function reads. So the identity could delete the billing
+association and could not find out whether it needed to.
+
+### Why Amendment 2 did not catch this
+
+Amendment 2 read the 403 and reasoned about the act the function exists to perform —
+detaching — and detaching is genuinely two-sided, so the analysis produced a real defect
+and a correct fix. What it did not do was read the log line it quoted. **`cannot read
+billing info` names the call that failed, and it is not the detach.** The fix addressed
+the second call while the failure was in the first, and the two-sided-authorization story
+was plausible enough to stop the search.
+
+The lesson is narrow and worth keeping: an error message that names an operation is
+evidence about *which* operation, and a diagnosis that does not account for the wording is
+incomplete however well it explains the status code.
+
+### Decision
+
+A custom role carrying one permission:
+
+```hcl
+resource "google_project_iam_custom_role" "killswitch_billing_reader" {
+  role_id     = "killswitchBillingReader"
+  permissions = ["resourcemanager.projects.get"]
+}
+```
+
+Rather than `roles/browser`, the narrowest predefined role containing it, which also
+grants `resourcemanager.projects.getIamPolicy`, `projects.list`, and folder and
+organization reads. This identity already holds administrator rights over the billing
+account; it is the last one in the project that should collect incidental reads. The cost
+is a resource type added to the architecture §7.1 allowlist, which is what that list is
+for.
+
+### What this says about the control, again
+
+Two live-fires, two permission defects, both invisible to configuration review and both
+fatal to the control. The kill-switch was inert from the day it was deployed until the day
+it was tested, and then it was inert again through one fix. §5's sentence — an untested
+kill-switch is a comfort object — has now been demonstrated twice by the same object.
+
+The third live-fire is the one that has to pass, and the record in
+`docs/runbooks/kill-switch.md` §4 carries all three attempts rather than only the one that
+worked. A runbook that archives only successes teaches nothing about the failure modes of
+the thing it documents.
 
 ## References
 
