@@ -10,6 +10,7 @@ the conversion back to typed JSON happens here — once, in one place.
 
 import argparse
 import datetime
+import decimal
 import json
 import sys
 import urllib.error
@@ -34,8 +35,13 @@ def query(base: str, sql: str) -> dict:
 
 
 def timestamp(raw: str) -> str:
-    """Epoch seconds (BigQuery's wire form) back to the microsecond ISO form the rows use."""
-    micros = round(float(raw) * 1_000_000)
+    """Epoch seconds (BigQuery's wire form) back to the microsecond ISO form the rows use.
+
+    Parsed as a decimal rather than a float: a microsecond-precision epoch is sixteen
+    significant digits, which is at the edge of what float64 represents exactly, and an
+    off-by-one microsecond here would look like a normalization bug in the diff.
+    """
+    micros = int((decimal.Decimal(str(raw)) * 1_000_000).quantize(decimal.Decimal(1)))
     moment = datetime.datetime.fromtimestamp(micros / 1_000_000, datetime.timezone.utc)
     return moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{micros % 1_000_000:06d}Z"
 

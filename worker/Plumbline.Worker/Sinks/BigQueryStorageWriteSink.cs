@@ -37,7 +37,10 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
     private readonly BigQueryWriteClient client;
     private readonly TimeProvider clock;
 
+    private readonly bool againstStandIn;
+
     private BigQueryWriteClient.AppendRowsStream? stream;
+    private string? standInStreamName;
     private readonly SemaphoreSlim streamLock = new(1, 1);
 
     public BigQueryStorageWriteSink(string project, string dataset, string table, string? emulatorEndpoint,
@@ -47,8 +50,10 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
         tablePath = $"projects/{project}/datasets/{dataset}/tables/{table}";
         destination = $"{project}.{dataset}.{table}";
 
+        againstStandIn = !string.IsNullOrEmpty(emulatorEndpoint);
+
         var builder = new BigQueryWriteClientBuilder();
-        if (!string.IsNullOrEmpty(emulatorEndpoint))
+        if (againstStandIn)
         {
             // The local stand-in speaks plaintext gRPC and wants no credentials. This is
             // the only branch in the write path that knows about the emulator, and it is
@@ -79,20 +84,19 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
             serialized.SerializedRows.Add(ToProto(row, ingestTime).ToByteString());
         }
 
-        var request = new AppendRowsRequest
-        {
-            WriteStreamAsWriteStreamName = WriteStreamName.FromProjectDatasetTableStream(
-                ProjectOf(tablePath), DatasetOf(tablePath), TableOf(tablePath), "_default"),
-            ProtoRows = new AppendRowsRequest.Types.ProtoData
-            {
-                WriterSchema = new ProtoSchema { ProtoDescriptor = WriterDescriptor },
-                Rows = serialized,
-            },
-        };
-
         await streamLock.WaitAsync(cancellationToken);
         try
         {
+            var request = new AppendRowsRequest
+            {
+                WriteStream = await StreamNameAsync(cancellationToken),
+                ProtoRows = new AppendRowsRequest.Types.ProtoData
+                {
+                    WriterSchema = new ProtoSchema { ProtoDescriptor = WriterDescriptor },
+                    Rows = serialized,
+                },
+            };
+
             stream ??= client.AppendRows();
             await stream.WriteAsync(request);
 
@@ -117,6 +121,7 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
         {
             // A broken stream stays broken; drop it so the next write reconnects rather
             // than replaying the same failure forever.
+            standInStreamName = null;
             var broken = stream;
             stream = null;
             if (broken is not null)
@@ -138,6 +143,49 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
         {
             streamLock.Release();
         }
+    }
+
+    /// <summary>
+    /// The stream to append to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// In the cloud this is the **default stream**: every table has one, it needs no
+    /// creation call, and it is at-least-once, which matches the delivery semantics the
+    /// pipeline already has (§3.3).
+    /// </para>
+    /// <para>
+    /// The local stand-in cannot resolve it. `goccy/bigquery-emulator` grew implicit
+    /// `_default` handling one day after its most recent release, so every tagged image
+    /// answers `failed to get stream from …/streams/_default` — measured in CI across
+    /// 0.6.6 and 0.8.1. Rather than depending on an untagged image, the stand-in branch
+    /// creates a stream explicitly and appends to that. It is the same client, the same
+    /// `AppendRows` RPC, the same descriptor and the same serialized rows; what differs
+    /// is one name. The emulator creates its own default stream as `COMMITTED` anyway,
+    /// so the semantics on that side are unchanged by asking for it by name.
+    /// </para>
+    /// </remarks>
+    private async Task<string> StreamNameAsync(CancellationToken cancellationToken)
+    {
+        if (!againstStandIn)
+        {
+            return WriteStreamName.FormatProjectDatasetTableStream(
+                ProjectOf(tablePath), DatasetOf(tablePath), TableOf(tablePath), "_default");
+        }
+
+        if (standInStreamName is not null)
+        {
+            return standInStreamName;
+        }
+
+        var created = await client.CreateWriteStreamAsync(new CreateWriteStreamRequest
+        {
+            Parent = tablePath,
+            WriteStream = new WriteStream { Type = WriteStream.Types.Type.Committed },
+        }, cancellationToken);
+
+        standInStreamName = created.Name;
+        return standInStreamName;
     }
 
     /// <summary>

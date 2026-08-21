@@ -1,7 +1,21 @@
 # .github/workflows
 
-`ci.yml` — the only workflow. Path-filtered Go, .NET and Terraform jobs, plus the
-invariant gates, aggregated into a single `ci complete` status check.
+`ci.yml` — the only workflow. Path-filtered Go, .NET, Terraform and end-to-end jobs,
+plus the invariant gates, aggregated into a single `ci complete` status check.
+
+| Job | Runs when | What it proves |
+| --- | --- | --- |
+| `invariant gates` | always | Gates A–F pass, **and** each is proven able to fail |
+| `collector (go)` | `collector/`, `testdata/` | build, vet, `go test -race` |
+| `worker and analytics (.net)` | `worker/`, `analytics/`, `normalization/`, `testdata/`, `third_party/` | build and `dotnet test` — golden files included |
+| `local end-to-end` | anything the pipeline is made of | `make e2e`: fixtures in, rows out through the views, poison in the DLQ |
+| `terraform static checks` | `infra/terraform/`, `scripts/ci/`, `docs/architecture.md` | fmt, validate, plan-guard self-test |
+| `terraform plan (wif)` | same, and only with the GCP variables set | an authenticated plan, guarded |
+
+Each path filter covers the job's *inputs*, not just its own directory. A fixture
+change is a change to what the collector's byte-identity test and the golden files
+assert, so it has to run them; a filter that misses its inputs is the skipped-and-green
+failure this file already warns about further down.
 
 Posture (F0 spec §W6.1, §W6.3):
 
@@ -21,6 +35,13 @@ Posture (F0 spec §W6.1, §W6.3):
 - `terraform plan (wif)` stays skipped until the GCP repository variables exist.
   A skipped job proves nothing, which is why F0 acceptance criterion 8 is tied to
   a specific authenticated run recorded in the completion note.
+
+- The end-to-end job runs on **every** pull request that touches the pipeline, not on
+  `main` only. Actions minutes are unmetered on public repositories, and in F1 this job
+  is the only place the compose path is exercised at all — the phase's development host
+  cannot run containers — so a check deferred to `main` would report a pipeline
+  regression to somebody who no longer has the change in front of them. Reasoning and
+  measured runtime: `docs/specs/F1-decision-log.md` W6.4.
 
 Branch protection requires `ci complete` only — see
 `docs/runbooks/branch-protection.md` for why the aggregate exists and how to

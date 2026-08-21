@@ -539,13 +539,22 @@ and with `min-instances = 0` that window is routinely longer than the instance.
 stream it will use in the cloud. The only difference is the endpoint and plaintext
 credentials, and that difference is one `if` in the sink's constructor rather than a
 second implementation.
+**One difference, stated rather than glossed:** the stand-in cannot resolve the implicit
+`_default` stream — every tagged image answers `failed to get stream from
+…/streams/_default`, measured in CI across 0.6.6 and 0.8.1, because that handling landed
+one day after the most recent release. So the stand-in branch creates a stream by name and
+appends to that. Same client, same `AppendRows` RPC, same descriptor, same serialized
+rows; one name differs, and the emulator creates its own default stream as `COMMITTED`
+anyway. Pinning an untagged `latest` image to avoid the branch was the alternative, and it
+trades a documented three-line branch for a non-deterministic CI input.
 **Alternatives:** the authorized fallback — a local sink for the end-to-end run with the
 BigQuery client wired but unexercised. It was implemented first, is still present as
 `LocalJsonSink`, and is what the worker's own tests use; what it cannot do is prove the
 write path works, which is the half of the pipeline that carries the cost invariant.
 **Rationale:** an end-to-end run that exercises a sink the cloud will never use tests the
 plumbing and not the contract.
-**C2:** yes, briefly — D4 asked for the empirical result either way.
+**C2:** yes, briefly — D4 asked for the empirical result either way, and this is it,
+including what the stand-in could not do.
 
 ### W6.2 — The local table is created from the SQL, through the API the stand-in supports
 **Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
