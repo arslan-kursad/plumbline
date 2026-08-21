@@ -105,3 +105,39 @@ public class SpanRowProtoTests
         Assert.Equal(7L, proto.IngestTime);
     }
 }
+
+/// <summary>
+/// The descriptor actually sent to the Storage Write API.
+/// </summary>
+/// <remarks>
+/// This is a regression test with a specific history: the first end-to-end run failed
+/// with `failed to create file descriptor: … under proto3 optional semantics must be
+/// specified in the proto3 syntax`, because a `DescriptorProto` carries no file-level
+/// syntax and is therefore read with proto2 semantics, where protoc's proto3-optional
+/// markers are invalid.
+/// </remarks>
+public class WriterDescriptorTests
+{
+    [Fact]
+    public void TheDescriptorSentToBigQueryCarriesNoProto3OptionalMarkers()
+    {
+        var descriptor = Plumbline.Worker.Sinks.BigQueryStorageWriteSink.WriterDescriptor;
+
+        Assert.Empty(descriptor.OneofDecl);
+        Assert.All(descriptor.Field, field =>
+        {
+            Assert.False(field.HasProto3Optional, $"{field.Name} still declares proto3_optional");
+            Assert.False(field.HasOneofIndex, $"{field.Name} still belongs to a synthetic one-of");
+        });
+    }
+
+    [Fact]
+    public void EveryColumnSurvivesTheConversionAsAnOptionalField()
+    {
+        var descriptor = Plumbline.Worker.Sinks.BigQueryStorageWriteSink.WriterDescriptor;
+
+        Assert.Equal(SpanRowProto.Descriptor.Fields.InFieldNumberOrder().Count, descriptor.Field.Count);
+        Assert.All(descriptor.Field, field =>
+            Assert.Equal(Google.Protobuf.Reflection.FieldDescriptorProto.Types.Label.Optional, field.Label));
+    }
+}

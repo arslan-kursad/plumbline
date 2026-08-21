@@ -1,5 +1,6 @@
 using Google.Cloud.BigQuery.Storage.V1;
 using Google.Protobuf;
+using Google.Protobuf.Reflection;
 using Grpc.Core;
 using Plumbline.Normalization.Rows;
 using Plumbline.Normalization.Storage;
@@ -84,7 +85,7 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
                 ProjectOf(tablePath), DatasetOf(tablePath), TableOf(tablePath), "_default"),
             ProtoRows = new AppendRowsRequest.Types.ProtoData
             {
-                WriterSchema = new ProtoSchema { ProtoDescriptor = SpanRowProto.Descriptor.ToProto() },
+                WriterSchema = new ProtoSchema { ProtoDescriptor = WriterDescriptor },
                 Rows = serialized,
             },
         };
@@ -137,6 +138,43 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
         {
             streamLock.Release();
         }
+    }
+
+    /// <summary>
+    /// The row descriptor as the Storage Write API wants it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The API takes a <c>DescriptorProto</c>, which carries no file-level <c>syntax</c>,
+    /// so the server reads it with proto2 semantics. C# only generates proto3, and proto3
+    /// spells explicit presence as `optional` — which protoc implements with a
+    /// `proto3_optional` flag and a synthetic one-of per field. Handed to a proto2 reader
+    /// those markers are invalid, and the server rejects the whole append:
+    /// </para>
+    /// <code>
+    /// failed to create file descriptor: proto: message field "SpanRowProto.start_time"
+    /// under proto3 optional semantics must be specified in the proto3 syntax
+    /// </code>
+    /// <para>
+    /// Stripping the two markers turns the descriptor into the proto2 form the API
+    /// expects: every field stays `LABEL_OPTIONAL`, which is what carries presence there.
+    /// The serialized rows are untouched — a proto3 optional field and a proto2 optional
+    /// field have identical wire encodings, so this changes what the schema *says* and
+    /// not a single byte of what is written.
+    /// </para>
+    /// </remarks>
+    internal static DescriptorProto WriterDescriptor { get; } = ProtoTwoStyle(SpanRowProto.Descriptor.ToProto());
+
+    private static DescriptorProto ProtoTwoStyle(DescriptorProto descriptor)
+    {
+        foreach (var field in descriptor.Field)
+        {
+            field.ClearProto3Optional();
+            field.ClearOneofIndex();
+        }
+
+        descriptor.OneofDecl.Clear();
+        return descriptor;
     }
 
     internal static SpanRowProto ToProto(SpanRow row, long ingestTimeMicroseconds)

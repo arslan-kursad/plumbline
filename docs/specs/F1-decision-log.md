@@ -530,3 +530,65 @@ spelling. This is a deviation from architecture wording and is recorded as one.
 rule that is correct only while one instance's memory outlives the redelivery window —
 and with `min-instances = 0` that window is routinely longer than the instance.
 **C2:** no.
+
+### W6.1 — The BigQuery stand-in is the emulator, on the real write path
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** D4's preferred option, verified empirically rather than assumed:
+`goccy/bigquery-emulator` speaks the Storage Write API over gRPC, and the worker's
+`BigQueryStorageWriteSink` writes to it through the same client and the same default
+stream it will use in the cloud. The only difference is the endpoint and plaintext
+credentials, and that difference is one `if` in the sink's constructor rather than a
+second implementation.
+**Alternatives:** the authorized fallback — a local sink for the end-to-end run with the
+BigQuery client wired but unexercised. It was implemented first, is still present as
+`LocalJsonSink`, and is what the worker's own tests use; what it cannot do is prove the
+write path works, which is the half of the pipeline that carries the cost invariant.
+**Rationale:** an end-to-end run that exercises a sink the cloud will never use tests the
+plumbing and not the contract.
+**C2:** yes, briefly — D4 asked for the empirical result either way.
+
+### W6.2 — The local table is created from the SQL, through the API the stand-in supports
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** the stand-in refuses `CREATE TABLE ... PARTITION BY` (measured: HTTP 400,
+"CREATE TABLE with PARTITION BY is unsupported"). Rather than keeping a second table
+definition for local use, `scripts/e2e/seed.py` parses the column list out of
+`analytics/sql/001_spans_table.sql` and creates the table through the REST API with
+partitioning, clustering and `requirePartitionFilter` attached — retrying without them,
+and saying so, if the stand-in refuses those too.
+**Alternatives:** a local-only DDL file — two definitions of one table, drifting from the
+first column added; or dropping `PARTITION BY` from the canonical file — that clause is a
+cost invariant (§7), and removing it from the source of truth to satisfy a stand-in
+inverts which one is authoritative.
+**Rationale:** the SQL file stays the single definition and the local table is a
+mechanical transformation of it. A test already compares that file against the proto twin
+the write path uses, so all three now derive from one place.
+**C2:** no.
+
+### W6.3 — The end-to-end run generates its own API key
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** `scripts/e2e/run.sh` mints a fresh `plb_local_…` key per run, hashes it into
+the registry the collector mounts, and leaves the plaintext in a gitignored directory.
+**Alternatives:** commit a fixed development key. It would be a real, matching key in a
+public repository, and Gate F would either fail on it or need an exclusion — which is how
+a gate stops covering the file that matters.
+**Rationale:** the gate stays meaningful because there is no key to commit, not because
+the one that exists is excused. It also makes the seeding step real rather than a
+formality.
+**C2:** no.
+
+### W6.4 — The end-to-end job runs on every pull request, path-filtered
+**Made:** 2026-08-21 · **Work item:** W6/W7 · **Reversibility:** cheap
+**Decision:** the `local end-to-end` job runs on any pull request touching the collector,
+the worker, the mappings, the fixtures, the analytical SQL, the compose stack or the
+end-to-end scripts. Not `main`-only.
+**Alternatives:** `main`-only, which the directive allows. It halves the CI minutes on
+documentation-heavy branches and reports a pipeline regression after the merge, to
+somebody who no longer has the change in front of them.
+**Rationale:** two things decide it. Actions minutes are unmetered on public repositories
+(F0 spec §0.2), so the usual argument for `main`-only does not apply here. And this job is
+the *only* place the compose path is exercised at all: F1's development host cannot run
+containers (macOS 12, no supported container runtime), so every claim about the local
+pipeline in this phase rests on this job. A check that runs after the merge would make
+those claims unverifiable at the moment they are made.
+**C2:** no — but the runtime is quoted in the completion note, because "either is
+acceptable, silence about the choice is not".
