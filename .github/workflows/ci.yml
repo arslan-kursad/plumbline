@@ -254,6 +254,7 @@ jobs:
         env:
           TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
           TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: |
           terraform init -input=false -backend-config="bucket=${{ vars.GCP_STATE_BUCKET }}"
           terraform plan -input=false -lock=false -out=plan.tfplan

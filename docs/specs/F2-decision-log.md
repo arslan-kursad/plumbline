@@ -295,6 +295,40 @@ applied while the rest of the configuration waits for the gate that does not exi
 Terraform's `Resource targeting is in effect` warning is the wave's receipt.
 **Exit review:** no, but it belongs in the completion note as a property of the governance
 model rather than an incident: any phase that merges ahead of its applies inherits it.
+### W1.3 — DLQ retention is seven days, and the default is chosen rather than inherited
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** cheap
+**Decision:** `traces-dlq-pull` sets `message_retention_duration = "604800s"` explicitly,
+with `retain_acked_messages = false` and no expiration policy. The reasoning is in the
+resource and in [`dead-letter.md`](../runbooks/dead-letter.md) §4, not only here.
+**Alternatives:** 24 hours — smallest exposure window, and it would routinely expire
+before anyone looked, since this project is maintained part-time; the alert would then
+describe a message that no longer exists, which is exposure without evidence. 31 days, the
+maximum — a month of unredacted personal data waiting for someone who was going to look in
+the first week anyway.
+**Rationale:** the window is simultaneously the exposure window and the evidence window,
+and #44 requires the decision to name both. Seven days is the shortest that survives a
+week of not looking.
+**On choosing the API default:** the value equals Pub/Sub's default, and that is not an
+argument against setting it. #44's obligation is that the value be *decided*: an inherited
+default is a number nobody argued for, and a future change to it would have nothing to
+argue against. Now it does.
+**Also decided:** no expiration policy (`ttl = ""`). A subscription that deletes itself
+after 31 idle days takes the dead-letter path with it, and nothing would notice until a
+poison message had nowhere to go — the silent degradation §3.4 exists to prevent.
+**Exit review:** surfaced at #44's closure, per §8.
+
+### W1.4 — The alert destination is a variable, because the repository is public
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** cheap
+**Decision:** `var.alert_email` has no default and is validated as an address. CI supplies
+it from a secret; the maintainer's `terraform.tfvars` is gitignored.
+**Alternatives:** hard-code the address — world-readable personal data in a history that
+is not erasable in practice, in a repository whose own rules forbid exactly that; make the
+channel optional so the alert can be created without one — an alert policy with no
+notification channel is a control that fires into nothing, which is worse than not having
+it because the console shows it as configured.
+**Rationale:** the only free notification channel type is email, and an email address is
+personal data. The variable keeps the control mandatory and the address out of the repo.
+**Exit review:** no.
 
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
