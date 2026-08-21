@@ -1,8 +1,8 @@
 # Runbook — billing kill-switch
 
-**Status:** configuration delivered (F0 W4/W5); **two live-fires attempted, both
-failed, each on a different missing permission** (§4). The F2 entry gate #33 stays
-open until billing has been observed detaching at the API.
+**Status:** **live-fired and working**, on the third attempt, 2026-08-21 (§4).
+The first two failed on two different missing permissions; both are fixed
+(ADR-0004 Amendments 2 and 3). F2 entry gate #33 is closed.
 
 The chain, its rationale, and why it is deliberately the *last* control are in
 [ADR-0004](../adr/ADR-0004-zero-cost-guardrails-kill-switch.md) §2 and §5.
@@ -275,12 +275,86 @@ authorization story was true and was not the failure in front of it. One live-fi
 per permission defect is an expensive way to find them; it is also the only way
 that has found any of them. Configuration review passed this identity twice.
 
-### Attempt 3 — pending
+### Attempt 3 — 2026-08-21 — **PASSED**
 
-> Not yet executed. Re-run §3 after the Amendment 3 custom role is applied. Both
-> known permission defects are now fixed: the read (Amendment 3) and the delete
-> (Amendment 2). The F2 entry gate #33 stays open until billing has been observed
-> detaching at the API.
+Operator: maintainer (`arslan-kursad`). Project: `plumbline-19458`.
+Applied first: the Amendment 3 custom role, targeted —
+`google_project_iam_custom_role.killswitch_billing_reader` and its binding,
+`2 added, 0 changed, 0 destroyed`.
+
+The role, read back before firing rather than trusted from state:
+
+```
+$ gcloud iam roles describe killswitchBillingReader --project plumbline-19458
+projects/plumbline-19458/roles/killswitchBillingReader   resourcemanager.projects.get   GA
+```
+
+Live-fire:
+
+```
+20:29:10 INFO budget notification received budget="plumbline zero-spend"
+              cost=0.01 currency=TRY threshold_exceeded=1 interval_start=LIVE-FIRE-3
+20:29:11 WARN spend reported; detaching billing account project=plumbline-19458
+              billing_account=billingAccounts/011680-E61D62-C3CAA2 cost=0.01 currency=TRY
+20:29:12 WARN billing detached project=plumbline-19458
+              previous_billing_account=billingAccounts/011680-E61D62-C3CAA2
+```
+
+Confirmed at the API, which is where this test passes or fails:
+
+```
+$ gcloud beta billing projects describe plumbline-19458    # after
+billingAccountName: ''
+billingEnabled: false
+```
+
+Idempotence under redelivery, published while detached:
+
+```
+20:30:34 INFO budget notification received ... interval_start=LIVE-FIRE-3-REDELIVERY
+20:30:34 WARN billing already detached; nothing to do project=plumbline-19458 cost=0.01
+```
+
+Re-attached by hand, per §5:
+
+```
+$ gcloud beta billing projects link plumbline-19458 --billing-account 011680-E61D62-C3CAA2
+billingAccountName: billingAccounts/011680-E61D62-C3CAA2
+billingEnabled: true
+```
+
+Post-detach drift check: `terraform plan` reports `0 to change, 0 to destroy`. The
+detach disabled nothing this configuration owns — the nine pending additions are
+Wave 1's, unrelated.
+
+**Elapsed: two seconds** from notification to detached, and about ninety seconds
+from the first live-fire message to billing being back. The control is fast; what
+took three attempts was finding out that it was authorized.
+
+**Console screenshot:** not archived. The API evidence above is the stronger
+claim — §3 says to confirm at the API and not only in the logs, and a screenshot
+of the console is a picture of the same fact one layer further from it. Recorded
+as a deliberate omission rather than a missing item; the earlier version of this
+section asked for one, and the reason it asked was that the API check had not been
+written down yet.
+
+### What three attempts cost, and what they bought
+
+| Attempt | Result | Missing |
+| --- | --- | --- |
+| 1 | 403 on the read | `billing.resourceAssociations.delete` (found), and the read permission (not found) |
+| 2 | 403 on the read, same line | `resourcemanager.projects.get` on the project |
+| 3 | **detached** | — |
+
+Two permission defects, in one identity, in a control whose configuration had been
+reviewed twice and read correct both times. Neither was visible in Terraform, in
+the role names, or in the architecture's identity table. The only thing that
+surfaced either was firing it.
+
+ADR-0004 §5 says an untested kill-switch is a comfort object. It was one for the
+entire period between deployment and Attempt 3, and it was one *again* for the
+hour between Attempt 1's fix and Attempt 2. A control is not tested by being
+fixed.
 
 **What this test does not cover.** The live-fire publishes a synthetic message and
 exercises Pub/Sub → function → detach. It says nothing about how the budget
