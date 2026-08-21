@@ -369,6 +369,27 @@ inference, and it is cheap to run.
 **Exit review:** yes. Two live-fires, two permission defects, both invisible to
 configuration review.
 
+### W0.5 — G1 is satisfied; the halt is lifted
+**Made:** 2026-08-21 · **Work item:** Wave 0 · **Reversibility:** one-way (the test
+happened)
+**Decision:** the third live-fire passed — notification, detach, API-confirmed
+`billingEnabled: false`, an idempotent redelivery, and a clean re-attach. Evidence in
+[`kill-switch.md`](../runbooks/kill-switch.md) §4, #33 closed. The stop rule invoked in
+W0.4 is lifted and Wave 1's remaining Lane A work resumes.
+**What the phase learned, kept because it is the reusable part:** two permission defects in
+one identity, in a control whose configuration had been reviewed twice and read correct
+both times. Neither was visible in Terraform, in the role names, or in the architecture's
+identity table. Configuration review found nothing; firing it found both.
+**And a second-order lesson:** after Attempt 1's fix the control was believed working for
+an hour, on the strength of a correct diagnosis of a real defect. It was still inert. A
+control is not tested by being fixed — which is exactly why the stop rule counts *failures
+to fire*, not *unexplained failures*.
+**Deliberate omission, logged rather than skipped:** no console screenshot is archived. §3
+requires confirming the detach at the API rather than only in the logs, and the API output
+is in the record; a screenshot is the same fact one layer further away. The requirement
+was written before the API check was.
+**Exit review:** yes — the three-attempt sequence is the phase's most transferable finding.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
