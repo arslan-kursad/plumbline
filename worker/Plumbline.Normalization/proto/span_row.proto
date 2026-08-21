@@ -1,0 +1,65 @@
+// The `spans` row, as the BigQuery Storage Write API wants it.
+//
+// The Storage Write API takes rows as serialized protobuf plus a descriptor, so the
+// table's schema needs a proto twin. This file is that twin and nothing else: it exists
+// to be the wire form of `analytics/sql/001_spans_table.sql`, and the two are checked
+// against each other by a test rather than by memory.
+//
+// BigQuery's type mapping for the write API, which is why the field types look the way
+// they do:
+//
+//   TIMESTAMP -> int64   (microseconds since the Unix epoch)
+//   STRING    -> string
+//   BOOL      -> bool
+//   INT64     -> int64
+//   FLOAT64   -> double
+//   JSON      -> string  (the JSON text)
+//
+// Every column is `optional` so that "not set" is distinguishable from "zero". A null
+// gen_ai column and a gen_ai column holding 0 are different facts about a span, and
+// proto3 without the keyword cannot tell them apart.
+syntax = "proto3";
+
+package plumbline.v1;
+
+option csharp_namespace = "Plumbline.Normalization.Storage";
+
+message SpanRowProto {
+  optional int64  start_time                 = 1;
+  optional int64  end_time                   = 2;
+  optional string trace_id                   = 3;
+  optional string span_id                    = 4;
+  optional string parent_span_id             = 5;
+  optional string name                       = 6;
+  optional string kind                       = 7;
+  optional string status_code                = 8;
+  optional string status_message             = 9;
+
+  optional string service_name               = 10;
+  optional string source_dialect             = 11;
+  optional string api_key_id                 = 12;
+  optional string schema_url                 = 13;
+  optional bool   synthetic                  = 14;
+
+  optional string gen_ai_provider_name       = 15;
+  optional string gen_ai_operation_name      = 16;
+  optional string gen_ai_request_model       = 17;
+  optional string gen_ai_response_model      = 18;
+  optional string gen_ai_response_id         = 19;
+  optional string gen_ai_conversation_id     = 20;
+  optional string gen_ai_agent_name          = 21;
+  optional string gen_ai_tool_name           = 22;
+  optional string gen_ai_tool_call_id        = 23;
+  optional int64  gen_ai_usage_input_tokens  = 24;
+  optional int64  gen_ai_usage_output_tokens = 25;
+  optional int64  gen_ai_request_max_tokens  = 26;
+  optional double gen_ai_request_temperature = 27;
+  optional double gen_ai_request_top_p       = 28;
+  optional string gen_ai_output_type         = 29;
+
+  optional string attributes                 = 30;
+  optional string events                     = 31;
+  optional string links                      = 32;
+
+  optional int64  ingest_time                = 33;
+}

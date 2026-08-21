@@ -66,17 +66,16 @@ public class WorkerOptionsTests
     }
 
     [Fact]
-    public async Task TheBigQuerySinkIsWiringOnlyAndSaysSoLoudly()
+    public void TheBigQuerySinkNamesItsDestinationAndItsStream()
     {
         var sink = Options(Environments.Production, ("PLUMBLINE_SINK", "bigquery"),
             ("PLUMBLINE_BQ_PROJECT", "plumbline-prod")).CreateSink();
 
         Assert.IsType<BigQueryStorageWriteSink>(sink);
-        Assert.Contains("storage write api", sink.Description, StringComparison.Ordinal);
 
-        var error = await Assert.ThrowsAsync<NotSupportedException>(() =>
-            sink.WriteAsync(Array.Empty<Normalization.Rows.SpanRow>(), CancellationToken.None));
-        Assert.Contains("wiring only in F1", error.Message, StringComparison.Ordinal);
+        // The description reaches the startup log and /healthz. It names the write path
+        // because "which API is this worker using" is a cost invariant, not a detail.
+        Assert.Equal("bigquery storage write api (plumbline-prod.plumbline.spans, default stream)", sink.Description);
     }
 
     [Fact]

@@ -1,48 +1,229 @@
+using Google.Cloud.BigQuery.Storage.V1;
+using Google.Protobuf;
+using Grpc.Core;
 using Plumbline.Normalization.Rows;
+using Plumbline.Normalization.Storage;
 
 namespace Plumbline.Worker.Sinks;
 
 /// <summary>
-/// The cloud write path: BigQuery **Storage Write API**, default stream.
+/// The permitted BigQuery write path: **Storage Write API**, default stream.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Wiring only in F1. The phase is local-first and creates no GCP resource, so this class
-/// carries the destination it would write to and the shape of the call, and refuses to
-/// run rather than pretending to. It exists in F1 because the F1 directive (D4) asks for
-/// the real client to be behind the sink interface before F2 deploys it, and because the
-/// alternative — introducing the write path in the phase that also introduces the cloud —
-/// puts two untested things in one deployment.
+/// The legacy streaming-insert surface is forbidden as a cost invariant (architecture
+/// §2.3, §7) and is unreachable from this repository: Gate A fails the build if
+/// `Google.Cloud.BigQuery.V2` appears in any project file, so the API cannot be called
+/// whatever a future author intends. This class is the only writer.
 /// </para>
 /// <para>
-/// Two constraints fix the choice and are stated here because the class is where an
-/// implementer will look. The write path is the Storage Write API and nothing else: the
-/// legacy streaming-insert surface is forbidden by architecture §2.3 as a cost invariant,
-/// and Gate A enforces it by refusing the package that exposes it, so the API cannot be
-/// reached from this repository whatever a future author intends. The stream is the
-/// **default stream**, which is at-least-once and matches §3.3; duplicates are removed
-/// downstream by the `spans_deduped` view, not by an exactly-once committed stream.
+/// The **default stream** rather than a committed one. It is at-least-once, which matches
+/// the delivery semantics the whole pipeline already has (§3.3), and duplicates are
+/// removed downstream by `spans_deduped` — a committed stream would buy exactly-once at
+/// the price of stream lifecycle management for a property the views already provide.
+/// </para>
+/// <para>
+/// Rows travel as serialized <see cref="SpanRowProto"/> plus its descriptor, which is
+/// what the API takes. `proto/span_row.proto` is the wire twin of
+/// `analytics/sql/001_spans_table.sql`, and a test compares the two rather than trusting
+/// that they were kept in step.
 /// </para>
 /// </remarks>
-public sealed class BigQueryStorageWriteSink : ISpanSink
+public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
 {
-    private readonly string project;
-    private readonly string dataset;
-    private readonly string table;
+    private readonly string tablePath;
+    private readonly string destination;
+    private readonly BigQueryWriteClient client;
+    private readonly TimeProvider clock;
 
-    public BigQueryStorageWriteSink(string project, string dataset, string table)
+    private BigQueryWriteClient.AppendRowsStream? stream;
+    private readonly SemaphoreSlim streamLock = new(1, 1);
+
+    public BigQueryStorageWriteSink(string project, string dataset, string table, string? emulatorEndpoint,
+        TimeProvider? clock = null)
     {
-        this.project = project;
-        this.dataset = dataset;
-        this.table = table;
+        this.clock = clock ?? TimeProvider.System;
+        tablePath = $"projects/{project}/datasets/{dataset}/tables/{table}";
+        destination = $"{project}.{dataset}.{table}";
+
+        var builder = new BigQueryWriteClientBuilder();
+        if (!string.IsNullOrEmpty(emulatorEndpoint))
+        {
+            // The local stand-in speaks plaintext gRPC and wants no credentials. This is
+            // the only branch in the write path that knows about the emulator, and it is
+            // configuration rather than a second implementation — the API calls below are
+            // the same ones the cloud takes.
+            builder.Endpoint = emulatorEndpoint;
+            builder.ChannelCredentials = ChannelCredentials.Insecure;
+            builder.GoogleCredential = null;
+            builder.CredentialsPath = null;
+        }
+
+        client = builder.Build();
     }
 
-    public string Description => $"bigquery storage write api ({project}.{dataset}.{table}, default stream)";
+    public string Description => $"bigquery storage write api ({destination}, default stream)";
 
-    public Task WriteAsync(IReadOnlyList<SpanRow> rows, CancellationToken cancellationToken) =>
-        throw new NotSupportedException(
-            $"the BigQuery sink for {project}.{dataset}.{table} is wiring only in F1, which is local-first and " +
-            "creates no GCP resource (F1 spec §4). It is implemented in F2, against a dataset Terraform owns. " +
-            "Selecting it now is a configuration error, and failing here is deliberate: a sink that silently " +
-            "dropped rows would look exactly like a working pipeline with no traffic.");
+    public async Task WriteAsync(IReadOnlyList<SpanRow> rows, CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        var ingestTime = ToMicroseconds(clock.GetUtcNow());
+        var serialized = new ProtoRows();
+        foreach (var row in rows)
+        {
+            serialized.SerializedRows.Add(ToProto(row, ingestTime).ToByteString());
+        }
+
+        var request = new AppendRowsRequest
+        {
+            WriteStreamAsWriteStreamName = WriteStreamName.FromProjectDatasetTableStream(
+                ProjectOf(tablePath), DatasetOf(tablePath), TableOf(tablePath), "_default"),
+            ProtoRows = new AppendRowsRequest.Types.ProtoData
+            {
+                WriterSchema = new ProtoSchema { ProtoDescriptor = SpanRowProto.Descriptor.ToProto() },
+                Rows = serialized,
+            },
+        };
+
+        await streamLock.WaitAsync(cancellationToken);
+        try
+        {
+            stream ??= client.AppendRows();
+            await stream.WriteAsync(request);
+
+            // Wait for the append to be acknowledged before the caller is told the write
+            // succeeded. Returning early would let the worker ACK a Pub/Sub message whose
+            // rows are still in flight, and a failure after that point has nothing left
+            // to retry from.
+            var responses = stream.GetResponseStream();
+            if (!await responses.MoveNextAsync(cancellationToken))
+            {
+                throw new InvalidOperationException($"the append stream to {destination} closed without responding");
+            }
+
+            var response = responses.Current;
+            if (response.Error is { Code: not 0 })
+            {
+                throw new InvalidOperationException(
+                    $"append to {destination} failed: {response.Error.Code} {response.Error.Message}");
+            }
+        }
+        catch
+        {
+            // A broken stream stays broken; drop it so the next write reconnects rather
+            // than replaying the same failure forever.
+            var broken = stream;
+            stream = null;
+            if (broken is not null)
+            {
+                try
+                {
+                    await broken.WriteCompleteAsync();
+                }
+                catch
+                {
+                    // The stream is already failing; its shutdown error is not the one
+                    // worth reporting.
+                }
+            }
+
+            throw;
+        }
+        finally
+        {
+            streamLock.Release();
+        }
+    }
+
+    internal static SpanRowProto ToProto(SpanRow row, long ingestTimeMicroseconds)
+    {
+        var proto = new SpanRowProto
+        {
+            StartTime = ToMicroseconds(row.StartTime),
+            EndTime = ToMicroseconds(row.EndTime),
+            TraceId = row.TraceId,
+            SpanId = row.SpanId,
+            Name = row.Name,
+            Kind = row.Kind,
+            StatusCode = row.StatusCode,
+            SourceDialect = row.SourceDialect,
+            Synthetic = row.Synthetic,
+            Attributes = row.Attributes.ToJsonString(),
+            Events = row.Events.ToJsonString(),
+            Links = row.Links.ToJsonString(),
+            IngestTime = ingestTimeMicroseconds,
+        };
+
+        // Optional fields are left unset rather than set to a default: BigQuery stores an
+        // unset optional as NULL, and NULL is what "this dialect does not emit token
+        // counts" means. Writing 0 would turn a measurement into a claim.
+        Set(row.ParentSpanId, value => proto.ParentSpanId = value);
+        Set(row.StatusMessage, value => proto.StatusMessage = value);
+        Set(row.ServiceName, value => proto.ServiceName = value);
+        Set(row.ApiKeyId, value => proto.ApiKeyId = value);
+        Set(row.SchemaUrl, value => proto.SchemaUrl = value);
+        Set(row.GenAiProviderName, value => proto.GenAiProviderName = value);
+        Set(row.GenAiOperationName, value => proto.GenAiOperationName = value);
+        Set(row.GenAiRequestModel, value => proto.GenAiRequestModel = value);
+        Set(row.GenAiResponseModel, value => proto.GenAiResponseModel = value);
+        Set(row.GenAiResponseId, value => proto.GenAiResponseId = value);
+        Set(row.GenAiConversationId, value => proto.GenAiConversationId = value);
+        Set(row.GenAiAgentName, value => proto.GenAiAgentName = value);
+        Set(row.GenAiToolName, value => proto.GenAiToolName = value);
+        Set(row.GenAiToolCallId, value => proto.GenAiToolCallId = value);
+        Set(row.GenAiOutputType, value => proto.GenAiOutputType = value);
+        Set(row.GenAiUsageInputTokens, value => proto.GenAiUsageInputTokens = value);
+        Set(row.GenAiUsageOutputTokens, value => proto.GenAiUsageOutputTokens = value);
+        Set(row.GenAiRequestMaxTokens, value => proto.GenAiRequestMaxTokens = value);
+        Set(row.GenAiRequestTemperature, value => proto.GenAiRequestTemperature = value);
+        Set(row.GenAiRequestTopP, value => proto.GenAiRequestTopP = value);
+
+        return proto;
+    }
+
+    private static void Set<T>(T? value, Action<T> assign) where T : class
+    {
+        if (value is not null)
+        {
+            assign(value);
+        }
+    }
+
+    private static void Set<T>(T? value, Action<T> assign) where T : struct
+    {
+        if (value.HasValue)
+        {
+            assign(value.Value);
+        }
+    }
+
+    internal static long ToMicroseconds(DateTimeOffset value) =>
+        (value.UtcDateTime - DateTime.UnixEpoch).Ticks / TimeSpan.TicksPerMicrosecond;
+
+    private static string ProjectOf(string path) => path.Split('/')[1];
+
+    private static string DatasetOf(string path) => path.Split('/')[3];
+
+    private static string TableOf(string path) => path.Split('/')[5];
+
+    public async ValueTask DisposeAsync()
+    {
+        if (stream is not null)
+        {
+            try
+            {
+                await stream.WriteCompleteAsync();
+            }
+            catch
+            {
+                // Shutdown of an already-failed stream is not worth surfacing.
+            }
+        }
+
+        streamLock.Dispose();
+    }
 }

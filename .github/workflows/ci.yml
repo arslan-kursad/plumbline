@@ -29,6 +29,7 @@ jobs:
       dotnet: ${{ steps.filter.outputs.dotnet }}
       killswitch: ${{ steps.filter.outputs.killswitch }}
       terraform: ${{ steps.filter.outputs.terraform }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -88,6 +89,10 @@ jobs:
             # The plan guard parses architecture §7.1, so a change to that
             # document is a change to the control.
             echo "terraform=$(match '^(infra/terraform/|scripts/ci/|docs/architecture\.md)')"
+            # The end-to-end run exercises the collector, the worker, the mappings, the
+            # fixtures, the SQL and the compose stack, so a change to any of them is a
+            # change to what it proves.
+            echo "e2e=$(match '^(collector/|worker/|normalization/|testdata/|third_party/|analytics/sql/|scripts/e2e/|docker-compose\.yml|Makefile)')"
           } >> "$GITHUB_OUTPUT"
 
           cat "$GITHUB_OUTPUT"
@@ -236,6 +241,34 @@ jobs:
       - name: Plan guard
         run: ./scripts/ci/terraform-plan-guard.sh infra/terraform/plan.tfplan
 
+  e2e:
+    name: local end-to-end
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    # Two emulators, two built images and a full pipeline. The step timings are in
+    # docs/runbooks/local-dev.md; the ceiling is here so a hang fails rather than
+    # occupying a runner until the job limit.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '8.0.x'
+
+      # Runs on every pull request rather than on main only. The measured runtime is
+      # recorded in the F1 decision log (W6.4) alongside the reasoning: this job is the
+      # only place the compose path is exercised at all, since the phase's development
+      # host cannot run containers, and a check that runs after the merge reports a
+      # regression to nobody in a position to fix it cheaply.
+      - name: make e2e
+        run: make e2e
+
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose --profile tools logs --tail 200
+
   # Single required status check. Path-filtered jobs report "skipped" when they
   # do not apply, and branch protection cannot distinguish "skipped" from "never
   # started"; aggregating here means a required check exists on every run
@@ -244,7 +277,7 @@ jobs:
   ci-complete:
     name: ci complete
     if: always()
-    needs: [gates, collector, killswitch, dotnet, terraform, terraform-plan]
+    needs: [gates, collector, killswitch, dotnet, terraform, terraform-plan, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded or been skipped

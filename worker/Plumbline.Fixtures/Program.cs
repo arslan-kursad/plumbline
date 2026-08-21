@@ -25,6 +25,33 @@ public static class Program
     {
         var check = args.Contains("--check");
         var root = FindFixtureRoot();
+
+        var verifyIndex = Array.IndexOf(args, "--verify");
+        if (verifyIndex >= 0)
+        {
+            if (root is null)
+            {
+                Console.Error.WriteLine("could not locate testdata/fixtures from the current directory");
+                return 2;
+            }
+
+            if (verifyIndex + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("--verify needs the path of the observed rows (newline-delimited JSON)");
+                return 2;
+            }
+
+            var failures = RowVerifier.Verify(root, args[verifyIndex + 1], Console.Out);
+            if (failures > 0)
+            {
+                Console.Error.WriteLine($"{failures} fixture(s) did not match what the pipeline produced");
+                return 1;
+            }
+
+            Console.WriteLine("pipeline output matches every golden file");
+            return 0;
+        }
+
         if (root is null)
         {
             Console.Error.WriteLine("could not locate testdata/fixtures from the current directory");

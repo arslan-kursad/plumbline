@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Seeds the local stand-ins: Pub/Sub topology and the BigQuery table and views.
+
+Talks to both emulators over their REST APIs from the host, so the seeding step needs no
+container of its own and its failures are readable rather than buried in compose output.
+
+Idempotent: every create tolerates "already exists", so a partially seeded stack can be
+re-seeded rather than torn down.
+"""
+
+import argparse
+import json
+import pathlib
+import sys
+import urllib.error
+import urllib.request
+
+PROJECT = "plumbline-local"
+DATASET = "plumbline"
+
+
+def request(method: str, url: str, body: dict | None = None) -> tuple[int, str]:
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    if data is not None:
+        req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return response.status, response.read().decode()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read().decode()
+
+
+def pubsub(base: str, worker_push_url: str) -> int:
+    """Topics, the push subscription, and the dead-letter path (architecture §3.2, §3.4)."""
+    root = f"{base}/v1/projects/{PROJECT}"
+
+    for topic in ("traces", "traces-dlq"):
+        status, body = request("PUT", f"{root}/topics/{topic}", {})
+        report(f"topic {topic}", status, body)
+
+    # max_delivery_attempts = 5, then traces-dlq. The worker never decides a message has
+    # failed enough times; this policy does.
+    status, body = request("PUT", f"{root}/subscriptions/traces-push", {
+        "topic": f"projects/{PROJECT}/topics/traces",
+        "pushConfig": {"pushEndpoint": worker_push_url},
+        "ackDeadlineSeconds": 10,
+        "deadLetterPolicy": {
+            "deadLetterTopic": f"projects/{PROJECT}/topics/traces-dlq",
+            "maxDeliveryAttempts": 5,
+        },
+    })
+    report("subscription traces-push", status, body)
+
+    # A pull subscription with no consumer, so a dead-lettered message is retained and
+    # countable rather than discarded (§3.4).
+    status, body = request("PUT", f"{root}/subscriptions/traces-dlq-pull", {
+        "topic": f"projects/{PROJECT}/topics/traces-dlq",
+    })
+    report("subscription traces-dlq-pull", status, body)
+
+    return 0
+
+
+def bigquery(base: str, sql_dir: pathlib.Path) -> int:
+    """Applies analytics/sql/*.sql in order — the same files Terraform will own in F2."""
+    url = f"{base}/bigquery/v2/projects/{PROJECT}/queries"
+
+    for path in sorted(sql_dir.glob("*.sql")):
+        statement = path.read_text()
+        status, body = request("POST", url, {"query": statement, "useLegacySql": False})
+        report(f"sql {path.name}", status, body)
+        if status >= 400:
+            return 1
+
+    return 0
+
+
+def report(what: str, status: int, body: str) -> None:
+    if status < 400:
+        print(f"  ok      {what}")
+        return
+
+    if "already exists" in body.lower() or status == 409:
+        print(f"  exists  {what}")
+        return
+
+    print(f"  FAILED  {what}: HTTP {status}\n          {body[:400]}", file=sys.stderr)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--pubsub", default="http://localhost:8085")
+    parser.add_argument("--bigquery", default="http://localhost:9050")
+    parser.add_argument("--worker-push", default="http://worker:8080/push")
+    parser.add_argument("--sql", default="analytics/sql")
+    args = parser.parse_args()
+
+    print("seeding pub/sub")
+    failures = pubsub(args.pubsub, args.worker_push)
+
+    print("seeding bigquery")
+    failures += bigquery(args.bigquery, pathlib.Path(args.sql))
+
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
