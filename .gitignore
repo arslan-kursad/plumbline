@@ -11,11 +11,13 @@ bin/
 obj/
 *.user
 
-# Terraform
+# Terraform — environment-specific inputs and state, never the pinned lock file
 .terraform/
 *.tfstate
 *.tfstate.backup
 *.tfvars
+backend.hcl
+*.tfplan
 .terraform.lock.hcl.backup
 crash.log
 
