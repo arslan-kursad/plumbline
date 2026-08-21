@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.5 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
+**Version:** 0.6 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -382,6 +382,7 @@ forbids.
 | ADR-0003 | Normalization mappings as versioned in-repo YAML embedded at build time | Accepted |
 | ADR-0004 | Zero-cost guardrails & billing kill-switch design | Accepted |
 | ADR-0005 | Static JSON export as v0.1 SPA data path | Accepted |
+| ADR-0006 | PII redaction happens in the worker, after deserialization | **Proposed** |
 
 Rationale, alternatives, and consequences live in `docs/adr/`; this index carries titles
 and status only. Where this document and an ADR disagree, the ADR is the decision record
@@ -404,6 +405,13 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.6 — 2026-08-21** — F1 W4.
+
+1. §10 ADR index gains ADR-0006 (PII redaction boundary) at status **Proposed**. The
+   index carries status, and an ADR that exists and is implemented but not accepted is a
+   state the index has to be able to express — otherwise the only way to learn that the
+   redaction stage rests on an unaccepted decision is to read the stage.
 
 **v0.5 — 2026-08-21** — F0 W6, CI plan scope.
 

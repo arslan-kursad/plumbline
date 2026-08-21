@@ -1,0 +1,76 @@
+# Redaction rules — claude-code, version 1
+#
+# Status: implements ADR-0006, which is **Proposed** and not accepted. If review moves
+# the boundary, this file moves with it; nothing outside the redaction stage reads it.
+#
+# Why this exists at all: Claude Code emits personal data by default and this repository
+# is public, so no fixture and no stored row may carry it (CLAUDE.md). Two findings from
+# the capture shape these rules:
+#
+#   1. The identity attributes are on **every span**, not on the resource. A
+#      resource-level denylist would remove none of them (evidence §7.1).
+#   2. Prompt and response content is gated off by default — `user_prompt` arrives as the
+#      emitter's own `<REDACTED>` placeholder. These rules do not rely on that default
+#      holding, because it is an emitter setting and not a contract.
+#
+# Marker: a redacted value becomes `[REDACTED:sha256:<first 8 hex of sha256(value)>]`.
+# Deterministic on purpose — the same value produces the same marker everywhere, so
+# counts and joins over redacted keys still work — and unkeyed, which means an eight-hex
+# prefix over a guessable value such as an email address is reversible by anyone willing
+# to hash a list. ADR-0006 states that limit rather than leaving it implicit.
+
+version: "1"
+dialect: claude-code
+
+# Every attribute level, because the identity block appears on spans and on events, and
+# a rule that covered only the level where a key was last seen would fail the next time
+# the emitter moved it.
+applies_to: [resource, span, event, link]
+
+rules:
+  - key: user.id
+    why: >
+      Personal data. Documented as always included when available; no flag turns it off.
+
+  - key: user.email
+    why: >
+      Personal data, directly identifying. Same: always included, not suppressible.
+
+  - key: user.account_uuid
+    why: >
+      Account identifier. `OTEL_METRICS_INCLUDE_ACCOUNT_UUID=false` is documented as
+      metrics-scoped, and the capture found the attribute on spans, so the flag is not the
+      control.
+
+  - key: user.account_id
+    why: >
+      Account identifier; same reasoning as user.account_uuid.
+
+  - key: organization.id
+    why: >
+      Account identifier. Identifies the customer organization rather than a person, which
+      makes it no less disqualifying in a public repository.
+
+  - key: session.id
+    why: >
+      Session-correlatable identifier. Redacted deterministically so that spans of one session
+      still group together without the session being nameable.
+
+  - key: client_request_id
+    why: >
+      Request-correlatable identifier. Appears on spans and on the `gen_ai.request.attempt`
+      event; the deterministic marker keeps the two joinable.
+
+  - key: workspace.host_paths
+    why: >
+      Local filesystem paths — host-identifying, and documented on events. Never observed in
+      any capture (evidence §3), and covered anyway: issue #11 requires it be treated as
+      present until a capture shows otherwise. Array-valued, so each element is redacted
+      individually.
+
+  - key: user_prompt
+    why: >
+      Prompt text. The emitter replaces it with its own `<REDACTED>` placeholder unless
+      OTEL_LOG_USER_PROMPTS is set, so by default this rule redacts a placeholder. It is here
+      for the case where the flag is set — an emitter default is not a guarantee, and the
+      difference between the two markers is documented in the fixture manifest.
