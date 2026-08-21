@@ -508,6 +508,29 @@ is neither; it is a wave that is not finished, and it finishes with a second app
 **Exit review:** no, but the completion note should carry it — the first use of the gated
 path found a real defect, and that is evidence about the gate rather than about the defect.
 
+### W2.1 — The images were already distroless; what was missing was the assertion
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Found rather than built:** Wave 2's first item asks for distroless Dockerfiles. F1 had
+already written both — `gcr.io/distroless/static-debian12:nonroot` for the collector,
+`aspnet:8.0-jammy-chiseled` for the worker. Rewriting them to satisfy a checklist would
+have been work that changed nothing.
+**What was actually missing:** anything that would notice if that stopped being true. A
+base image swapped for a convenient one while debugging is exactly the change that merges
+quietly and is discovered when someone asks why the image is 900 MB. The new job runs
+`docker run --entrypoint sh` against both images and fails if either answers — the same
+shape as the gate proofs: assert the property, do not trust the file that declares it.
+**Push is main-only, and the `if` is documentation rather than the control.** `ci-deploy`
+is bound to `attribute.ref/refs/heads/main`, so a pull request cannot obtain a token that
+writes to Artifact Registry even if this job asked for one. The condition states the rule;
+Google enforces it.
+**No `latest` tag.** Images are tagged by commit alone. A moving tag makes "which image is
+running" a question with no answer, and Cloud Run pins a digest regardless.
+**Path filter covers inputs, not directories:** the worker image is built from the
+repository root because it embeds the mapping YAML, so `normalization/` and `third_party/`
+are its inputs and are in the filter. The same rule that `analytics/sql/` had to be added
+under.
+**Exit review:** no.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the

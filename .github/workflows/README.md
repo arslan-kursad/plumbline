@@ -12,6 +12,7 @@ gates, aggregated into a single `ci complete` status check.
 | `invariant gates` | always | Gates A–F pass, **and** each is proven able to fail |
 | `collector (go)` | `collector/`, `testdata/` | build, vet, `go test -race` |
 | `worker and analytics (.net)` | `worker/`, `analytics/`, `normalization/`, `testdata/`, `third_party/` | build and `dotnet test` — golden files included |
+| `images (distroless)` | `collector/`, `worker/`, `normalization/`, `third_party/` | both images build, **and neither has a shell**; pushed to Artifact Registry only from `main` |
 | `local end-to-end` | anything the pipeline is made of | `make e2e`: fixtures in, rows out through the views, poison in the DLQ |
 | `terraform static checks` | `infra/terraform/`, `scripts/ci/`, `docs/architecture.md`, `analytics/sql/` | fmt, validate, plan-guard self-test, and the generated BigQuery schema against the DDL it came from |
 | `terraform plan (wif)` | same, and only with the GCP variables set | an authenticated plan, guarded |

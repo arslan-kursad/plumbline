@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       collector: ${{ steps.filter.outputs.collector }}
+      images: ${{ steps.filter.outputs.images }}
       dotnet: ${{ steps.filter.outputs.dotnet }}
       killswitch: ${{ steps.filter.outputs.killswitch }}
       terraform: ${{ steps.filter.outputs.terraform }}
@@ -86,6 +87,10 @@ jobs:
             # checks moves.
             echo "dotnet=$(match '^(worker|analytics|normalization|testdata|third_party)/')"
             echo "killswitch=$(match '^infra/functions/')"
+            # Everything that ends up inside an image, plus the Dockerfiles themselves.
+            # The worker image is built from the repository root because it embeds the
+            # mapping YAML, so normalization/ and third_party/ are its inputs too.
+            echo "images=$(match '^(collector/|worker/|normalization/|third_party/|\.github/workflows/ci\.yml)')"
             # The plan guard parses architecture §7.1, so a change to that
             # document is a change to the control. analytics/sql/ is in scope for
             # the same reason one level down: the BigQuery table schema is
@@ -261,6 +266,67 @@ jobs:
 
       - name: Plan guard
         run: ./scripts/ci/terraform-plan-guard.sh infra/terraform/plan.tfplan
+
+  # Images are built on every pull request and pushed only from main.
+  #
+  # The split is not a convention, it is the identity model: `ci-deploy` is bound to
+  # `attribute.ref/refs/heads/main`, so a pull request cannot obtain a token that can
+  # write to Artifact Registry even if this job asked for one. The `if` below states the
+  # rule; Google enforces it.
+  images:
+    name: images (distroless)
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # Build first, always, with no credentials in scope. A build that only happens
+      # behind an authentication step is a build whose failures look like auth failures.
+      - name: Build the collector image
+        run: docker build -t collector:${{ github.sha }} ./collector
+
+      - name: Build the worker image
+        run: docker build -t worker:${{ github.sha }} -f worker/Dockerfile .
+
+      # The images must be what §8 claims they are. Asserted rather than trusted: a base
+      # image swapped for a convenient one during debugging is the kind of change that
+      # merges quietly and is discovered when someone asks why the image is 900 MB.
+      - name: Assert both images are distroless
+        run: |
+          fail=0
+          for image in collector:${{ github.sha }} worker:${{ github.sha }}; do
+            if docker run --rm --entrypoint sh "$image" -c 'echo reachable' 2>/dev/null; then
+              echo "::error::$image has a shell; it is not distroless"
+              fail=1
+            else
+              echo "$image: no shell"
+            fi
+          done
+          exit $fail
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        if: github.ref == 'refs/heads/main' && vars.GCP_DEPLOY_SERVICE_ACCOUNT != ''
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Push to Artifact Registry
+        if: github.ref == 'refs/heads/main' && vars.GCP_DEPLOY_SERVICE_ACCOUNT != ''
+        env:
+          REGISTRY: us-central1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/plumbline
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+          # Tagged by commit only. No `latest`: a moving tag makes "which image is
+          # running" a question with no answer, and Cloud Run pins a digest anyway.
+          for component in collector worker; do
+            docker tag "${component}:${{ github.sha }}" "${REGISTRY}/${component}:${{ github.sha }}"
+            docker push "${REGISTRY}/${component}:${{ github.sha }}"
+          done
 
   e2e:
     name: local end-to-end
