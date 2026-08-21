@@ -163,24 +163,15 @@ step "checking the dead-letter topic"
 poison_count="$(find testdata/fixtures -path '*/poison/request.pb' | wc -l | tr -d ' ')"
 printf '  expecting %s dead-lettered message(s)\n' "$poison_count"
 
-# Dead-lettering is not immediate: the subscription redelivers up to its
-# max_delivery_attempts before routing, and each attempt waits out an ack deadline. So
-# this polls rather than checking once — the alternative is a test that passes on a fast
-# runner and fails on a slow one, which is worse than no test.
-for attempt in $(seq 1 120); do
-  if python3 scripts/e2e/dlq-depth.py --expect "$poison_count" >/dev/null 2>&1; then
-    printf '  dead-lettered after %ss\n' "$attempt"
-    break
-  fi
-  if [ "$attempt" = "120" ]; then
-    python3 scripts/e2e/dlq-depth.py --expect "$poison_count"
-    printf '  the poison payloads did not reach traces-dlq within 120s\n' >&2
-    "${compose[@]}" logs --tail 60 worker >&2
-    exit 1
-  fi
-  sleep 1
-done
-python3 scripts/e2e/dlq-depth.py --expect "$poison_count"
+# One call, which polls internally. Dead-lettering is not immediate — the subscription
+# redelivers up to max_delivery_attempts, each attempt waiting out an ack deadline — and
+# a pulled-but-unacked message is leased, so a second check moments later would see an
+# empty subscription and disagree with the first.
+python3 scripts/e2e/dlq-depth.py --expect "$poison_count" --timeout 120 || {
+  printf '  the poison payloads did not reach traces-dlq\n' >&2
+  "${compose[@]}" logs --tail 60 worker >&2
+  exit 1
+}
 
 # ---------------------------------------------------------------------------
 # 7. No credential took part in any of this.
