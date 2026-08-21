@@ -1,9 +1,9 @@
 # F0 — Completion note
 
 **Date:** 2026-08-19 · **Spec:** [`F0-foundations.md`](F0-foundations.md) v0.7
-**Status: F0 is not complete.** Seven of eleven acceptance criteria are fully met,
-one is partly met, and three require GCP work that has only just become possible —
-the project now exists. §3 lists what remains, in the order it has to happen.
+**Status: F0 is not complete.** Nine of eleven acceptance criteria are met. The
+two that remain are the kill-switch live-fire and a billing period's bill — one
+needs a human to watch billing detach, the other needs time to pass.
 
 This note exists because the spec asks for one (§6): the gate proofs and the CI
 run link are recorded here. It states what is done, what is not, and what the
@@ -20,10 +20,10 @@ is open is the failure this project is written against.
 | 4 | Repository public; `main` protection enabled **and** its scope recorded | **met** | Public; PR required, force-push denied, `enforce_admins`; required check `ci complete` (strict) added 2026-08-21 after the first green `main` run, with the read-back and the log entry in [`runbooks/branch-protection.md`](../runbooks/branch-protection.md) |
 | 5 | ADR-0001..0005, 0002–0005 Accepted; ADR-0004 records the grep-insufficiency rationale | **met** | [`docs/adr/`](../adr/) |
 | 6 | `docs/eval-plan.md` on `main`, `DRAFT — NOT FROZEN` | **met** | PR #6 |
-| 7 | **Kill-switch live-fired**, evidence archived, billing re-attached | **open** (#17) | Configuration and procedure ready: [`runbooks/kill-switch.md`](../runbooks/kill-switch.md). §4 of that file is empty and says so |
-| 8 | CI green on `main` via WIF; provider carries the repository+owner condition; zero exported SA keys | **partly met** | CI green on `main` with **every job actually running** — run [32468242751](https://github.com/arslan-kursad/plumbline/actions/runs/32468242751). WIF configuration written with the attribute condition; **no authenticated run has happened**, because the identity does not exist yet |
+| 7 | **Kill-switch live-fired**, evidence archived, billing re-attached | **open** (#17) | Everything it needs is deployed and planning clean. What is missing is the act itself: a human publishing the notification and watching billing detach |
+| 8 | CI green on `main` via WIF; provider carries the repository+owner condition; zero exported SA keys | **met** | Run [32474458433](https://github.com/arslan-kursad/plumbline/actions/runs/32474458433) on `main`: all eight jobs green, `terraform plan (wif)` among them — authenticated through the pool, not skipped. Provider carries the repository+owner attribute condition; no service account key exists to export |
 | 9 | Gates A–E active **and each proven to fail** | **met** | [`evidence/f0-gate-proofs.md`](../evidence/f0-gate-proofs.md); `prove-gates.sh` runs in CI on every build |
-| 10 | `terraform plan` clean; state in the GCS backend | **open** (#17) | `fmt`/`validate` pass in CI; `plan` needs the project |
+| 10 | `terraform plan` clean; state in the GCS backend | **met** | `No changes. Your infrastructure matches the configuration.` State in `plumbline-19458-tfstate`, prefix `f0`; 41 resources. Quota applied and granted at 20480 MiB/day, read back from the API |
 | 11 | GCP bill for the period: **$0.00** | **open** (#17) | No project, no bill. Not the same as a verified $0.00 |
 
 ## 2. What the phase produced beyond the checklist
@@ -111,44 +111,28 @@ is worth naming as such rather than presenting as diligence.
 
 ## 3. What is left, in order
 
-Already done, and recorded here so the list below is only what is left: the F0
-pull requests are merged, `main` is green with every job running, the required
-status check is in place, and the GCP project has been created with billing
-linked.
+Already done: the F0 pull requests are merged, `main` is green with every job
+running and authenticating, the required status check is in place, the GCP
+project exists with billing linked, and the infrastructure is applied and
+planning clean.
 
-Everything below needs a human at a console: applying Terraform, watching billing
-detach, and reading a bill. None of it can be produced from the repository.
+Two criteria remain, plus one verification that could not be run any earlier.
 
-1. **Enable the two APIs Terraform needs before it can enable the rest** —
-   `cloudresourcemanager` and `serviceusage`. On a fresh project the first plan
-   fails without them and the error reads like a bug in the configuration:
-   [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §2.
-2. **Confirm the pinned function runtime is still offered**
-   (`gcloud functions runtimes list --region us-central1`). The pin is `go126`,
-   which is generally available per the published support matrix — deprecation
-   Feb/Mar 2027, decommission Aug/Sep 2027. Raising it past the function's
-   `go.mod` language version is safe; lowering it below is not.
-3. **Apply Terraform** — `bootstrap/`, then the root module:
-   [`infra/terraform/README.md`](../../infra/terraform/README.md). Closes criterion 10.
-4. **Live-fire the kill-switch** and archive the evidence in §4 of its runbook,
-   then re-attach billing. Closes criterion 7. Note what it does not cover: the
-   budget → notification segment is checked in F2, not here.
-5. **Record Verification A**, the morning after the apply: Billing → Reports with
+1. **Live-fire the kill-switch** — publish the synthetic notification, watch
+   billing detach, archive the log output and the billing page in
+   [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §4, publish a second
+   time to confirm idempotence under redelivery, then re-attach billing. Closes
+   **criterion 7**. Note what it does not cover: the budget → notification
+   segment is checked in F2 (#18), not here.
+2. **Record Verification A**, the morning after the apply: Billing → Reports with
    the credit filters cleared, confirming a non-zero usage cost against a zero net
    total. It is the premise the budget's spend basis rests on (ADR-0004
    Amendment 1) and is currently supported by Google's documentation alone. It
-   comes *after* the apply on purpose — an empty project produces no usage line,
-   so both figures read zero and the check confirms nothing. Procedure and evidence
-   slot: [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §1.
-6. **Set the repository variables** so the CI plan job stops skipping:
-   `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_CI_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`,
-   `GCP_STATE_BUCKET`, and the `GCP_BILLING_ACCOUNT_ID` secret. The Terraform
-   outputs print the first two. Record the resulting green run's URL in criterion 8
-   above. Closes criterion 8.
-7. **Check the bill** at the end of the billing period. Closes criterion 11.
-
-Tracked as [issue #17](https://github.com/arslan-kursad/plumbline/issues/17), so the
-remaining work does not live only in this file.
+   comes after the apply because an empty project produces no usage line, so the
+   check would confirm nothing. The function's build and Artifact Registry storage
+   are now that usage.
+3. **Check the bill** at the end of the billing period. Closes **criterion 11**,
+   and it is the one criterion that cannot be hurried.
 
 ## 4. Notes for whoever closes this
 
