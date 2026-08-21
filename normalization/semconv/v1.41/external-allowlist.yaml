@@ -1,0 +1,74 @@
+# External attribute allowlist — GenAI semconv v1.41.0
+#
+# `model/gen-ai/spans.yaml` references attributes defined outside the gen_ai namespace.
+# Vendoring the whole upstream `model/` tree to resolve them would drag in hundreds of
+# unrelated namespaces and dilute what "validated against the pin" means (issue #8), so
+# the references are enumerated here instead, one row per attribute, each carrying the
+# upstream file that defines it.
+#
+# This list is closed. A name that is neither defined in the vendored gen-ai model YAMLs
+# nor present here fails SemconvRegistryTests; adding a row is a pull request, and the
+# row must name a real upstream definition at this semconv version.
+#
+# Rows are derived from `grep -E '^\s+- ref: ' spans.yaml` at v1.41.0, excluding
+# `gen_ai.*`. Re-derive rather than copy when the pin moves.
+
+semconv_version: 1.41.0
+source: https://github.com/open-telemetry/semantic-conventions/tree/v1.41.0/model
+
+attributes:
+  - name: error.type
+    defined_in: model/error/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: >
+      Emitted by this project's dialects on failed spans; expected to stay in use.
+
+  - name: server.address
+    defined_in: model/server/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: >
+      Model-endpoint host on client spans.
+
+  - name: server.port
+    defined_in: model/server/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: >
+      Model-endpoint port on client spans.
+
+  # The rows below are referenced by the upstream model but are not emitted by any of
+  # this project's three dialects. They are listed so that the check validates against
+  # the model as published rather than against the subset this project happens to meet.
+  - name: azure.resource_provider.namespace
+    defined_in: model/azure/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: Not emitted by any plumbline dialect at v0.1.
+
+  - name: aws.bedrock.guardrail.id
+    defined_in: model/aws/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: Not emitted by any plumbline dialect at v0.1.
+
+  - name: aws.bedrock.knowledge_base.id
+    defined_in: model/aws/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: Not emitted by any plumbline dialect at v0.1.
+
+  - name: openai.api.type
+    defined_in: model/openai/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: Not emitted by any plumbline dialect at v0.1.
+
+  - name: openai.request.service_tier
+    defined_in: model/openai/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: Not emitted by any plumbline dialect at v0.1.
+
+  - name: openai.response.service_tier
+    defined_in: model/openai/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: Not emitted by any plumbline dialect at v0.1.
+
+  - name: openai.response.system_fingerprint
+    defined_in: model/openai/registry.yaml
+    referenced_by: model/gen-ai/spans.yaml
+    note: Not emitted by any plumbline dialect at v0.1.
