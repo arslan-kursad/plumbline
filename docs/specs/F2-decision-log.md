@@ -664,3 +664,35 @@ resource classes that end the zero-cost envelope, and these three end nothing.
 the project's only unauthenticated endpoint. It is written in one resource, named
 `collector_public`, so a reader looking for "what is exposed" finds it in one grep.
 **Exit review:** no, unless the exit review wants to revisit the public collector itself.
+
+### W2.8 — The cleanup policy goes live on evidence that it is inert, which is not the evidence W1.6 asked for
+**Made:** 2026-08-22 · **Work item:** Wave 2 (#57) · **Reversibility:** cheap to reverse
+the flag; **one-way** for anything it deletes
+**What the dry run was asked:** whether keep-last-2 would ever select the image the
+kill-switch function runs. W1.6 put the policy in dry run rather than trusting the
+reasoning, because this phase had already watched that control be inert twice on
+reasoning that read correctly.
+**What it answered: nothing, because it had nothing to select.** Measured on 2026-08-22
+against the project: `gcf-artifacts` holds two packages with exactly **one version each**
+— the function image and its build cache — so keep-last-2 claims both and DELETE selects
+nothing. There are no Artifact Registry cleanup entries in this project's logs at all.
+W1.6's premise, that the repository accumulates an image per function deploy, is not what
+the repository shows; 93 MB is one image plus one cache, not a handful of deploys' worth.
+**Decision:** switch it live anyway, and say plainly what that rests on. The flag changes
+nothing today — the policy is provably inert either way — so flipping it carries no
+present risk, and leaving it in dry run indefinitely means the only bound on a 0.5 GB
+allowance is a control that has been asked never to act.
+**What actually carries the risk, stated because it is not observation:** the running
+image is the most recent by construction, keep-last-2 spares the two most recent, and
+`older_than = 86400s` adds a day. This is the same protection `plumbline` has run live
+under since Wave 1 — and that repository holds the images Cloud Run pins, so the project
+already depends on this argument for the services it is about to deploy.
+**Alternatives:** hold dry run until a third kill-switch deploy makes a version eligible
+— it is the observation W1.6 wanted, and it waits on an event that may not happen this
+phase while the allowance stays unbounded; drop the policy on this repository — it
+reverses W1.6's adoption argument, and "not ours" was never a size limit.
+**The honest residual:** the first genuine exercise of this policy is the third
+kill-switch deploy. If a deploy is ever followed by a function that cannot pull its
+image, the runbook's §7 is where that trail starts.
+**Exit review:** yes — #57 must not close silently, and this is the entry that says the
+dry run answered a different question than the one it was set up for.
