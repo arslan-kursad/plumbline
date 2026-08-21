@@ -13,7 +13,7 @@ protection deadlocks the branch (F0 spec §W6.5).
 | Force pushes | denied | History on a public repository is not erasable in practice; pretending otherwise is worse than not trying. |
 | Branch deletion | denied | |
 | Conversation resolution required | true | Pre-existing; kept. |
-| Required status checks | `ci complete`, added once CI is green on `main` | See sequencing below. |
+| Required status checks | `ci complete`, strict | Added 2026-08-21, after the first green run on `main`. See sequencing below. |
 
 **The pull request requirement does not produce review.** With zero required
 approvals, nothing mechanically forces a second pair of eyes, and a reader of a
@@ -34,16 +34,25 @@ was skipped. One check is required; every job still gates the merge.
 ## Sequencing
 
 Protection was enabled before the CI workflow existed, so required status checks
-are added **after** the first green run on `main`, not before. Requiring a check
+were added **after** the first green run on `main`, not before. Requiring a check
 that has never run blocks the very pull request that would introduce it.
 
+Note for the next time this is done on a fresh branch: the
+`.../protection/required_status_checks` sub-resource answers **404 "Required
+status checks not enabled"** when none are configured yet. It edits an existing
+configuration; it does not create one. Creating one means the full protection
+endpoint, which **replaces** the whole configuration — so every other setting has
+to be sent along with it or it is silently reset:
+
 ```bash
-gh api -X PATCH repos/arslan-kursad/plumbline/branches/main/protection/required_status_checks \
-  -F strict=true -f 'contexts[]=ci complete'
+gh api repos/arslan-kursad/plumbline/branches/main/protection > before.json
+# build a PUT payload from before.json, adding required_status_checks
+gh api -X PUT repos/arslan-kursad/plumbline/branches/main/protection --input payload.json
 ```
 
 Read it back afterwards; a write that reports success is not evidence that
-anything changed (see `repository-settings.md`).
+anything changed (see `repository-settings.md`). Here that is not hypothetical:
+the first attempt returned no error and left `checks` empty.
 
 ## Deadlock recovery
 
@@ -69,8 +78,27 @@ anyway, so the only thing hiding it would cost is credibility.
 | Date | Action | Pull request | Reason |
 | --- | --- | --- | --- |
 | 2026-08-19 | Documented existing protection; no change made | #15 | Protection predates this runbook. It was enabled outside any work package and was therefore undocumented drift until now — the F0 spec's own definition. |
+| 2026-08-21 | Added required status check `ci complete` (strict), preserving every other setting | #20 | F0 acceptance criterion 4. Sequenced after the first green `main` run ([32468242751](https://github.com/arslan-kursad/plumbline/actions/runs/32468242751)), in which every job — Go, .NET, Terraform, gates — actually ran rather than being skipped. |
 
-State as read on 2026-08-19, before any change on this branch:
+State as read on 2026-08-21, after adding the required check:
+
+```json
+{
+  "required_status_checks": { "strict": true, "checks": ["ci complete"] },
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false,
+    "require_last_push_approval": false,
+    "required_approving_review_count": 0
+  },
+  "enforce_admins": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}
+```
+
+State as read on 2026-08-19, before any change:
 
 ```json
 {
@@ -92,4 +120,4 @@ State as read on 2026-08-19, before any change on this branch:
 }
 ```
 
-No `required_status_checks` key is present: none are configured yet.
+No `required_status_checks` key was present: none were configured at that point.
