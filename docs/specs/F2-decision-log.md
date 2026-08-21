@@ -550,3 +550,29 @@ behaves.
 **Cost, stated:** it obligates the maintainer for a step the directive did not budget.
 That is why it is logged as a deviation rather than folded into §9 quietly.
 **Exit review:** yes — it is the one place this spec asks for more than the directive did.
+
+### W2.3 — The Firestore registry reads the whole collection once, at startup
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** `FirestoreRegistry` reads every document of `api_keys` at startup under
+the collector's own identity and resolves to the same in-memory keyset as the file
+registry — one validation path (`buildKeyset`), one constant-time lookup, two loaders.
+The collection name moves into `internal/auth` beside the key format, shared with
+`cmd/keyctl` by the W1.7 argument: the data plane must read what the tool writes, and
+two places agreeing about a name by inspection is drift waiting to be found in
+production. Exactly one backend may be configured; a file path and a Firestore project
+set together is a startup error rather than a precedence rule.
+**Alternatives:** per-request Firestore reads — hot-path latency and an unbounded
+failure mode for a registry that changes at human cadence; a status-filtered query —
+one backend filtering in a query language the other never runs, so the two registries
+would disagree about what "inactive" means the day the filter and `buildKeyset` drift;
+precedence instead of refusal when both backends are set — whichever the guess picked,
+the collector would look configured while authenticating against the other one's keys.
+**Skew accepted, named:** a key issued after startup is invisible until the next cold
+start or redeploy. That is the file registry's contract already (W1.7 makes rotation a
+redeploy), and with `min_instances = 0` an idle collector re-reads on its next wake
+anyway.
+**Not proven here:** the read path against real Firestore under the collector's service
+account — no emulator runs on this host, and the unit tests cover parsing and selection,
+not the wire. Wave 4's cloud e2e with the provisioned `adjudicator-prod` key is that
+test.
+**Exit review:** no.
