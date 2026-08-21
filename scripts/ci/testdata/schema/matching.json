@@ -1,0 +1,37 @@
+[
+  {
+    "name": "start_time",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "trace_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "parent_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "synthetic",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "token_count",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "temperature",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "attributes",
+    "type": "JSON",
+    "mode": "REQUIRED"
+  }
+]

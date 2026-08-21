@@ -87,8 +87,14 @@ jobs:
             echo "dotnet=$(match '^(worker|analytics|normalization|testdata|third_party)/')"
             echo "killswitch=$(match '^infra/functions/')"
             # The plan guard parses architecture §7.1, so a change to that
-            # document is a change to the control.
-            echo "terraform=$(match '^(infra/terraform/|scripts/ci/|docs/architecture\.md)')"
+            # document is a change to the control. analytics/sql/ is in scope for
+            # the same reason one level down: the BigQuery table schema is
+            # generated from 001_spans_table.sql and the view bodies are read out
+            # of the other two at plan time, so a change there is a change to what
+            # Terraform builds — and the schema guard that catches the mismatch
+            # would otherwise stay skipped in exactly the commit that introduced
+            # one.
+            echo "terraform=$(match '^(infra/terraform/|scripts/ci/|docs/architecture\.md|analytics/sql/)')"
             # The end-to-end run exercises the collector, the worker, the mappings, the
             # fixtures, the SQL and the compose stack, so a change to any of them is a
             # change to what it proves.
@@ -203,6 +209,14 @@ jobs:
       # rather than against a live plan — the same reasoning as the gate proofs.
       - name: Plan guard self-test
         run: ./scripts/ci/terraform-plan-guard.sh --self-test
+
+      # The generated BigQuery schema against the DDL it came from, and the guard
+      # itself against fixtures that violate it.
+      - name: Schema guard
+        run: ./scripts/ci/bq-schema-guard.sh
+
+      - name: Schema guard self-test
+        run: ./scripts/ci/bq-schema-guard.sh --self-test
 
   terraform-plan:
     name: terraform plan (wif)

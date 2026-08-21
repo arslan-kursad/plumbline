@@ -237,6 +237,42 @@ did not answer, and the workflow refuses on all of 1 and 2.
 **Exit review:** no, unless the preflight's environment read turns out to need a token
 permission the default one lacks, which changes the repository's Actions posture.
 
+### W1.2 — D4's mechanism: views by extraction, the table schema by generation
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** cheap
+**Decision:** two different mechanisms, because the two artefacts are not the same problem.
+
+*Views.* `bigquery.tf` reads `analytics/sql/002_*.sql` and `003_*.sql` with `file()` and
+strips the DDL prologue with one `regex()`, then expands the `plumbline.` dataset
+reference to a project-qualified one for the cloud copy. Nothing is duplicated and nothing
+is generated: there is one authored definition and Terraform reads it. Verified offline
+with `terraform console` — the extracted `spans_deduped` body is the `SELECT` with
+`FROM \`plumbline-19458.plumbline.spans\``, and a `precondition` on each view fails the
+plan if the extraction ever stops starting with `SELECT`.
+
+*Table schema.* A BigQuery table resource wants a JSON schema, and no regex should be
+asked to turn thirty-three column definitions into one. `scripts/ci/bq_schema.py` derives
+it from `001_spans_table.sql`; the result is committed under `infra/terraform/generated/`
+because Terraform reads it with `file()` and has no build step; and
+`scripts/ci/bq-schema-guard.sh` fails CI when the two disagree.
+**Alternatives:** hand-write the JSON schema in Terraform — thirty-three columns in a
+second place, which is the divergence D4 exists to prevent, one level below the views D4
+names; parse the DDL in HCL with `regexall` — it works and it is unreadable, and this
+project has to be able to review its own controls; generate the DDL *from* the JSON — the
+DDL is the file carrying F1's reasoning in comments, and making it an output would throw
+that away.
+**Rationale:** one authored source per artefact, and where a copy is unavoidable it is
+generated and guarded rather than maintained. The parser refuses any column line it does
+not fully understand instead of skipping it, because a parser that skips silently drops a
+column and produces a schema that looks fine.
+**Verified how:** the guard's self-test, on four fixtures — a matching pair, a stale JSON
+missing a column and loosening a mode, a `DEFAULT` clause the parser will not guess at,
+and an unknown type. Three-valued exit again: match, mismatch, unparseable.
+**Path filter, which was the defect underneath:** `analytics/sql/` was not in the terraform
+job's filter, so the schema guard would have stayed skipped on precisely the pull request
+that changed the DDL. Added, with the reason next to it — the README already warns that a
+filter must cover a job's *inputs*, not its own directory.
+**Exit review:** no.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the

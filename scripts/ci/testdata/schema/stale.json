@@ -1,0 +1,32 @@
+[
+  {
+    "name": "start_time",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "trace_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "parent_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "synthetic",
+    "type": "BOOLEAN",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "token_count",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "attributes",
+    "type": "JSON",
+    "mode": "REQUIRED"
+  }
+]
