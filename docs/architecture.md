@@ -275,7 +275,7 @@ secret-free by construction.
 
 | Invariant | Enforcement point(s) |
 |---|---|
-| Storage Write API only; the legacy streaming insert API and its client package are forbidden | **Gate A (load-bearing):** no `Google.Cloud.BigQuery.V2` reference in any `*.csproj` or `Directory.Packages.props` — if the package is absent the forbidden API surface cannot be reached, whatever the symbol is called. **Gate B (secondary):** path-scoped symbol scan over `collector/**/*.go`, `worker/**/*.cs`, `analytics/**/*.cs` for `insertAll`, `tabledata.insertAll`, `InsertRow(`, `InsertRows(`, `InsertRowsAsync(`, `.Inserter(`. Code review is **not** an enforcement point |
+| Storage Write API only; the legacy streaming insert API and its client package are forbidden | **Gate A (load-bearing):** no `Google.Cloud.BigQuery.V2` reference in any `*.csproj` or `Directory.Packages.props` — if the package is absent the forbidden API surface cannot be reached, whatever the symbol is called. **Gate B (secondary):** path-scoped symbol scan over the declared source roots — `collector/`, `worker/`, `analytics/`, `infra/functions/` — for `insertAll`, `tabledata.insertAll`, `InsertRow(`, `InsertRows(`, `InsertRowsAsync(`, `.Inserter(`. Code review is **not** an enforcement point |
 | `require_partition_filter=true`, custom query quota | Terraform (`google_bigquery_table`, project quota) |
 | Cloud Run `min=0`, `max≤2`, smallest instance, us-central1 | Terraform; CI check on plan diff |
 | Pub/Sub: no topic retention; batched+gzipped | Terraform (topics); collector code + golden tests (batching) |
@@ -404,7 +404,7 @@ raised rather than resolved silently.
 
 ## 11. Changelog
 
-**v0.4 — 2026-08-19** — F0 spec W4/W5.
+**v0.4 — 2026-08-19** — F0 spec W4/W5, W6.
 
 1. **§7.1 added — the Terraform resource-type allowlist now exists.** `CLAUDE.md`
    and F0 spec W5 both instruct that no resource may be created outside "the
@@ -417,6 +417,11 @@ raised rather than resolved silently.
    (Cloud Run scaling bounds, region, Pub/Sub topic retention). Each was a hard
    invariant in `CLAUDE.md` with no enforcement point named in §7; naming them
    here keeps the §7 register's promise that every invariant states what holds it.
+3. §7 Gate B row now names the declared source roots rather than three fixed globs.
+   W4 added Go source under `infra/functions/`, and Gate B's coverage check refuses
+   to let source live outside the scanned roots — so the root list changed, in the
+   explicit way issue #5 required. The executable list is `SOURCE_ROOTS` in
+   `scripts/ci/invariant-gates.sh`; this row, the F0 spec and ADR-0004 describe it.
 
 **v0.3 — 2026-08-18** — F0 spec W2.
 

@@ -263,8 +263,9 @@ printing offending `path:line`.
   `Directory.Packages.props` references `Google.Cloud.BigQuery.V2`. The only permitted
   BigQuery write dependency is `Google.Cloud.BigQuery.Storage.V1`. If the package is
   absent, the forbidden API surface does not exist regardless of symbol naming.
-- **Gate B — path-scoped symbol scan (secondary).** Over `collector/**/*.go`,
-  `worker/**/*.cs`, `analytics/**/*.cs` only: `insertAll`, `tabledata.insertAll`,
+- **Gate B — path-scoped symbol scan (secondary).** Over the declared source roots
+  only — `collector/`, `worker/`, `analytics/`, `infra/functions/` (W4's kill-switch
+  source): `insertAll`, `tabledata.insertAll`,
   `InsertRow(`, `InsertRows(`, `InsertRowsAsync(`, `.Inserter(`. Scope is a path
   allowlist, not a file denylist — documentation will keep naming these symbols and must
   never need an exclusion entry.
@@ -451,7 +452,10 @@ subset (file-path deny rules, command deny-list). Minimum content:
 4. Gate B's coverage check is stricter than issue #5 required: it fails if any source
    file sits outside the declared scan roots, not only if a new *top-level* source
    directory appears. Source nested one level deeper would satisfy the top-level reading
-   while being scanned by nothing.
+   while being scanned by nothing. Its first real use was immediate: W4 put Go source
+   under `infra/functions/`, and that root was added deliberately rather than
+   discovered missing later. §W6.2, architecture §7 and ADR-0004 now name the roots
+   instead of three fixed globs; the executable list lives once, in the gate script.
 5. Gate D scans workflow files (`*.yml`, `*.yaml`) under `.github/workflows/` rather
    than everything in that directory. The first implementation failed on that
    directory's `README.md`, which documents the trigger the workflow must not use. The
