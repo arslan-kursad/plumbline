@@ -1,0 +1,295 @@
+# The gated apply path (F2 spec §2 Lane B, decision D1).
+#
+# Every cloud mutation from Wave 1 onward runs here and nowhere else. The
+# confirmation is not a sentence in a conversation, it is a GitHub Environment
+# review: timestamped, attributable, and readable months later by someone who was
+# not there.
+#
+# Shape, and why:
+#
+#   preflight -> plan -> [environment approval] -> apply
+#
+# * `workflow_dispatch` only. A wave is armed deliberately; a merge must never be
+#   a deployment, because self-merge is authorized in Lane A and would otherwise
+#   become a cloud mutation.
+# * The plan job's log is the reviewable diff. It is produced before the approval
+#   gate pauses the run, so the reviewer reads the plan and then decides.
+# * Nothing is uploaded as an artifact. This repository is public and workflow
+#   artifacts are not masked the way logs are, so a plan file would publish every
+#   value it contains — including `billing_account_id`, which this repository
+#   stores as a secret. The plan therefore never leaves the runner.
+# * The apply job re-plans and refuses unless the diff still matches what the plan
+#   job showed. Applying a *saved* plan would be the usual way to bind approval to
+#   diff; that route needs an artifact, so the binding is a fingerprint instead —
+#   sorted `address action` pairs, hashed. Addresses and action verbs carry no
+#   attribute values, so the fingerprint is safe to print in a public log.
+name: deploy
+
+run-name: "deploy — wave ${{ inputs.wave }} (issue #${{ inputs.wave_issue }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      wave:
+        description: Wave being applied
+        required: true
+        type: choice
+        options: ["1", "2", "3", "4"]
+      wave_issue:
+        description: Wave issue number, so the run and the record point at each other
+        required: true
+        type: string
+
+# Never cancel an apply in flight: a half-applied Terraform run is worse than a
+# queued one.
+concurrency:
+  group: deploy-gcp-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  ENVIRONMENT_NAME: gcp-production
+
+jobs:
+  preflight:
+    name: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # workflow_dispatch can be aimed at any ref. The environment's own branch
+      # policy should refuse a non-main ref too; two independent refusals cost
+      # nothing and fail differently, which is the point.
+      - name: Refuse any ref but main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::deploy runs from main only; this run is on ${{ github.ref }}"
+            exit 1
+          fi
+
+      # A deploy that skips is worse than one that fails: the F0 plan job may skip
+      # when the variables are absent because a skipped plan proves nothing, but a
+      # skipped apply looks like a completed wave.
+      - name: Refuse without the GCP configuration
+        run: |
+          missing=""
+          [ -n "${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] || missing="$missing GCP_WORKLOAD_IDENTITY_PROVIDER"
+          [ -n "${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}" ]     || missing="$missing GCP_DEPLOY_SERVICE_ACCOUNT"
+          [ -n "${{ vars.GCP_PROJECT_ID }}" ]                 || missing="$missing GCP_PROJECT_ID"
+          [ -n "${{ vars.GCP_STATE_BUCKET }}" ]               || missing="$missing GCP_STATE_BUCKET"
+          if [ -n "$missing" ]; then
+            echo "::error::missing repository variables:$missing"
+            exit 1
+          fi
+
+      # Load-bearing, not decoration. Naming an environment that does not exist
+      # creates it on first use *without* protection rules, so the approval gate
+      # this workflow is built around would silently not be there. The check runs
+      # before any credential is minted.
+      - name: Refuse without a required reviewer on the environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! environment=$(gh api "repos/${{ github.repository }}/environments/${ENVIRONMENT_NAME}" 2>&1); then
+            echo "::error::cannot read the ${ENVIRONMENT_NAME} environment. Either it does not exist \
+          (create it per the Wave 0 issue) or this token cannot read protection rules. \
+          Refusing: an unverified gate is not a gate."
+            echo "$environment"
+            exit 1
+          fi
+
+          reviewers=$(jq '[.protection_rules[]? | select(.type == "required_reviewers") | .reviewers[]?] | length' <<<"$environment")
+          if [ "${reviewers:-0}" -lt 1 ]; then
+            echo "::error::${ENVIRONMENT_NAME} has no required reviewer; the approval gate D1 depends on is absent"
+            exit 1
+          fi
+
+          branches=$(jq -r '.deployment_branch_policy.protected_branches // false' <<<"$environment")
+          custom=$(jq -r '.deployment_branch_policy.custom_branch_policies // false' <<<"$environment")
+          if [ "$branches" = "false" ] && [ "$custom" = "false" ]; then
+            echo "::warning::${ENVIRONMENT_NAME} has no deployment branch policy; this workflow still refuses any ref but main"
+          fi
+
+          echo "environment ${ENVIRONMENT_NAME}: ${reviewers} required reviewer(s)"
+
+  plan:
+    name: plan
+    needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      fingerprint: ${{ steps.fingerprint.outputs.value }}
+      changes: ${{ steps.fingerprint.outputs.changes }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_wrapper: false
+
+      - name: Plan
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.GCP_STATE_BUCKET }}"
+          terraform plan -input=false -out=plan.tfplan
+
+      # The guard runs here and again before the apply. It parses the allowlist out
+      # of docs/architecture.md §7.1, so it is checking the same source the spec
+      # cites rather than a copy of it.
+      - name: Plan guard
+        run: ./scripts/ci/terraform-plan-guard.sh infra/terraform/plan.tfplan
+
+      - name: Fingerprint and summary
+        id: fingerprint
+        working-directory: infra/terraform
+        run: |
+          terraform show -json plan.tfplan > plan.json
+          changed=$(jq -r '
+            .resource_changes[]?
+            | select(.change.actions != ["no-op"])
+            | "\(.address) \(.change.actions | join(","))"
+          ' plan.json | LC_ALL=C sort)
+
+          if [ -z "$changed" ]; then
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          value=$(printf '%s' "$changed" | sha256sum | cut -d' ' -f1)
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Planned changes — wave ${{ inputs.wave }}"
+            echo
+            echo '```'
+            [ -n "$changed" ] && echo "$changed" || echo "(no changes)"
+            echo '```'
+            echo
+            echo "Fingerprint \`$value\` — addresses and actions only, no attribute values."
+            echo "The apply job re-plans and refuses unless it recomputes this exact value."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # The reviewable diff comes out of the same plan file the fingerprint
+          # was computed from. Running a second `terraform plan` to print it would
+          # refresh again and could show something the fingerprint does not cover.
+          echo "--- plan ---"
+          terraform show -no-color plan.tfplan
+
+          # The plan never leaves this runner. Removing it is belt-and-braces
+          # against a future step that uploads the workspace.
+          rm -f plan.tfplan plan.json
+
+  apply:
+    name: apply
+    needs: [preflight, plan]
+    runs-on: ubuntu-latest
+    # The approval gate. The run pauses here until the required reviewer acts, by
+    # which time the plan job's diff is already in the log above.
+    environment: gcp-production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_wrapper: false
+
+      - name: Re-plan
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.GCP_STATE_BUCKET }}"
+          terraform plan -input=false -out=plan.tfplan
+
+      - name: Plan guard
+        run: ./scripts/ci/terraform-plan-guard.sh infra/terraform/plan.tfplan
+
+      # What was approved is what is applied. If anything moved between the plan
+      # job and the approval — a merge to main, a hand-made change in the console,
+      # a resource drifting — the fingerprint differs and this refuses. Re-running
+      # the workflow produces a fresh diff and a fresh approval, which is the
+      # correct response rather than an obstacle.
+      - name: Refuse a diff the reviewer did not see
+        working-directory: infra/terraform
+        run: |
+          terraform show -json plan.tfplan > plan.json
+          changed=$(jq -r '
+            .resource_changes[]?
+            | select(.change.actions != ["no-op"])
+            | "\(.address) \(.change.actions | join(","))"
+          ' plan.json | LC_ALL=C sort)
+          rm -f plan.json
+
+          value=$(printf '%s' "$changed" | sha256sum | cut -d' ' -f1)
+          if [ "$value" != "${{ needs.plan.outputs.fingerprint }}" ]; then
+            echo "::error::the plan changed after approval"
+            echo "  approved: ${{ needs.plan.outputs.fingerprint }}"
+            echo "  now:      $value"
+            echo "$changed"
+            exit 1
+          fi
+          echo "fingerprint matches the approved plan: $value"
+
+      - name: Apply
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
+        run: terraform apply -input=false plan.tfplan
+
+      # Drift is a bug (architecture §8). A wave that leaves the configuration and
+      # the project disagreeing has not finished, and finding that out now is
+      # cheaper than finding it out at the next wave's plan.
+      - name: Prove the plan is clean afterwards
+        working-directory: infra/terraform
+        env:
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
+        run: |
+          rm -f plan.tfplan
+
+          # -detailed-exitcode returns 2 for "there are changes", which the shell's
+          # errexit would treat as a failure before the case can distinguish it
+          # from a real error. The difference matters: one is drift, the other is a
+          # broken plan.
+          set +e
+          terraform plan -input=false -detailed-exitcode -no-color
+          status=$?
+          set -e
+
+          case $status in
+            0) echo "post-apply plan is clean" ;;
+            2) echo "::error::changes remain after apply; the wave is not finished" ; exit 1 ;;
+            *) echo "::error::post-apply plan failed with status $status" ; exit 1 ;;
+          esac
+
+      - name: Record
+        run: |
+          {
+            echo "### Applied — wave ${{ inputs.wave }}"
+            echo
+            echo "Approved fingerprint \`${{ needs.plan.outputs.fingerprint }}\`, applied by run ${{ github.run_id }}."
+            echo "Record this run and the post-apply verification in issue #${{ inputs.wave_issue }}."
+          } >> "$GITHUB_STEP_SUMMARY"

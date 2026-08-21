@@ -1,7 +1,11 @@
 # .github/workflows
 
-`ci.yml` — the only workflow. Path-filtered Go, .NET, Terraform and end-to-end jobs,
-plus the invariant gates, aggregated into a single `ci complete` status check.
+Two workflows, and the split between them is the F2 governance model in file form:
+`ci.yml` proves things and mutates nothing, `deploy.yml` is the only path that mutates
+the cloud.
+
+`ci.yml` — path-filtered Go, .NET, Terraform and end-to-end jobs, plus the invariant
+gates, aggregated into a single `ci complete` status check.
 
 | Job | Runs when | What it proves |
 | --- | --- | --- |
@@ -42,6 +46,33 @@ Posture (F0 spec §W6.1, §W6.3):
   cannot run containers — so a check deferred to `main` would report a pipeline
   regression to somebody who no longer has the change in front of them. Reasoning and
   measured runtime: `docs/specs/F1-decision-log.md` W6.4.
+
+## `deploy.yml` — the gated apply path (F2 spec §2, decision D1)
+
+| Job | Runs when | What it proves |
+| --- | --- | --- |
+| `preflight` | every dispatch | the ref is `main`, the GCP variables exist, and the `gcp-production` environment really carries a required reviewer |
+| `plan` | after preflight | an authenticated plan, guarded, with the diff in the log and a fingerprint of it in the summary |
+| `apply` | after the environment approval | the diff still matches what was approved, it applies, and the plan is clean afterwards |
+
+Four properties are worth stating because each was a choice:
+
+- **`workflow_dispatch` only.** Lane A authorizes self-merge, so a workflow that deployed
+  on merge would turn every self-merge into a cloud mutation. A wave is armed by a person
+  naming the wave and its issue.
+- **Nothing is uploaded.** This repository is public and workflow artifacts are not masked
+  the way logs are, so a plan file would publish every value it carries, including the
+  billing account ID this repository keeps as a secret. The plan file never leaves the
+  runner, and the approval is bound to the diff by a fingerprint — sorted `address action`
+  pairs, hashed — which carries no attribute values at all.
+- **The apply refuses a diff the reviewer did not see.** It re-plans, recomputes the
+  fingerprint, and stops if it moved. Re-dispatching produces a fresh diff and a fresh
+  approval; that is the correct response to a moved plan, not an obstacle to route around.
+- **The environment check is load-bearing.** Naming an environment that does not exist
+  creates it on first use *without* protection rules, so the gate this whole workflow is
+  built around would silently not be there. `preflight` refuses when it cannot see a
+  required reviewer — including when it cannot read the environment at all, because an
+  unverified gate is not a gate.
 
 Branch protection requires `ci complete` only — see
 `docs/runbooks/branch-protection.md` for why the aggregate exists and how to

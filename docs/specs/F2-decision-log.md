@@ -188,6 +188,39 @@ down before is what stops the question from being answered by default when Wave 
 **Exit review:** yes — ADR-0004 Amendment 2 had to withdraw a claim about what an identity
 could not do. This is the same class of claim, made in advance.
 
+### W1.1 — The approval is bound to the diff by a fingerprint, not by a saved plan
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** cheap
+**Decision:** `deploy.yml` runs `preflight → plan → [environment approval] → apply`. The
+plan job prints the diff and publishes a fingerprint of it — sorted `address action`
+pairs, hashed — as a job output. The apply job re-plans, recomputes the fingerprint, and
+refuses unless it matches. No plan file is uploaded anywhere.
+**Alternatives:** upload the plan as an artifact and `terraform apply plan.tfplan`, which
+is the usual way to bind an approval to a diff — rejected because this repository is
+public and workflow artifacts are not masked the way logs are, so the artifact would
+publish every value the plan carries, including the billing account ID the repository
+keeps as an Actions secret; re-plan and apply without comparing — rejected because then
+the reviewer approves one diff and the runner applies whatever it finds, which is D1's
+property in name only.
+**Rationale:** the fingerprint carries addresses and action verbs and no attribute values,
+so it is safe to print in a public log and still answers the only question the gate asks:
+is this the change that was approved? Its blind spot is stated rather than papered over —
+an attribute-level change that keeps the same address and action set would not move the
+fingerprint. The plan guard runs in both jobs, and the same-run checkout pins the code, so
+the remaining gap is a value edited in the cloud console between plan and apply, which is
+drift, which is already a bug by architecture §8.
+**Also decided here:** the preflight refuses unless it can see a required reviewer on the
+`gcp-production` environment. Naming an environment that does not exist creates it on
+first use without protection rules, so the gate the workflow is built around would
+silently not be there — the same failure shape as the two W6.4 settings that returned
+HTTP 200 and changed nothing. Refusing when the environment cannot be read at all is
+deliberate: an unverified gate is not a gate.
+**Verified how:** YAML parse and the invariant gates locally; the workflow's real proof is
+its first refusal. It is dispatched once **before** the environment is configured, and
+must refuse — the same discipline as `prove-gates.sh`, which exists because this project
+has already shipped a gate that could not fail.
+**Exit review:** no, unless the preflight's environment read turns out to need a token
+permission the default one lacks, which changes the repository's Actions posture.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
