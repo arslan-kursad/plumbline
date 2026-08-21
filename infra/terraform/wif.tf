@@ -72,6 +72,35 @@ resource "google_project_iam_member" "ci_readonly_viewer" {
   member  = "serviceAccount:${google_service_account.ci_readonly.email}"
 }
 
+# `terraform plan` refreshes every resource in state, and two of them are not
+# reachable through project-level Viewer.
+#
+# The budget is a billing-account resource, so project Owner does not reach it and
+# neither does project Viewer. Billing Account Viewer is the narrowest role that
+# can read a budget — budgets carry no IAM of their own — and it does mean the CI
+# identity can read this billing account's costs. Read-only, and the alternative
+# was worse: planning with `-refresh=false` would keep the identity narrower at the
+# cost of making CI blind to drift, which is a bug class this project refuses to
+# stop looking for.
+#
+# The cleaner long-term shape is to hold billing-account-scoped resources in their
+# own state, so the CI identity never needs to read across that boundary at all.
+# That is an F2 conversation, not an F0 change.
+resource "google_billing_account_iam_member" "ci_readonly_billing" {
+  billing_account_id = var.billing_account_id
+  role               = "roles/billing.viewer"
+  member             = "serviceAccount:${google_service_account.ci_readonly.email}"
+}
+
+# Cloud Quotas is recent enough that the basic Viewer role cannot be relied on to
+# carry its read permissions. Granting the service's own viewer role is explicit
+# and costs nothing.
+resource "google_project_iam_member" "ci_readonly_quota_viewer" {
+  project = var.project_id
+  role    = "roles/cloudquotas.viewer"
+  member  = "serviceAccount:${google_service_account.ci_readonly.email}"
+}
+
 # State access is scoped to the state bucket rather than granted project-wide:
 # the same identity must not be able to reach the function-source bucket.
 # objectAdmin rather than objectViewer because Terraform writes a state lock
