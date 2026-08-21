@@ -73,7 +73,10 @@ jobs:
           }
 
           {
-            echo "collector=$(match '^collector/')"
+            # testdata/ carries the fixture corpus the collector's splitter and
+            # byte-identity tests run against, so a fixture change is a change to
+            # what those tests assert.
+            echo "collector=$(match '^(collector|testdata)/')"
             # testdata/ and third_party/ are inputs to the .NET test suite: the
             # fixture corpus and the vendored OTLP protos. normalization/ holds the
             # mapping and redaction YAML embedded into the worker at build. A change to
@@ -118,6 +121,10 @@ jobs:
       - run: go build ./...
         working-directory: collector
       - run: go vet ./...
+        working-directory: collector
+      # -race because the collector is concurrent by construction: two listeners,
+      # a shared rate limiter, and a publisher called from both.
+      - run: go test -race ./...
         working-directory: collector
 
   killswitch:
