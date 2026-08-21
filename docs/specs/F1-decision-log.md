@@ -468,3 +468,65 @@ at query time (moves the question).
 **Rationale:** the transit exposure was going to happen by default. The point of the ADR
 is that it is now a decision someone signed rather than a consequence nobody noticed.
 **C2:** yes — accept or reject.
+
+### W5.1 — The status code is the only acknowledgement the worker gives
+**Made:** 2026-08-21 · **Work item:** W5 · **Reversibility:** cheap
+**Decision:** 204 for a stored message, 400 for one that can never be read, 503 for a
+write that failed, 401 for an unauthenticated request. Nothing else.
+**Alternatives:** ACK a poison message and record it somewhere of our own — a private
+dead-letter table, a log line with the payload. Every version of that ends with
+`traces-dlq` empty, the depth alert silent, and the operator's only evidence in a log
+nobody reads.
+**Rationale:** Pub/Sub ACKs on 2xx and NACKs on anything else, and the subscription's
+`max_delivery_attempts` is what routes to the DLQ (§3.4). The worker's job is to answer
+honestly; the routing is not its decision to make.
+**C2:** no.
+
+### W5.2 — The OIDC stub fails closed and announces itself
+**Made:** 2026-08-21 · **Work item:** W5 · **Reversibility:** cheap
+**Decision:** three implementations behind `IPushAuthenticator`. The stub accepts
+everything and is **refused at startup outside a Development environment**; the OIDC
+implementation does not exist yet and therefore refuses everything; the default is OIDC.
+The chosen mechanism is named in the startup log and on `/healthz`.
+**Alternatives:** a boolean flag and a comment — the F1 directive asks for the stub to be
+"visible in code, so it cannot ship to cloud silently", and a comment is visible only to
+someone already reading the file; or make the stub the default for convenience — that is
+precisely the configuration that ships.
+**Rationale:** Cloud Run sets no `ASPNETCORE_ENVIRONMENT`, so the guard bites by default
+rather than by remembering to configure it. An incomplete deployment is visibly broken
+instead of quietly open.
+**C2:** no.
+
+### W5.3 — `BigQueryStorageWriteSink` throws rather than pretending
+**Made:** 2026-08-21 · **Work item:** W5 · **Reversibility:** cheap
+**Decision:** the cloud sink carries its destination and the shape of the call, and
+throws `NotSupportedException` if selected in F1.
+**Alternatives:** implement it against the emulator now — F1 must not depend on a cloud
+client library working against a stand-in that may not implement the API, and D4 makes
+that a W6 question; or make it a no-op — a sink that silently drops rows looks exactly
+like a working pipeline with no traffic, which is the worst of the available failures.
+**Rationale:** D4 asks for the real client behind the interface as "wiring only". The
+`insertAll` prohibition stays structurally true in both branches: Gate A refuses the
+package that exposes it, so the legacy surface is unreachable rather than unused.
+**C2:** only if the D4 fallback is activated in W6.
+
+### W5.4 — `spans_deduped` uses ROW_NUMBER in a subquery, not QUALIFY
+**Made:** 2026-08-21 · **Work item:** W5 · **Reversibility:** cheap
+**Decision:** the view is written with a `ROW_NUMBER` subquery. Architecture §4.1
+describes it as `QUALIFY ROW_NUMBER`; the semantics are identical.
+**Alternatives:** QUALIFY, as written. It is shorter, it is the idiom a BigQuery reader
+expects, and it is a BigQuery extension the local stand-in may not parse — which would
+mean two definitions of the dedup rule, one per environment, and the local one untested
+against the real one.
+**Rationale:** one definition that runs in both places is worth more than the shorter
+spelling. This is a deviation from architecture wording and is recorded as one.
+**C2:** yes, briefly.
+
+### W5.5 — No dedup in the worker
+**Made:** 2026-08-21 · **Work item:** W5 · **Reversibility:** cheap
+**Decision:** the worker writes what it receives, duplicates included.
+**Rationale:** architecture §3.3 puts dedup downstream, in the views, on
+`(trace_id, span_id)`. A worker-side cache would be a second implementation of the same
+rule that is correct only while one instance's memory outlives the redelivery window —
+and with `min-instances = 0` that window is routinely longer than the instance.
+**C2:** no.
