@@ -455,6 +455,28 @@ not a licence to erase the metadata of the system that still writes to it, and a
 nulls a field nobody asked to change costs a reviewer attention for nothing.
 **Exit review:** no, but #57 must not close silently.
 
+### W1.7 — `keyctl` lives in the collector module, not in `tools/`
+**Made:** 2026-08-21 · **Work item:** Wave 1 · **Reversibility:** cheap
+**Decision:** the issuing tool is `collector/cmd/keyctl`, not `tools/keyctl` as D5
+sketched. `internal/auth` is importable from there and from nowhere else, so the key the
+tool issues and the key the collector accepts are defined by one piece of code — the
+format, the prefix, the issuable environment markers and the hash. A tool in a separate
+module would restate that contract, and a restated contract drifts silently until an agent
+in production presents a key the data plane rejects.
+**Consequence worth naming, because it looks like the tail wagging the dog:** the Gate B
+source-root extension this phase predicted is no longer needed. That is a side effect, not
+the reason. Had `tools/` been right on the merits, the gate roots would have grown and the
+change would have been logged — widening a scan is the response ADR-0004 §3 asks for.
+**Also added:** `auth.HasIssuableShape`, exported so the tool can assert that what it just
+generated is something the collector would accept. Two places agreeing about a format by
+inspection is how a tool ships keys that fail at an agent, in production, on someone else's
+clock; one function called by both cannot drift from itself. Its doc comment says it
+answers shape and not authentication, because a future caller will be tempted.
+**Refusal that is deliberate:** `Create`, not `Set`. An `api_key_id` that already exists
+belongs to a key some agent may still be presenting; overwriting the hash would revoke it
+silently at the next collector start, with no error anywhere near the person who caused it.
+**Exit review:** the maintainer runs this tool, so its UX is theirs to accept.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the

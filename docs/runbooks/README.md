@@ -8,4 +8,5 @@ run. A procedure with an empty evidence section is a procedure nobody has tested
 | [`kill-switch.md`](kill-switch.md) | Billing kill-switch: what triggers it, the mandatory live-fire, the manual re-attach, and the BigQuery query quota. |
 | [`repository-settings.md`](repository-settings.md) | Every manually managed GitHub setting, with dates, reasons and read-back evidence. |
 | [`branch-protection.md`](branch-protection.md) | `main` protection: what it does and does not enforce, and the deadlock escape. |
+| [`api-keys.md`](api-keys.md) | Issuing, losing and revoking agent API keys: the `api_keys` collection, `keyctl`, and why revocation is not instant. |
 | [`dead-letter.md`](dead-letter.md) | The dead-letter path: what a dead-lettered message contains, how to triage it without exposing it, replay, and why retention is seven days. |

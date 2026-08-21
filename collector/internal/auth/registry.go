@@ -74,6 +74,30 @@ var IssuedEnvironments = []string{"local", "live"}
 
 var keyShape = regexp.MustCompile(`^plb_[a-z]{3,8}_[0-9a-f]{32}$`)
 
+// HasIssuableShape reports whether a string is shaped like a key this project issues.
+//
+// Exported for the issuing tool (cmd/keyctl), which asserts that what it just generated
+// is something the data plane would accept. Two places agreeing about a format by
+// inspection is how a tool ships keys that fail at an agent, in production, on someone
+// else's clock; one function, called by both, cannot drift from itself.
+//
+// Shape only. It says nothing about whether the key is registered, active, or real —
+// Lookup answers that, and a caller that treats this as authentication has misread it.
+func HasIssuableShape(presented string) bool {
+	if !keyShape.MatchString(presented) {
+		return false
+	}
+
+	for _, environment := range IssuedEnvironments {
+		if strings.HasPrefix(presented, KeyPrefix+environment+"_") {
+			return true
+		}
+	}
+
+	// `test` matches keyShape and is never issued (see IssuedEnvironments).
+	return false
+}
+
 // FileRegistry is the local stand-in for the Firestore key registry: a JSON file of
 // hashed keys, mounted into the container.
 type FileRegistry struct {
