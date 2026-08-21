@@ -93,7 +93,22 @@ F2 acceptance criterion.
 1. Create the GCP project and link a billing account.
 2. Hold **Billing Account Administrator** on that billing account — the budget is
    a billing-account-level resource — and Owner (or equivalent) on the project.
-3. Enable the two APIs Terraform itself needs before it can enable anything
+3. Authenticate **twice**. `gcloud auth login` signs the CLI in; Terraform's
+   Google provider reads Application Default Credentials, which is a separate
+   store:
+
+   ```bash
+   gcloud auth login
+   gcloud auth application-default login
+   gcloud auth application-default set-quota-project "$PROJECT_ID"
+   ```
+
+   The third command is not optional decoration. ADC without a quota project
+   makes client libraries bill quota to no project, and the symptom is an
+   "API not enabled" or "quota exceeded" error naming a service that is plainly
+   enabled. `gcloud` prints the warning at login and it is easy to scroll past.
+
+4. Enable the two APIs Terraform itself needs before it can enable anything
    else — on a fresh project the first plan fails without them, and the error
    reads like a bug in the configuration:
 
@@ -102,9 +117,11 @@ F2 acceptance criterion.
      --project "$PROJECT_ID"
    ```
 
-4. Run `infra/terraform/bootstrap`, then the root module
-   (see [`infra/terraform/README.md`](../../infra/terraform/README.md)).
-5. Before the first apply, confirm the pinned function runtime still exists:
+5. Run `infra/terraform/bootstrap`, then the root module
+   (see [`infra/terraform/README.md`](../../infra/terraform/README.md)). Both are
+   run **from their own directory**; the modules are separate root modules, not a
+   parent and a child.
+6. Before the first apply, confirm the pinned function runtime still exists:
    `gcloud functions runtimes list --region us-central1`. The value is
    `var.killswitch_runtime`, currently `go126`; the function's `go.mod` requires
    Go 1.25, so raising the runtime is safe and lowering it below that is not.
@@ -120,6 +137,7 @@ points somewhere other than its cause.
 | --- | --- | --- |
 | `Service account ...-compute@developer.gserviceaccount.com was not found` | Cloud Build's default identity is the default *compute* service account, which only exists once the Compute Engine API has been enabled. This configuration avoids it by naming its own build identity (`killswitch-build`); if the error still appears, something is falling back to the default. | Confirm `build_config.service_account` is set on the function. Enabling `compute.googleapis.com` also fixes it, at the price of a default VPC this project has no use for — prefer the named identity. |
 | Build fails on permissions after the identity exists | The build identity was created in the same apply that used it, and IAM propagation lags. | Re-run `terraform apply`. The configuration already orders the grants before the function; propagation delay is not something ordering can fix. |
+| An "API not enabled" or quota error naming a service you can see is enabled | ADC has no quota project. | `gcloud auth application-default set-quota-project "$PROJECT_ID"` (§2). |
 | `The caller does not have permission` on `google_billing_budget` | The budget is a billing-account-level resource, and project Owner does not reach it. | The operator needs Billing Account Administrator on the billing account, not only on the project (§2). |
 
 None of these are cost events. They are first-apply friction, and they are written
