@@ -92,6 +92,18 @@ resource "google_billing_account_iam_member" "ci_readonly_billing" {
   member             = "serviceAccount:${google_service_account.ci_readonly.email}"
 }
 
+# `plan` refreshes IAM-member resources by reading the policy they belong to, and
+# basic Viewer carries `getIamPolicy` for the project, service accounts and Cloud
+# Run — but not for storage buckets. Security Reviewer is the read-only role whose
+# entire purpose is reading IAM policies; the storage roles that include
+# `buckets.getIamPolicy` also include `setIamPolicy`, which this identity must not
+# have (F0 spec §W6.1: no mutating IAM).
+resource "google_project_iam_member" "ci_readonly_security_reviewer" {
+  project = var.project_id
+  role    = "roles/iam.securityReviewer"
+  member  = "serviceAccount:${google_service_account.ci_readonly.email}"
+}
+
 # Required because the provider sends X-Goog-User-Project on every request
 # (user_project_override in versions.tf). Without it CI authenticates, then fails
 # on `caller does not have serviceusage.services.use`.
