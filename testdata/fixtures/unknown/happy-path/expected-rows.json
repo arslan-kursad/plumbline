@@ -1,0 +1,56 @@
+[
+  {
+    "start_time": "2026-08-19T10:00:00.000000Z",
+    "end_time": "2026-08-19T10:00:00.750000Z",
+    "trace_id": "3132333435363738393a3b3c3d3e3f40",
+    "span_id": "4142434445464748",
+    "parent_span_id": null,
+    "name": "claude_code.llm_request",
+    "kind": "SPAN_KIND_CLIENT",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "unregistered-agent",
+    "source_dialect": "unknown",
+    "api_key_id": "local-test",
+    "schema_url": "https://opentelemetry.io/schemas/1.41.0",
+    "synthetic": false,
+    "gen_ai_provider_name": "openai",
+    "gen_ai_operation_name": "chat",
+    "gen_ai_request_model": "gpt-4o",
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": null,
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": 42,
+    "gen_ai_usage_output_tokens": 7,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "unregistered-agent",
+        "service.version": "0.0.1",
+        "telemetry.sdk.language": "rust"
+      },
+      "scope": {
+        "name": "com.example.unregistered.agent",
+        "version": "0.0.1",
+        "attributes": {}
+      },
+      "span": {
+        "span.type": "llm_request",
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": "openai",
+        "gen_ai.request.model": "gpt-4o",
+        "gen_ai.usage.input_tokens": 42,
+        "gen_ai.usage.output_tokens": 7,
+        "vendor.private.knob": "on"
+      }
+    },
+    "events": [],
+    "links": []
+  }
+]

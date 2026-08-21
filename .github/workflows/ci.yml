@@ -74,7 +74,13 @@ jobs:
 
           {
             echo "collector=$(match '^collector/')"
-            echo "dotnet=$(match '^(worker|analytics)/')"
+            # testdata/ and third_party/ are inputs to the .NET test suite: the
+            # fixture corpus and the vendored OTLP protos. normalization/ holds the
+            # mapping and redaction YAML embedded into the worker at build. A change to
+            # any of them is a change to what those tests assert, so the job that runs
+            # them has to be in scope or it stays skipped and green while the thing it
+            # checks moves.
+            echo "dotnet=$(match '^(worker|analytics|normalization|testdata|third_party)/')"
             echo "killswitch=$(match '^infra/functions/')"
             # The plan guard parses architecture §7.1, so a change to that
             # document is a change to the control.
@@ -144,6 +150,11 @@ jobs:
           dotnet-version: '8.0.x'
       - run: dotnet build worker/Plumbline.Worker.sln --nologo
       - run: dotnet build analytics/Plumbline.Analytics.sln --nologo
+
+      # Tests, not only compilation. The fixture corpus, its integrity checks and the
+      # golden-file suite all live in the worker solution; a suite CI does not run is
+      # advisory, which is the state F1 W2 ends.
+      - run: dotnet test worker/Plumbline.Worker.sln --nologo --no-build
 
   terraform:
     name: terraform static checks

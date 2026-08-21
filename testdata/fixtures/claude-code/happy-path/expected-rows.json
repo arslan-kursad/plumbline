@@ -1,0 +1,216 @@
+[
+  {
+    "start_time": "2026-08-19T10:00:00.000000Z",
+    "end_time": "2026-08-19T10:00:00.216000Z",
+    "trace_id": "e5d4c3b2a1908f7e6d5c4b3a29180706",
+    "span_id": "0f1e2d3c4b5a6978",
+    "parent_span_id": null,
+    "name": "claude_code.interaction",
+    "kind": "SPAN_KIND_INTERNAL",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "claude-code",
+    "source_dialect": "claude-code",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": null,
+    "gen_ai_operation_name": "invoke_agent",
+    "gen_ai_request_model": null,
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": null,
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "claude-code",
+        "service.version": "2.1.229",
+        "os.type": "darwin",
+        "os.version": "00.0.0",
+        "host.arch": "amd64"
+      },
+      "scope": {
+        "name": "com.anthropic.claude_code.tracing",
+        "version": "1.0.0",
+        "attributes": {}
+      },
+      "span": {
+        "span.type": "interaction",
+        "user.id": "[REDACTED:sha256:02a88619]",
+        "user.email": "[REDACTED:sha256:edf7623e]",
+        "organization.id": "[REDACTED:sha256:06bcd15f]",
+        "user.account_uuid": "[REDACTED:sha256:db8055e0]",
+        "user.account_id": "[REDACTED:sha256:08b6488e]",
+        "session.id": "[REDACTED:sha256:4d18165a]",
+        "terminal.type": "non-interactive",
+        "user_prompt": "[REDACTED:sha256:1d31bdaf]",
+        "user_prompt_length": 133,
+        "interaction.sequence": 1,
+        "interaction.duration_ms": 216
+      }
+    },
+    "events": [],
+    "links": []
+  },
+  {
+    "start_time": "2026-08-19T10:00:00.020000Z",
+    "end_time": "2026-08-19T10:00:00.120000Z",
+    "trace_id": "e5d4c3b2a1908f7e6d5c4b3a29180706",
+    "span_id": "1e2d3c4b5a697887",
+    "parent_span_id": "0f1e2d3c4b5a6978",
+    "name": "claude_code.llm_request",
+    "kind": "SPAN_KIND_INTERNAL",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "claude-code",
+    "source_dialect": "claude-code",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": "anthropic",
+    "gen_ai_operation_name": "chat",
+    "gen_ai_request_model": "claude-sonnet-4-5",
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": null,
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "claude-code",
+        "service.version": "2.1.229",
+        "os.type": "darwin",
+        "os.version": "00.0.0",
+        "host.arch": "amd64"
+      },
+      "scope": {
+        "name": "com.anthropic.claude_code.tracing",
+        "version": "1.0.0",
+        "attributes": {}
+      },
+      "span": {
+        "span.type": "llm_request",
+        "user.id": "[REDACTED:sha256:02a88619]",
+        "user.email": "[REDACTED:sha256:edf7623e]",
+        "organization.id": "[REDACTED:sha256:06bcd15f]",
+        "user.account_uuid": "[REDACTED:sha256:db8055e0]",
+        "user.account_id": "[REDACTED:sha256:08b6488e]",
+        "session.id": "[REDACTED:sha256:4d18165a]",
+        "terminal.type": "non-interactive",
+        "gen_ai.system": "anthropic",
+        "gen_ai.request.model": "claude-sonnet-4-5",
+        "model": "claude-sonnet-4-5",
+        "llm_request.context": "interaction",
+        "speed": "normal",
+        "duration_ms": 100,
+        "success": true,
+        "attempt": 1,
+        "client_request_id": "[REDACTED:sha256:8a70316d]"
+      }
+    },
+    "events": [
+      {
+        "time": "2026-08-19T10:00:00.021000Z",
+        "name": "gen_ai.request.attempt",
+        "attributes": {
+          "attempt": 1,
+          "client_request_id": "[REDACTED:sha256:8a70316d]"
+        },
+        "dropped_attributes_count": 0
+      }
+    ],
+    "links": []
+  },
+  {
+    "start_time": "2026-08-19T10:00:00.130000Z",
+    "end_time": "2026-08-19T10:00:00.139000Z",
+    "trace_id": "e5d4c3b2a1908f7e6d5c4b3a29180706",
+    "span_id": "2d3c4b5a69788796",
+    "parent_span_id": "0f1e2d3c4b5a6978",
+    "name": "claude_code.llm_request",
+    "kind": "SPAN_KIND_INTERNAL",
+    "status_code": "STATUS_CODE_ERROR",
+    "status_message": "OAuth session expired and could not be refreshed",
+    "service_name": "claude-code",
+    "source_dialect": "claude-code",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": "anthropic",
+    "gen_ai_operation_name": "chat",
+    "gen_ai_request_model": "claude-sonnet-4-5",
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": null,
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "claude-code",
+        "service.version": "2.1.229",
+        "os.type": "darwin",
+        "os.version": "00.0.0",
+        "host.arch": "amd64"
+      },
+      "scope": {
+        "name": "com.anthropic.claude_code.tracing",
+        "version": "1.0.0",
+        "attributes": {}
+      },
+      "span": {
+        "span.type": "llm_request",
+        "user.id": "[REDACTED:sha256:02a88619]",
+        "user.email": "[REDACTED:sha256:edf7623e]",
+        "organization.id": "[REDACTED:sha256:06bcd15f]",
+        "user.account_uuid": "[REDACTED:sha256:db8055e0]",
+        "user.account_id": "[REDACTED:sha256:08b6488e]",
+        "session.id": "[REDACTED:sha256:4d18165a]",
+        "terminal.type": "non-interactive",
+        "gen_ai.system": "anthropic",
+        "gen_ai.request.model": "claude-sonnet-4-5",
+        "model": "claude-sonnet-4-5",
+        "llm_request.context": "interaction",
+        "speed": "normal",
+        "duration_ms": 9,
+        "success": false,
+        "error": "OAuth session expired and could not be refreshed",
+        "attempt": 1,
+        "client_request_id": "[REDACTED:sha256:19e4a6c5]"
+      }
+    },
+    "events": [
+      {
+        "time": "2026-08-19T10:00:00.131000Z",
+        "name": "gen_ai.request.attempt",
+        "attributes": {
+          "attempt": 1,
+          "client_request_id": "[REDACTED:sha256:19e4a6c5]"
+        },
+        "dropped_attributes_count": 0
+      }
+    ],
+    "links": []
+  }
+]

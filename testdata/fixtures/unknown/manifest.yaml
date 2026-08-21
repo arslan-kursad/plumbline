@@ -1,0 +1,41 @@
+# Fixture manifest — unknown-dialect (the fallback path, not a dialect)
+# Field semantics: see testdata/fixtures/langgraph-python/manifest.yaml.
+
+dialect: unknown
+provenance: constructed
+construction_basis: >
+  Deliberately built as the adversarial case for detection: an unregistered
+  instrumentation scope (`com.example.unregistered.agent`) on spans whose *names* carry
+  the `claude_code.` prefix and a `span.type` attribute. A detector that keys on span
+  names instead of the scope would misclassify this payload as claude-code.
+  docs/evidence/claude-code-otel-capture.md §6.3 names exactly this shape as the
+  fallback test input.
+constructed_on: 2026-08-21
+emitter: none — synthetic payload
+emitter_version: not-applicable
+otel_sdk_version: not-applicable
+instrumentation_scope:
+  name: com.example.unregistered.agent
+  version: "0.0.1"
+semconv_version_emitted: "1.41.0"      # declared by the scope's schemaUrl
+schema_url_emitted: https://opentelemetry.io/schemas/1.41.0
+otel_semconv_stability_opt_in: not-applicable
+redacted_fields: []
+synthetic_resource_attribute: absent
+
+validation_status: synthetic-by-design  # there is no real emitter to validate against
+
+# Architecture §5 and ADR-0003 §6: an unknown dialect is normalized generically and never
+# dropped. Because this payload declares the pin's own schema URL and uses v1.41 attribute
+# names, the generic path fills the typed columns directly from those names; a payload
+# using an emitter-private vocabulary would leave them null and keep everything in the
+# lossless attributes. Both outcomes are `source_dialect='unknown'` with the unknown
+# counter incremented.
+
+cases:
+  happy-path:
+    description: >
+      One chat span with v1.41-shaped `gen_ai.*` attributes, an unregistered scope, and
+      one emitter-private attribute. Asserts detection returns `unknown`, the generic
+      mapping still fills what OTLP and v1.41 name directly, and nothing is dropped.
+    spans: 1

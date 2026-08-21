@@ -1,0 +1,37 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "apartment-triage" } },
+          { "key": "telemetry.sdk.language", "value": { "stringValue": "dotnet" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "Experimental.Microsoft.Extensions.AI", "version": "9.3.0" },
+          "schemaUrl": "https://opentelemetry.io/schemas/1.28.0",
+          "spans": [
+            {
+              "traceId": "1112131415161718191a1b1c1d1e1f20",
+              "spanId": "2122232425262728",
+              "name": "chat gpt-4o-mini",
+              "kind": "SPAN_KIND_CLIENT",
+              "startTimeUnixNano": "1787133600000000000",
+              "endTimeUnixNano": "1787133600500000000",
+              "attributes": [
+                { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "gpt-4o-mini" } },
+                { "key": "triage.property_class", "value": { "stringValue": "residential" } },
+                { "key": "triage.queue_depth", "value": { "intValue": "17" } },
+                { "key": "triage.sla_hours", "value": { "doubleValue": 4.5 } },
+                { "key": "triage.after_hours", "value": { "boolValue": true } }
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

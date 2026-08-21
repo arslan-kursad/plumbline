@@ -1,0 +1,58 @@
+[
+  {
+    "start_time": "2026-08-19T10:00:00.000000Z",
+    "end_time": "2026-08-19T10:00:00.500000Z",
+    "trace_id": "0102030405060708090a0b0c0d0e0f10",
+    "span_id": "1112131415161718",
+    "parent_span_id": null,
+    "name": "ChatAnthropic",
+    "kind": "SPAN_KIND_CLIENT",
+    "status_code": "STATUS_CODE_UNSET",
+    "status_message": null,
+    "service_name": "anomaly-adjudicator",
+    "source_dialect": "langgraph-python",
+    "api_key_id": "local-test",
+    "schema_url": null,
+    "synthetic": false,
+    "gen_ai_provider_name": null,
+    "gen_ai_operation_name": "chat",
+    "gen_ai_request_model": "claude-sonnet-4-5",
+    "gen_ai_response_model": null,
+    "gen_ai_response_id": null,
+    "gen_ai_conversation_id": null,
+    "gen_ai_agent_name": null,
+    "gen_ai_tool_name": null,
+    "gen_ai_tool_call_id": null,
+    "gen_ai_usage_input_tokens": null,
+    "gen_ai_usage_output_tokens": null,
+    "gen_ai_request_max_tokens": null,
+    "gen_ai_request_temperature": null,
+    "gen_ai_request_top_p": null,
+    "gen_ai_output_type": null,
+    "attributes": {
+      "resource": {
+        "service.name": "anomaly-adjudicator",
+        "telemetry.sdk.language": "python"
+      },
+      "scope": {
+        "name": "openinference.instrumentation.langchain",
+        "version": "0.1.29",
+        "attributes": {}
+      },
+      "span": {
+        "openinference.span.kind": "LLM",
+        "llm.model_name": "claude-sonnet-4-5",
+        "adjudicator.rule_version": "2026.07.3",
+        "adjudicator.confidence": 0.8125,
+        "adjudicator.retry_budget": 3,
+        "adjudicator.escalated": false,
+        "adjudicator.reviewers": [
+          "rule-engine",
+          "llm"
+        ]
+      }
+    },
+    "events": [],
+    "links": []
+  }
+]

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Generated protobuf code is not ours to keep warning-free. -->
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.29.3" />
+    <PackageReference Include="Grpc.Tools" Version="2.68.1" PrivateAssets="All" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+  <!--
+    OTLP protobuf types are generated from the vendored upstream .proto files
+    (third_party/opentelemetry-proto/) rather than taken from a NuGet package: the
+    wire contract is the thing this project pins, so it is vendored with checksums
+    like the semconv registry. GrpcServices="None" — the worker is a Pub/Sub push
+    endpoint and never serves the OTLP gRPC service; that is the collector's job.
+  -->
+  <ItemGroup>
+    <Protobuf Include="..\..\third_party\opentelemetry-proto\v1.11.0\opentelemetry\proto\**\*.proto"
+              ProtoRoot="..\..\third_party\opentelemetry-proto\v1.11.0"
+              GrpcServices="None"
+              Access="Public" />
+  </ItemGroup>
+
+</Project>

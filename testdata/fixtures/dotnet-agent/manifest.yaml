@@ -1,0 +1,56 @@
+# Fixture manifest — dotnet-agent
+# Field semantics: see testdata/fixtures/langgraph-python/manifest.yaml.
+
+dialect: dotnet-agent
+provenance: constructed
+construction_basis: >
+  .NET OTel GenAI instrumentation shape as emitted by Microsoft.Extensions.AI's
+  OpenTelemetry chat client: ActivitySource name `Experimental.Microsoft.Extensions.AI`,
+  semconv-shaped `gen_ai.*` attributes, span names of the form `<operation> <model>`,
+  and a scope-level schema URL naming an *older* convention version than this project's
+  pin. No payload from the Apartment Triage agent was used: that project is outside the
+  F1 handoff scope.
+constructed_on: 2026-08-21
+emitter: .NET agent using Microsoft.Extensions.AI OpenTelemetry instrumentation
+emitter_version: not-applicable
+otel_sdk_version: "1.11.2"
+instrumentation_scope:
+  name: Experimental.Microsoft.Extensions.AI
+  version: "9.3.0"
+semconv_version_emitted: "1.28.0"      # declared by the scope's schemaUrl
+schema_url_emitted: https://opentelemetry.io/schemas/1.28.0
+otel_semconv_stability_opt_in: not-applicable
+redacted_fields: []
+synthetic_resource_attribute: absent
+
+validation_status: unvalidated-against-a-real-emitter
+
+# This dialect is the version-drift case, and it is the reason the deprecated semconv
+# model files are vendored. It emits `gen_ai.system`, which v1.41 deprecates in favour
+# of `gen_ai.provider.name`, and declares schema 1.28.0 while the platform pin is 1.41.
+# Architecture §5: drift is mapped *to* the pin, never the reverse — so the row carries
+# `gen_ai_provider_name`, and `gen_ai.system` survives untouched in the lossless
+# attributes as what the emitter actually sent.
+
+cases:
+  happy-path:
+    description: >
+      Three-span trace: invoke_agent root, a chat client span with request/response
+      models, token counts, sampling parameters and server.address/port, and an
+      execute_tool child. Exercises deprecated-name rewriting, numeric coercion, and the
+      external-attribute allowlist (server.*).
+    spans: 3
+    notes: >
+      `gen_ai.response.finish_reasons` is an array. The typed column set is scalars
+      only, so it stays in the lossless attributes — recorded here because "why is there
+      no finish-reason column" is the first question a reader asks.
+  unmapped-attributes:
+    description: >
+      One chat span with four emitter-private `triage.*` attributes (string, int,
+      double, bool) alongside two mapped ones.
+    spans: 1
+  poison:
+    description: >
+      The first 96 bytes of happy-path/request.pb; see the langgraph-python manifest for
+      the shared rationale.
+    spans: 0
