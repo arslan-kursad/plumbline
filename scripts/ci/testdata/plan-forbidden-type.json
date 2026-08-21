@@ -1,0 +1,15 @@
+{
+  "format_version": "1.2",
+  "_comment": "A resource class outside the architecture §7.1 allowlist: managed databases are exactly what the zero-cost envelope excludes (architecture §9).",
+  "resource_changes": [
+    {
+      "address": "google_sql_database_instance.metadata",
+      "type": "google_sql_database_instance",
+      "name": "metadata",
+      "change": {
+        "actions": ["create"],
+        "after": { "name": "plumbline-metadata", "region": "us-central1" }
+      }
+    }
+  ]
+}
