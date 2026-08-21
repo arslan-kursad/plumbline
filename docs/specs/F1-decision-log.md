@@ -1,6 +1,7 @@
 # F1 — Decision log
 
-**Status:** Live for the duration of F1 · **Opened:** 2026-08-21
+**Status:** Closed with the phase · **Opened:** 2026-08-21 · **Closed:** 2026-08-21
+**Summary:** [`F1-completion-note.md`](F1-completion-note.md)
 
 F1 runs in autonomous mode ([`F1-local-first-core.md`](F1-local-first-core.md) §2): the
 handoff directive is the single approval, and this log is what replaces propose → confirm.

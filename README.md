@@ -4,10 +4,11 @@ OTel-native observability and evaluation platform for AI agents: a Go OTLP colle
 a .NET ingestion worker, and a .NET analytics/eval API on GCP, running inside a
 zero-cost envelope with enforced guardrails.
 
-Active work package: [`docs/specs/F1-local-first-core.md`](docs/specs/F1-local-first-core.md)
-(local-first core; F0 is complete — see its
-[completion note](docs/specs/F0-completion-note.md)). [`CLAUDE.md`](CLAUDE.md) is the
-project contract.
+F0 and F1 are complete — the pipeline runs end to end locally
+([F1 completion note](docs/specs/F1-completion-note.md)). Next is F2, minimal GCP
+footprint, whose entry gate is the kill-switch live-fire
+([#33](https://github.com/arslan-kursad/plumbline/issues/33)).
+[`CLAUDE.md`](CLAUDE.md) is the project contract.
 
 ## Documentation precedence
 
