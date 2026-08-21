@@ -35,10 +35,30 @@ Start here:
 | `analytics/` | `Plumbline.Analytics` — .NET 8 analytics and eval API |
 | `normalization/mappings/` | Versioned normalization mapping YAML (F1) |
 | `normalization/semconv/` | Vendored GenAI semantic conventions at the pin, with provenance and checksums |
+| `normalization/redaction/` | Redaction rules (ADR-0006, Proposed), embedded at build |
+| `testdata/fixtures/` | Raw OTLP payloads and the rows they must normalize to |
+| `third_party/` | Vendored upstream sources — OTLP protobuf definitions |
+| `analytics/sql/` | The `spans` table and the two canonical views |
+| `scripts/e2e/` | The local end-to-end run |
 | `infra/terraform/` | Terraform (F0: state backend, kill-switch, quotas) |
 | `infra/functions/` | Cloud Function sources deployed by Terraform |
 | `scripts/ci/` | Invariant gate scripts (W6) |
 | `docs/` | Source of truth — see above |
+
+## Running it locally
+
+The whole pipeline runs on a laptop with no GCP project and no credential:
+
+```bash
+make test    # collector (-race), normalization, worker, golden files
+make e2e     # the full pipeline under docker compose
+make gates   # the invariant gates, and the proof that each can fail
+```
+
+`make e2e` sends every fixture through the collector, waits for the rows to arrive
+through the BigQuery views, compares them against the golden files, and requires the
+poison payloads to be in the dead-letter topic. Details and troubleshooting:
+[`docs/runbooks/local-dev.md`](docs/runbooks/local-dev.md).
 
 ## Repository posture
 

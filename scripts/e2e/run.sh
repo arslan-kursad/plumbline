@@ -138,6 +138,18 @@ step "querying the views"
 python3 scripts/e2e/query-rows.py --view spans_deduped --out "${state}/spans_deduped.ndjson"
 python3 scripts/e2e/query-rows.py --view spans_real --out "${state}/spans_real.ndjson"
 
+# No fixture carries `synthetic=true`, so spans_real must hold exactly what
+# spans_deduped holds. Checking it makes the second view a tested object rather than a
+# file that was applied successfully.
+deduped_rows="$(wc -l < "${state}/spans_deduped.ndjson" | tr -d ' ')"
+real_rows="$(wc -l < "${state}/spans_real.ndjson" | tr -d ' ')"
+if [ "$deduped_rows" != "$real_rows" ]; then
+  printf '  spans_deduped has %s row(s) and spans_real has %s; no fixture is synthetic, so they must agree\n' \
+    "$deduped_rows" "$real_rows" >&2
+  exit 1
+fi
+printf '  spans_real agrees with spans_deduped (%s rows, none synthetic)\n' "$real_rows"
+
 step "comparing against the golden files"
 dotnet run --project worker/Plumbline.Fixtures -- --verify "${state}/spans_deduped.ndjson"
 
@@ -149,6 +161,25 @@ dotnet run --project worker/Plumbline.Fixtures -- --verify "${state}/spans_dedup
 # ---------------------------------------------------------------------------
 step "checking the dead-letter topic"
 poison_count="$(find testdata/fixtures -path '*/poison/request.pb' | wc -l | tr -d ' ')"
+printf '  expecting %s dead-lettered message(s)\n' "$poison_count"
+
+# Dead-lettering is not immediate: the subscription redelivers up to its
+# max_delivery_attempts before routing, and each attempt waits out an ack deadline. So
+# this polls rather than checking once — the alternative is a test that passes on a fast
+# runner and fails on a slow one, which is worse than no test.
+for attempt in $(seq 1 120); do
+  if python3 scripts/e2e/dlq-depth.py --expect "$poison_count" >/dev/null 2>&1; then
+    printf '  dead-lettered after %ss\n' "$attempt"
+    break
+  fi
+  if [ "$attempt" = "120" ]; then
+    python3 scripts/e2e/dlq-depth.py --expect "$poison_count"
+    printf '  the poison payloads did not reach traces-dlq within 120s\n' >&2
+    "${compose[@]}" logs --tail 60 worker >&2
+    exit 1
+  fi
+  sleep 1
+done
 python3 scripts/e2e/dlq-depth.py --expect "$poison_count"
 
 # ---------------------------------------------------------------------------

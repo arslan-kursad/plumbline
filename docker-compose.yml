@@ -57,8 +57,15 @@ services:
       PLUMBLINE_PUBSUB_TOPIC: traces
       PLUMBLINE_KEY_REGISTRY: /etc/plumbline/keys.json
       # Small enough that the fixture corpus exercises the splitter rather than passing
-      # through whole. The e2e asserts every span survives, which is only a claim worth
-      # testing if splitting actually happened.
+      # through whole: at 700 compressed bytes, three of the four payloads are split in
+      # two. The e2e asserts every span survives, which is only worth asserting if
+      # splitting actually happened.
+      #
+      # Measured, not guessed. The smallest budget each payload can be split to at all is
+      # 510 (langgraph-python), 600 (dotnet-agent), 640 (claude-code) and 390 (unknown) —
+      # below its own figure the collector answers 413 rather than truncating, which is
+      # correct and would fail this run. 700 keeps ~9% of headroom over the tightest of
+      # them; a fixture that grows past it fails loudly with that 413 rather than quietly.
       PLUMBLINE_MAX_COMPRESSED_BYTES: "700"
     volumes:
       - ./.e2e/keys.json:/etc/plumbline/keys.json:ro

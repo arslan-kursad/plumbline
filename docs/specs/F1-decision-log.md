@@ -592,3 +592,25 @@ pipeline in this phase rests on this job. A check that runs after the merge woul
 those claims unverifiable at the moment they are made.
 **C2:** no — but the runtime is quoted in the completion note, because "either is
 acceptable, silence about the choice is not".
+
+### W6.5 — The compose collector runs a deliberately small message budget
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** `PLUMBLINE_MAX_COMPRESSED_BYTES=700` in `docker-compose.yml`, against a
+4 MiB default.
+**Rationale:** the fixture corpus is small enough that a realistic budget would pass every
+payload through whole, and an end-to-end run in which nothing was split proves less than
+it appears to. At 700 bytes the splitter runs, the parts are published separately, and the
+assertion that every span survives is about something that happened.
+**C2:** no.
+
+### W6.6 — The end-to-end run asserts the absence of a credential
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** the last step of `scripts/e2e/run.sh` fails if the compose stack references
+`GOOGLE_APPLICATION_CREDENTIALS`, a service-account file, or a mounted gcloud config.
+**Alternatives:** rely on the phase's scope statement. F1 DoD item 7 asks for zero GCP
+mutations "asserted by the absence of credentials in the e2e path" — an assertion is a
+check, and a scope statement is a promise.
+**Rationale:** it is the cheapest possible control for the invariant that matters most in
+this phase, and it fails loudly on the change that would break it: someone mounting their
+own credentials to "just try it against the real project".
+**C2:** no.

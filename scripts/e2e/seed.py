@@ -107,26 +107,24 @@ def bigquery(base: str, sql_dir: pathlib.Path) -> int:
         print("  FAILED  could not parse a schema out of 001_spans_table.sql", file=sys.stderr)
         return 1
 
+    # Columns only. The stand-in refuses `CREATE TABLE ... PARTITION BY` outright, and a
+    # table created through this API carrying `timePartitioning` does not resolve on its
+    # Storage Write default stream either — measured, both times, in CI.
+    #
+    # So the local table is an unpartitioned, unclustered copy of the same columns. That
+    # is a real difference from the cloud table and it is printed on every run rather
+    # than buried here: `require_partition_filter` is a cost invariant (architecture §7)
+    # and it is Terraform, not this file, that carries it in F2. What the local stack can
+    # still check is that every query written against these views carries a partition
+    # filter anyway — which the query step does, exactly as a dashboard would have to.
     resource = {
         "tableReference": {"projectId": PROJECT, "datasetId": DATASET, "tableId": "spans"},
         "schema": {"fields": fields},
-        "timePartitioning": {"type": "DAY", "field": "start_time", "requirePartitionFilter": True},
-        "clustering": {"fields": ["trace_id", "span_id"]},
     }
 
     status, body = request("POST", tables, resource)
-    if status >= 400 and status != 409 and "already exists" not in body.lower():
-        # The stand-in may refuse partitioning or clustering outright. Retry without them
-        # and say so: a local table that is not partitioned is a difference between this
-        # stack and the cloud, and a difference nobody was told about is the kind that
-        # gets discovered in F2.
-        print(f"  note    partitioned table refused by the stand-in; creating an unpartitioned one\n"
-              f"          ({body[:200]})")
-        resource.pop("timePartitioning")
-        resource.pop("clustering")
-        status, body = request("POST", tables, resource)
-
-    report(f"table {DATASET}.spans ({len(fields)} columns)", status, body)
+    report(f"table {DATASET}.spans ({len(fields)} columns, unpartitioned — see the comment in this file)",
+           status, body)
     if status >= 400 and status != 409 and "already exists" not in body.lower():
         return 1
 
