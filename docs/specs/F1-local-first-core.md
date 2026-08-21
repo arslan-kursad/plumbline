@@ -59,7 +59,7 @@ before the first run.
 Consequences carried out in W1: [`F0-foundations.md`](F0-foundations.md) §2 and W3, and
 the Brief's phase text, carry dated amendment notes. `docs/eval-plan.md` §2 still reads
 "F1 entry gate" and **is not edited in F1** (§4) — the contradiction is real, is recorded
-here and in the ratification issue, and is resolved at Freeze A by the human who performs
+here and in ratification issue #35, and is resolved at Freeze A by the human who performs
 it. Ratification is a C2 item and blocks nothing before then.
 
 ### D2 — External-dialect fixtures are constructed, and say so
@@ -224,8 +224,9 @@ Dependency-ordered. W3 and W4 are independent of each other and both depend on W
 ### W8 — Phase close
 - F1 completion note: DoD checklist with evidence links, decision-log summary, deferred
   items.
-- Issues: close #8, resolve #10's procedure half and record the capture status, update #11
-  with the ADR-0006 state, open the F4 fixture re-validation issue (D2).
+- Issues: close #8 on its three repository-side items (#36 carries the fourth to Freeze
+  A), resolve #10's procedure half and record the capture status, update #11 with the
+  ADR-0006 state, open the F4 fixture re-validation issue (D2).
 - Assemble the C2 review packet (§8).
 
 ## 6. Definition of Done

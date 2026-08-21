@@ -50,8 +50,8 @@ content was invented to unblock a schedule is worse than an unfrozen plan, and t
 spec already rejects that reasoning for Freeze B constants.
 **Rationale:** Freeze A protects the seeded-regression experiment, which starts in F3.
 Nothing in the collector, the worker, or the mappings reads a criterion.
-**C2:** yes — ratification issue, and the eval-plan contradiction is stated there rather
-than quietly carried.
+**C2:** yes — ratification issue #35, which states the eval-plan contradiction rather
+than quietly carrying it.
 
 ### D2 — External-dialect fixtures are constructed, and labelled as such
 **Made:** 2026-08-21 · **Work item:** W2 · **Reversibility:** cheap
@@ -160,7 +160,7 @@ for an obligation that does not exist.
 **Decision:** deliver #8's three repository-side items — vendored model YAMLs with
 checksums and a refresh procedure, the closed external-attribute allowlist, and the row-1.4
 check implemented against both sources — and split its fourth item, "update eval plan row
-1.4 wording ... as part of eval-plan v0.2", into a separate issue targeted at Freeze A.
+1.4 wording ... as part of eval-plan v0.2", into issue #36, targeted at Freeze A.
 **Alternatives:** close #8 anyway and let the wording drift — the artefact and the rule
 that cites it would disagree, with nothing recording that anyone noticed; or edit
 `docs/eval-plan.md` — prohibited outright for this phase (spec §4), and prohibited for
