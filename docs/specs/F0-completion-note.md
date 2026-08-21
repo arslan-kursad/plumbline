@@ -28,8 +28,8 @@ is open is the failure this project is written against.
 
 ## 2. What the phase produced beyond the checklist
 
-Four defects were found while implementing the specification — three in the spec,
-one in the implementation — and each was fixed in the branch that found it rather
+Five things were found while implementing the specification — three in the spec,
+two in the implementation — and each was fixed in the branch that found it rather
 than noted for later:
 
 1. **The Terraform resource-type allowlist did not exist.** `CLAUDE.md` and W5
@@ -59,8 +59,29 @@ than noted for later:
    at Pub/Sub, and the defect was in how the budget computed the number the
    function reads.
 
+5. **Four things would have failed at the first apply or the first authenticated
+   CI run** (found by checking the configuration's assumptions against current
+   platform behaviour, before running it rather than during):
+   - The budget pinned `currency_code = "USD"`; the Budget API rejects a create
+     whose currency differs from the billing account's. Now inherited.
+   - Cloud Build builds Gen2 functions as the *default compute* service account,
+     which exists only once the Compute Engine API is enabled — an API this
+     project has no reason to enable. Replaced with a named build identity.
+   - `cloudquotas`, `sts` and `iamcredentials` were not in the enabled-API list.
+     The first fails the apply; the other two fail the CI authentication, after
+     the apply looks clean.
+   - The CI identity could not read the budget (a billing-account resource) or
+     the quota preference, both of which `terraform plan` refreshes. It would
+     have authenticated successfully and then failed on permissions.
+
 Items 1–3 are recorded in the F0 spec changelog (v0.6, v0.7) with their
-reasoning; item 4 is ADR-0004 Amendment 1.
+reasoning; item 4 is ADR-0004 Amendment 1; item 5 is in the pull requests that
+made each change and in the first-apply table in
+[`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §2.
+
+None of item 5 was found by a test. They were found by reading what each resource
+actually calls — which is the only method available before a project exists, and
+is worth naming as such rather than presenting as diligence.
 
 ## 3. What is left, in order
 
@@ -76,9 +97,11 @@ detach, and reading a bill. None of it can be produced from the repository.
    `cloudresourcemanager` and `serviceusage`. On a fresh project the first plan
    fails without them and the error reads like a bug in the configuration:
    [`runbooks/kill-switch.md`](../runbooks/kill-switch.md) §2.
-2. **Confirm the pinned function runtime still exists**
-   (`gcloud functions runtimes list --region us-central1`). It is coupled to the
-   function's `go.mod`, so lowering it is not a one-line change.
+2. **Confirm the pinned function runtime is still offered**
+   (`gcloud functions runtimes list --region us-central1`). The pin is `go126`,
+   which is generally available per the published support matrix — deprecation
+   Feb/Mar 2027, decommission Aug/Sep 2027. Raising it past the function's
+   `go.mod` language version is safe; lowering it below is not.
 3. **Apply Terraform** — `bootstrap/`, then the root module:
    [`infra/terraform/README.md`](../../infra/terraform/README.md). Closes criterion 10.
 4. **Live-fire the kill-switch** and archive the evidence in §4 of its runbook,
