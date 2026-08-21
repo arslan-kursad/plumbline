@@ -36,11 +36,10 @@ public sealed class RedactionRuleSet
 /// </summary>
 /// <remarks>
 /// <para>
-/// **This stage implements ADR-0006, which is `Proposed` and not accepted.** It is
-/// isolated for that reason: it runs on the finished rows, reads nothing but its own rule
-/// files, and no other stage knows it exists. If review moves the boundary — to the
-/// emitter, or out of the shared path altogether — what moves is this class and its
-/// call site.
+/// This stage implements ADR-0006, accepted at the F1 exit review on 2026-08-21. It stays
+/// isolated — it runs on the finished rows, reads nothing but its own rule files, and no
+/// other stage knows it exists — because the ADR's own argument is that moving the
+/// boundary later should cost this class and its call site, and nothing else.
 /// </para>
 /// <para>
 /// Architecture §2.1 is why the boundary is here at all: redaction is attribute

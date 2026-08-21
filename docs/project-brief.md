@@ -82,9 +82,10 @@ The success-criteria heading above read "to be frozen in docs/eval-plan.md befor
 code". Freeze A now happens at the **F3 entry gate**: F1's code reads no evaluation
 criterion, and what the freeze protects is the seeded-regression experiment in F3.
 Freeze B is unchanged. `docs/specs/F0-foundations.md` v0.8 carries the same amendment
-with its reasoning, `docs/specs/F1-decision-log.md` records the decision, and
-`docs/eval-plan.md` is not edited during F1 — so it still says "F1 entry gate" and is
-stale on that line until Freeze A is performed.
+with its reasoning, `docs/specs/F1-decision-log.md` records the decision, and the
+maintainer ratified it at the F1 exit review on 2026-08-21. `docs/eval-plan.md` was not
+edited during F1 — so it still says "F1 entry gate" and is stale on that line until the
+human performing Freeze A reconciles it (issue #36).
 
 ## Import note (2026-08-18, F0 spec W1.1)
 

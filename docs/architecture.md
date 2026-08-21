@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.6 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
+**Version:** 0.7 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-21
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -382,7 +382,7 @@ forbids.
 | ADR-0003 | Normalization mappings as versioned in-repo YAML embedded at build time | Accepted |
 | ADR-0004 | Zero-cost guardrails & billing kill-switch design | Accepted |
 | ADR-0005 | Static JSON export as v0.1 SPA data path | Accepted |
-| ADR-0006 | PII redaction happens in the worker, after deserialization | **Proposed** |
+| ADR-0006 | PII redaction happens in the worker, after deserialization | Accepted |
 
 Rationale, alternatives, and consequences live in `docs/adr/`; this index carries titles
 and status only. Where this document and an ADR disagree, the ADR is the decision record
@@ -405,6 +405,15 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.7 — 2026-08-21** — F1 exit review.
+
+1. §10 ADR index: ADR-0006 moves from `Proposed` to `Accepted`. The maintainer accepted
+   it at the F1 C2 checkpoint, which is what the status records — an ADR implemented under
+   autonomous governance could not flip its own status, and the index carried `Proposed`
+   for exactly as long as that was true. Accepting it makes two F2 obligations binding:
+   the DLQ runbook must state that a dead-lettered message may carry personal data, and
+   DLQ retention must be set deliberately (issue #44).
 
 **v0.6 — 2026-08-21** — F1 W4.
 
