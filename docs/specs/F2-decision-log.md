@@ -145,4 +145,22 @@ check cannot catch F2 creating them, so it is written down here where a reader c
 
 ## W-level — decisions made during the phase
 
-*No entries yet. The first arrives with Wave 0.*
+### W-repo.1 — Verification A stays a human touchpoint
+**Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
+**Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
+directive's list of human touchpoints, which the directive itself called complete.
+**Alternatives:** keep §9 identical to the directive and leave Verification A where it is
+today — outstanding in [`kill-switch.md`](../runbooks/kill-switch.md) §1 and in #17 step 2,
+owned by an F0 issue that closes when the billing period does. That is how an obligation
+becomes nobody's: the phase that could have discharged it declines to name it, and the
+issue that names it closes for an unrelated reason.
+**Rationale:** ADR-0004 Amendment 1 changed the budget's spend basis on the premise that
+Always Free is credit-implemented rather than an absence of charge. That premise has never
+been observed on this account — the runbook says so in the place where the observation
+should be. F2 is the first phase where the check is not vacuous, because F2 is the first
+phase with usage to look at, and the check is one browser tab in a morning. Deferring it
+again would leave a live control resting on documentation about how a different account
+behaves.
+**Cost, stated:** it obligates the maintainer for a step the directive did not budget.
+That is why it is logged as a deviation rather than folded into §9 quietly.
+**Exit review:** yes — it is the one place this spec asks for more than the directive did.
