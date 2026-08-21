@@ -2,6 +2,8 @@
 
 **Version:** 0.1 · **Status:** Approved on handoff (2026-08-21) · **Date:** 2026-08-21
 **Phase budget:** ~25 h · **Executor:** Claude Code (autonomous mode, §1)
+**Outcome:** [`F1-completion-note.md`](F1-completion-note.md) — DoD evidence, what the
+phase does *not* prove, and the C2 review batch.
 **Predecessor:** F0 complete ([`F0-completion-note.md`](F0-completion-note.md)); the
 kill-switch live-fire is deferred to the F2 entry gate (issue #33), which F1 does not
 touch because F1 does not touch the cloud.
