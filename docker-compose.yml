@@ -30,7 +30,13 @@ services:
   # which is the write path the worker uses in the cloud as well — the emulator is a
   # different endpoint, not a different code path.
   bigquery:
-    image: ghcr.io/goccy/bigquery-emulator:0.6.6
+    #
+    # Pinned, and the pin matters: the Storage Write API's implicit `_default` stream is
+    # only resolved from 0.7 onward. On 0.6.6 every append fails with "failed to get
+    # stream from .../streams/_default" — measured in CI, twice, before the tag was the
+    # suspect. The same series carries the Storage Write fixes for wrapper types and
+    # case-insensitive column matching.
+    image: ghcr.io/goccy/bigquery-emulator:0.8.1
     command:
       - --project=plumbline-local
       - --dataset=plumbline
@@ -39,11 +45,10 @@ services:
     ports:
       - "9050:9050"
       - "9060:9060"
-    healthcheck:
-      test: ["CMD", "/bin/bigquery-emulator", "--version"]
-      interval: 2s
-      timeout: 3s
-      retries: 30
+    # No healthcheck: the image has no shell to run one in, and nothing gates on it. The
+    # run waits for rows to arrive, which is a better readiness signal than a port being
+    # open anyway.
+
 
   collector:
     build:

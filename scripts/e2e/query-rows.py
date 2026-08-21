@@ -40,7 +40,14 @@ def timestamp(raw: str) -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%S.") + f"{micros % 1_000_000:06d}Z"
 
 
-def convert(value, kind: str):
+# The three JSON columns, by name. The stand-in reports their type inconsistently — a
+# column declared JSON can come back tagged STRING — and a JSON document left as a string
+# would fail the comparison as a type difference rather than as the data difference it is
+# not. Naming them is more reliable than trusting the tag.
+JSON_COLUMNS = {"attributes", "events", "links"}
+
+
+def convert(value, kind: str, name: str = ""):
     if value is None:
         return None
     if kind == "TIMESTAMP":
@@ -51,7 +58,7 @@ def convert(value, kind: str):
         return float(value)
     if kind == "BOOLEAN":
         return value in (True, "true")
-    if kind == "JSON":
+    if kind == "JSON" or name in JSON_COLUMNS:
         return json.loads(value) if isinstance(value, str) else value
     return value
 
@@ -62,7 +69,7 @@ def rows(result: dict) -> list[dict]:
     for row in result.get("rows", []):
         values = row.get("f", [])
         out.append({
-            field["name"]: convert(cell.get("v"), field.get("type", "STRING"))
+            field["name"]: convert(cell.get("v"), field.get("type", "STRING"), field["name"])
             for field, cell in zip(fields, values)
         })
     return out
