@@ -109,6 +109,28 @@ is worth naming as such rather than presenting as diligence.
    green" — it was "a run that authenticated is green", and those are different
    claims.
 
+8. **The live-fire found the kill-switch inert.** The first attempt (2026-08-21)
+   published a synthetic notification; the function received it, decided to
+   detach, and was refused with `403: The caller does not have permission`.
+   Billing stayed attached. Detaching is authorized on both sides of the
+   project-to-billing-account association, and the identity held only the project
+   side: `billing.resourceAssociations.delete` exists in exactly one predefined
+   role, Billing Account Administrator, grantable only on the billing account
+   (ADR-0004 Amendment 2).
+
+   Two things follow, and neither is comfortable.
+
+   The design's tidiest sentence — that this identity can detach and cannot
+   re-attach, by construction — was false. No narrower role exists, and the role
+   that deletes an association can create one. Re-attachment is human by procedure
+   and by the function's code, which is a weaker guarantee, now written as one.
+
+   And the control had been inert since the day it was deployed, while every layer
+   above it worked: the budget published, the trigger fired, the function decided
+   correctly. ADR-0004 §5 called an untested kill-switch a comfort object and made
+   the live-fire mandatory over it. That requirement is the only reason this was
+   found on a Tuesday morning instead of during the incident it exists for.
+
 ## 3. What is left, in order
 
 Already done: the F0 pull requests are merged, `main` is green with every job
