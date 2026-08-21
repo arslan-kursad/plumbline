@@ -530,3 +530,100 @@ spelling. This is a deviation from architecture wording and is recorded as one.
 rule that is correct only while one instance's memory outlives the redelivery window —
 and with `min-instances = 0` that window is routinely longer than the instance.
 **C2:** no.
+
+### W6.1 — The BigQuery stand-in is the emulator, on the real write path
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** D4's preferred option, verified empirically rather than assumed:
+`goccy/bigquery-emulator` speaks the Storage Write API over gRPC, and the worker's
+`BigQueryStorageWriteSink` writes to it through the same client and the same default
+stream it will use in the cloud. The only difference is the endpoint and plaintext
+credentials, and that difference is one `if` in the sink's constructor rather than a
+second implementation.
+**One difference, stated rather than glossed:** the stand-in cannot resolve the implicit
+`_default` stream — every tagged image answers `failed to get stream from
+…/streams/_default`, measured in CI across 0.6.6 and 0.8.1, because that handling landed
+one day after the most recent release. So the stand-in branch creates a stream by name and
+appends to that. Same client, same `AppendRows` RPC, same descriptor, same serialized
+rows; one name differs, and the emulator creates its own default stream as `COMMITTED`
+anyway. Pinning an untagged `latest` image to avoid the branch was the alternative, and it
+trades a documented three-line branch for a non-deterministic CI input.
+**Alternatives:** the authorized fallback — a local sink for the end-to-end run with the
+BigQuery client wired but unexercised. It was implemented first, is still present as
+`LocalJsonSink`, and is what the worker's own tests use; what it cannot do is prove the
+write path works, which is the half of the pipeline that carries the cost invariant.
+**Rationale:** an end-to-end run that exercises a sink the cloud will never use tests the
+plumbing and not the contract.
+**C2:** yes, briefly — D4 asked for the empirical result either way, and this is it,
+including what the stand-in could not do.
+
+### W6.2 — The local table is created from the SQL, through the API the stand-in supports
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** the stand-in refuses `CREATE TABLE ... PARTITION BY` (measured: HTTP 400,
+"CREATE TABLE with PARTITION BY is unsupported"). Rather than keeping a second table
+definition for local use, `scripts/e2e/seed.py` parses the column list out of
+`analytics/sql/001_spans_table.sql` and creates the table through the REST API with
+partitioning, clustering and `requirePartitionFilter` attached — retrying without them,
+and saying so, if the stand-in refuses those too.
+**Alternatives:** a local-only DDL file — two definitions of one table, drifting from the
+first column added; or dropping `PARTITION BY` from the canonical file — that clause is a
+cost invariant (§7), and removing it from the source of truth to satisfy a stand-in
+inverts which one is authoritative.
+**Rationale:** the SQL file stays the single definition and the local table is a
+mechanical transformation of it. A test already compares that file against the proto twin
+the write path uses, so all three now derive from one place.
+**C2:** no.
+
+### W6.3 — The end-to-end run generates its own API key
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** `scripts/e2e/run.sh` mints a fresh `plb_local_…` key per run, hashes it into
+the registry the collector mounts, and leaves the plaintext in a gitignored directory.
+**Alternatives:** commit a fixed development key. It would be a real, matching key in a
+public repository, and Gate F would either fail on it or need an exclusion — which is how
+a gate stops covering the file that matters.
+**Rationale:** the gate stays meaningful because there is no key to commit, not because
+the one that exists is excused. It also makes the seeding step real rather than a
+formality.
+**C2:** no.
+
+### W6.4 — The end-to-end job runs on every pull request, path-filtered
+**Made:** 2026-08-21 · **Work item:** W6/W7 · **Reversibility:** cheap
+**Decision:** the `local end-to-end` job runs on any pull request touching the collector,
+the worker, the mappings, the fixtures, the analytical SQL, the compose stack or the
+end-to-end scripts. Not `main`-only.
+**Alternatives:** `main`-only, which the directive allows. It halves the CI minutes on
+documentation-heavy branches and reports a pipeline regression after the merge, to
+somebody who no longer has the change in front of them.
+**Rationale:** two things decide it. Actions minutes are unmetered on public repositories
+(F0 spec §0.2), so the usual argument for `main`-only does not apply here. And this job is
+the *only* place the compose path is exercised at all: F1's development host cannot run
+containers (macOS 12, no supported container runtime), so every claim about the local
+pipeline in this phase rests on this job. A check that runs after the merge would make
+those claims unverifiable at the moment they are made.
+**Measured:** 1 minute 54 seconds on a GitHub-hosted `ubuntu-latest` runner, cold — two
+emulator images pulled, both service images built, the pipeline exercised, torn down. Well
+inside the 20-minute job ceiling, and short enough that the cadence question answers
+itself.
+**C2:** no — but the runtime is quoted here and in the completion note, because "either is
+acceptable, silence about the choice is not".
+
+### W6.5 — The compose collector runs a deliberately small message budget
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** `PLUMBLINE_MAX_COMPRESSED_BYTES=700` in `docker-compose.yml`, against a
+4 MiB default.
+**Rationale:** the fixture corpus is small enough that a realistic budget would pass every
+payload through whole, and an end-to-end run in which nothing was split proves less than
+it appears to. At 700 bytes the splitter runs, the parts are published separately, and the
+assertion that every span survives is about something that happened.
+**C2:** no.
+
+### W6.6 — The end-to-end run asserts the absence of a credential
+**Made:** 2026-08-21 · **Work item:** W6 · **Reversibility:** cheap
+**Decision:** the last step of `scripts/e2e/run.sh` fails if the compose stack references
+`GOOGLE_APPLICATION_CREDENTIALS`, a service-account file, or a mounted gcloud config.
+**Alternatives:** rely on the phase's scope statement. F1 DoD item 7 asks for zero GCP
+mutations "asserted by the absence of credentials in the e2e path" — an assertion is a
+check, and a scope statement is a promise.
+**Rationale:** it is the cheapest possible control for the invariant that matters most in
+this phase, and it fails loudly on the change that would break it: someone mounting their
+own credentials to "just try it against the real project".
+**C2:** no.

@@ -1,0 +1,115 @@
+# Local end-to-end pipeline (F1 W6). One command: `make e2e`.
+#
+# Everything here is a local stand-in. No GCP resource is created and no credential is
+# present — the absence of one is the assertion that F1 cannot touch the cloud, which is
+# why neither service mounts a credentials file or reads GOOGLE_APPLICATION_CREDENTIALS.
+
+name: plumbline
+
+services:
+  # The official Pub/Sub emulator, from the Google Cloud CLI image.
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command:
+      - gcloud
+      - beta
+      - emulators
+      - pubsub
+      - start
+      - --project=plumbline-local
+      - --host-port=0.0.0.0:8085
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sf http://localhost:8085/v1/projects/plumbline-local/topics || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # BigQuery stand-in (F1 directive D4). Speaks the Storage Write API over gRPC on 9060,
+  # which is the write path the worker uses in the cloud as well — the emulator is a
+  # different endpoint, not a different code path.
+  bigquery:
+    #
+    # Pinned, and the pin matters: the Storage Write API's implicit `_default` stream is
+    # only resolved from 0.7 onward. On 0.6.6 every append fails with "failed to get
+    # stream from .../streams/_default" — measured in CI, twice, before the tag was the
+    # suspect. The same series carries the Storage Write fixes for wrapper types and
+    # case-insensitive column matching.
+    image: ghcr.io/goccy/bigquery-emulator:0.8.1
+    command:
+      - --project=plumbline-local
+      - --dataset=plumbline
+      - --port=9050
+      - --grpc-port=9060
+    ports:
+      - "9050:9050"
+      - "9060:9060"
+    # No healthcheck: the image has no shell to run one in, and nothing gates on it. The
+    # run waits for rows to arrive, which is a better readiness signal than a port being
+    # open anyway.
+
+
+  collector:
+    build:
+      context: ./collector
+    depends_on:
+      pubsub:
+        condition: service_healthy
+    environment:
+      PUBSUB_EMULATOR_HOST: pubsub:8085
+      PLUMBLINE_PUBSUB_PROJECT: plumbline-local
+      PLUMBLINE_PUBSUB_TOPIC: traces
+      PLUMBLINE_KEY_REGISTRY: /etc/plumbline/keys.json
+      # Small enough that the fixture corpus exercises the splitter rather than passing
+      # through whole: at 700 compressed bytes, three of the four payloads are split in
+      # two. The e2e asserts every span survives, which is only worth asserting if
+      # splitting actually happened.
+      #
+      # Measured, not guessed. The smallest budget each payload can be split to at all is
+      # 510 (langgraph-python), 600 (dotnet-agent), 640 (claude-code) and 390 (unknown) —
+      # below its own figure the collector answers 413 rather than truncating, which is
+      # correct and would fail this run. 700 keeps ~9% of headroom over the tightest of
+      # them; a fixture that grows past it fails loudly with that 413 rather than quietly.
+      PLUMBLINE_MAX_COMPRESSED_BYTES: "700"
+    volumes:
+      - ./.e2e/keys.json:/etc/plumbline/keys.json:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    depends_on:
+      bigquery:
+        condition: service_started
+    environment:
+      # Development is what permits the stubbed push authentication. The worker refuses
+      # to start with the stub in any other environment (architecture §6.1), so this line
+      # is the local exception rather than a default that could travel.
+      ASPNETCORE_ENVIRONMENT: Development
+      PLUMBLINE_PUSH_AUTH: stub
+      PLUMBLINE_SINK: bigquery
+      PLUMBLINE_BQ_PROJECT: plumbline-local
+      PLUMBLINE_BQ_DATASET: plumbline
+      PLUMBLINE_BQ_TABLE: spans
+      PLUMBLINE_BQ_EMULATOR: bigquery:9060
+    ports:
+      - "8080:8080"
+
+  # One-shot: posts every fixture to the collector with the seeded key. Runs under a
+  # profile so `docker compose up` starts the pipeline and not the traffic.
+  sender:
+    image: curlimages/curl:8.11.0
+    profiles: ["tools"]
+    depends_on:
+      - collector
+    volumes:
+      - ./testdata:/testdata:ro
+      - ./scripts/e2e:/scripts:ro
+      - ./.e2e:/e2e:ro
+    entrypoint: ["sh", "/scripts/send-fixtures.sh"]
+    environment:
+      COLLECTOR: http://collector:4318

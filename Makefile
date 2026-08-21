@@ -1,0 +1,33 @@
+# Development entry points. Every target here is also runnable in CI, because a command
+# that only works on a laptop is a command whose failure nobody sees until a laptop
+# changes.
+
+.DEFAULT_GOAL := help
+.PHONY: help gates test test-go test-dotnet fixtures e2e e2e-up e2e-down
+
+help: ## List the targets
+	@grep -hE '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-12s %s\n", $$1, $$2}'
+
+gates: ## Run the invariant gates and prove each one can fail
+	./scripts/ci/invariant-gates.sh
+	./scripts/ci/prove-gates.sh
+
+test: test-go test-dotnet ## Run every unit and golden test
+
+test-go: ## Collector tests, with the race detector
+	cd collector && go vet ./... && go test -race ./...
+
+test-dotnet: ## Normalization, worker and golden-file tests
+	dotnet test worker/Plumbline.Worker.sln --nologo
+
+fixtures: ## Regenerate the binary fixtures from their OTLP/JSON twins
+	dotnet run --project worker/Plumbline.Fixtures
+
+e2e: ## Full local pipeline: fixtures in, views out, poison in the DLQ
+	./scripts/e2e/run.sh
+
+e2e-up: ## Bring the local stack up and leave it running
+	E2E_KEEP_UP=1 ./scripts/e2e/run.sh
+
+e2e-down: ## Tear the local stack down
+	docker compose --profile tools down --volumes --remove-orphans

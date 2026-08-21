@@ -26,6 +26,12 @@ public sealed record WorkerOptions
 
     public string? BigQueryTable { get; init; }
 
+    /// <summary>
+    /// Host:port of a local BigQuery stand-in's gRPC endpoint, or null for the real
+    /// service. The only place in the write path that knows a stand-in can exist.
+    /// </summary>
+    public string? BigQueryEmulatorEndpoint { get; init; }
+
     public required bool AllowStubAuthentication { get; init; }
 
     public static WorkerOptions FromConfiguration(IConfiguration configuration, IHostEnvironment environment)
@@ -39,6 +45,7 @@ public sealed record WorkerOptions
             BigQueryProject = configuration["PLUMBLINE_BQ_PROJECT"],
             BigQueryDataset = configuration["PLUMBLINE_BQ_DATASET"],
             BigQueryTable = configuration["PLUMBLINE_BQ_TABLE"],
+            BigQueryEmulatorEndpoint = configuration["PLUMBLINE_BQ_EMULATOR"],
 
             // The stub is available only where a human has said the environment is
             // development. Cloud Run sets no ASPNETCORE_ENVIRONMENT, so the default is
@@ -65,7 +72,8 @@ public sealed record WorkerOptions
         "bigquery" => new BigQueryStorageWriteSink(
             BigQueryProject ?? throw new InvalidOperationException("PLUMBLINE_SINK=bigquery needs PLUMBLINE_BQ_PROJECT"),
             BigQueryDataset ?? "plumbline",
-            BigQueryTable ?? "spans"),
+            BigQueryTable ?? "spans",
+            BigQueryEmulatorEndpoint),
         var other => throw new InvalidOperationException($"PLUMBLINE_SINK={other} is not a known sink"),
     };
 }

@@ -31,3 +31,6 @@ crash.log
 # Editors
 .vscode/
 .idea/
+
+# Local end-to-end run state: a generated API key and query output, never committed.
+.e2e/
