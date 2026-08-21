@@ -34,8 +34,20 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
 {
     private readonly string tablePath;
     private readonly string destination;
-    private readonly BigQueryWriteClient client;
+    private readonly BigQueryWriteClientBuilder clientBuilder;
     private readonly TimeProvider clock;
+
+    /// <summary>
+    /// Built on first write, not in the constructor.
+    /// </summary>
+    /// <remarks>
+    /// `BigQueryWriteClientBuilder.Build()` resolves Application Default Credentials, so
+    /// constructing the client is I/O that fails where no credential exists. Doing it in
+    /// the constructor made the worker's own unit tests depend on the machine having
+    /// gcloud configured — green on a developer's laptop, red in CI, for a test that
+    /// never intended to reach a network.
+    /// </remarks>
+    private BigQueryWriteClient? client;
 
     private readonly bool againstStandIn;
 
@@ -65,7 +77,7 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
             builder.CredentialsPath = null;
         }
 
-        client = builder.Build();
+        clientBuilder = builder;
     }
 
     public string Description => $"bigquery storage write api ({destination}, default stream)";
@@ -87,6 +99,8 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
         await streamLock.WaitAsync(cancellationToken);
         try
         {
+            client ??= clientBuilder.Build();
+
             var request = new AppendRowsRequest
             {
                 WriteStream = await StreamNameAsync(cancellationToken),
@@ -97,6 +111,7 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
                 },
             };
 
+            client ??= clientBuilder.Build();
             stream ??= client.AppendRows();
             await stream.WriteAsync(request);
 
@@ -177,6 +192,8 @@ public sealed class BigQueryStorageWriteSink : ISpanSink, IAsyncDisposable
         {
             return standInStreamName;
         }
+
+        client ??= clientBuilder.Build();
 
         var created = await client.CreateWriteStreamAsync(new CreateWriteStreamRequest
         {
