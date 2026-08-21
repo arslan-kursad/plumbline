@@ -88,10 +88,11 @@ make e2e-down
 
 ## Troubleshooting
 
-**The worker's health endpoint says `push_authentication: stub`.** Correct locally, and
-it is printed so that it cannot be true anywhere else without someone seeing it. The
-worker refuses to start with the stub outside a Development environment (architecture
-§6.1); OIDC validation is F2.
+**The worker's health endpoint says `push_authentication: none (...)`.** Correct locally
+— the Pub/Sub emulator cannot mint Google-signed OIDC tokens — and it is printed so that
+it cannot be true anywhere else without someone seeing it. The worker refuses to start
+with authentication off outside a Development environment (architecture §6.1); the cloud
+runs real OIDC validation (F2).
 
 **A payload gets `413` from the collector.** A single span plus its resource and scope
 exceeds the compressed budget. The collector refuses rather than truncating (§3.2). Raise
@@ -116,7 +117,8 @@ Every service here is a local stand-in. The Pub/Sub emulator is the official one
 BigQuery stand-in is `goccy/bigquery-emulator` (F1 directive D4), which speaks the same
 Storage Write API over gRPC that the cloud path uses — a different endpoint, not a
 different code path. The key registry is a mounted file rather than Firestore (D5), and
-push authentication is stubbed rather than OIDC.
+push authentication is off rather than OIDC, because the emulator cannot mint
+Google-signed tokens.
 
 None of that makes the end-to-end run evidence about the cloud. It is evidence about the
 normalization contract, the message contract, and the poison path. F2 is where the same

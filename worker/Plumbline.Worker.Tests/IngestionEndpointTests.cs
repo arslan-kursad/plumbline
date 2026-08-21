@@ -136,14 +136,14 @@ public class IngestionEndpointTests : IClassFixture<WorkerFixture>
     }
 
     [Fact]
-    public async Task TheHealthEndpointNamesTheStubSoItCannotShipQuietly()
+    public async Task TheHealthEndpointNamesTheMechanismSoAcceptAllCannotShipQuietly()
     {
         using var run = worker.NewRun();
 
         var health = await run.Client.GetFromJsonAsync<JsonElement>("/healthz");
 
         Assert.Equal("ok", health.GetProperty("status").GetString());
-        Assert.Contains("stub", health.GetProperty("push_authentication").GetString()!, StringComparison.Ordinal);
+        Assert.Contains("none", health.GetProperty("push_authentication").GetString()!, StringComparison.Ordinal);
     }
 
     private static byte[] Fixture(string dialect, string kind)
@@ -209,7 +209,7 @@ public sealed class WorkerFixture : WebApplicationFactory<Program>
         var factory = WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment(Environments.Development);
-            builder.UseSetting("PLUMBLINE_PUSH_AUTH", "stub");
+            builder.UseSetting("PLUMBLINE_PUSH_AUTH", "none");
             builder.UseSetting("PLUMBLINE_SINK", "local");
             builder.UseSetting("PLUMBLINE_LOCAL_SINK_DIR", directory);
         });
