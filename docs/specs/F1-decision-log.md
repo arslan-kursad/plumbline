@@ -599,7 +599,11 @@ the *only* place the compose path is exercised at all: F1's development host can
 containers (macOS 12, no supported container runtime), so every claim about the local
 pipeline in this phase rests on this job. A check that runs after the merge would make
 those claims unverifiable at the moment they are made.
-**C2:** no — but the runtime is quoted in the completion note, because "either is
+**Measured:** 1 minute 54 seconds on a GitHub-hosted `ubuntu-latest` runner, cold — two
+emulator images pulled, both service images built, the pipeline exercised, torn down. Well
+inside the 20-minute job ceiling, and short enough that the cadence question answers
+itself.
+**C2:** no — but the runtime is quoted here and in the completion note, because "either is
 acceptable, silence about the choice is not".
 
 ### W6.5 — The compose collector runs a deliberately small message budget

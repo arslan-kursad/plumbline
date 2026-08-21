@@ -22,6 +22,9 @@ than a procedure so that it can also be a CI job.
 
 `make test` needs only the two SDKs — the container runtime is for the end-to-end path.
 
+A full run takes about two minutes on a cold GitHub-hosted runner — two emulator images
+pulled, both service images built, the pipeline exercised end to end, torn down.
+
 **A host that cannot run containers can still do most of the work.** `make test` covers
 the collector, the normalization core, the worker endpoint and every golden file; what it
 does not cover is the compose wiring, the Pub/Sub topology and the write path against the
