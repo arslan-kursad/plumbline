@@ -33,8 +33,9 @@ import (
 	"github.com/arslan-kursad/plumbline/collector/internal/auth"
 )
 
-// One document per key, keyed by api_key_id.
-const collection = "api_keys"
+// One document per key, keyed by api_key_id. The collection name lives with the format
+// contract in internal/auth, because the data plane reads what this tool writes.
+const collection = auth.Collection
 
 var idShape = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`)
 

@@ -48,6 +48,12 @@ type Registry interface {
 	Lookup(presented string) (Key, error)
 }
 
+// Collection is the Firestore collection holding one document per issued key, keyed by
+// api_key_id. Shared by the data plane (FirestoreRegistry) and the issuing tool
+// (cmd/keyctl) for the same reason the key format is (W1.7): two places agreeing about
+// a name by inspection is how a tool writes keys the collector never reads.
+const Collection = "api_keys"
+
 // KeyPrefix is the fixed prefix every issued plumbline key carries.
 //
 // GitHub's non-provider secret-scanning patterns require a paid plan, which the
@@ -101,18 +107,60 @@ func HasIssuableShape(presented string) bool {
 // FileRegistry is the local stand-in for the Firestore key registry: a JSON file of
 // hashed keys, mounted into the container.
 type FileRegistry struct {
+	keyset
+}
+
+// storedKey is one registry entry as both backends store it. The JSON tags are the
+// file format; the firestore tags are the document fields cmd/keyctl writes. They are
+// the same names on purpose — one entry shape, two encodings of it.
+type storedKey struct {
+	APIKeyID      string  `json:"api_key_id" firestore:"api_key_id"`
+	KeySHA256     string  `json:"key_sha256" firestore:"key_sha256"`
+	SourceDialect string  `json:"source_dialect" firestore:"source_dialect"`
+	RatePerSecond float64 `json:"rate_limit_per_second" firestore:"rate_limit_per_second"`
+	Burst         int     `json:"burst" firestore:"burst"`
+	Status        string  `json:"status" firestore:"status"`
+
+	hash []byte
+}
+
+// keyset is the in-memory registry both backends resolve to: validated active keys and
+// the constant-time lookup over them. Loading and looking up are separate concerns —
+// the backends differ only in where the entries come from.
+type keyset struct {
 	keys []storedKey
 }
 
-type storedKey struct {
-	APIKeyID      string  `json:"api_key_id"`
-	KeySHA256     string  `json:"key_sha256"`
-	SourceDialect string  `json:"source_dialect"`
-	RatePerSecond float64 `json:"rate_limit_per_second"`
-	Burst         int     `json:"burst"`
-	Status        string  `json:"status"`
+// buildKeyset validates entries into a keyset. Inactive keys are skipped; a malformed
+// entry is an error rather than a skip, because a registry that quietly drops the entry
+// with the typo is a collector that refuses one agent's traffic with no error anywhere
+// near the person who caused it. `source` names the registry in errors.
+func buildKeyset(entries []storedKey, source string) (keyset, error) {
+	var set keyset
+	for i, key := range entries {
+		if key.APIKeyID == "" {
+			return keyset{}, fmt.Errorf("auth: %s entry %d has no api_key_id", source, i)
+		}
 
-	hash []byte
+		hash, err := hex.DecodeString(strings.TrimSpace(key.KeySHA256))
+		if err != nil || len(hash) != sha256.Size {
+			return keyset{}, fmt.Errorf("auth: key %q has no valid sha256 hash (want %d hex-encoded bytes)",
+				key.APIKeyID, sha256.Size)
+		}
+
+		if key.Status != "active" {
+			continue
+		}
+
+		key.hash = hash
+		set.keys = append(set.keys, key)
+	}
+
+	if len(set.keys) == 0 {
+		return keyset{}, fmt.Errorf("auth: %s holds no active keys", source)
+	}
+
+	return set, nil
 }
 
 // LoadFileRegistry reads the registry file once, at startup.
@@ -134,31 +182,12 @@ func LoadFileRegistry(path string) (*FileRegistry, error) {
 		return nil, fmt.Errorf("auth: parsing key registry %s: %w", path, err)
 	}
 
-	registry := &FileRegistry{}
-	for i, key := range file.Keys {
-		if key.APIKeyID == "" {
-			return nil, fmt.Errorf("auth: key registry entry %d has no api_key_id", i)
-		}
-
-		hash, err := hex.DecodeString(strings.TrimSpace(key.KeySHA256))
-		if err != nil || len(hash) != sha256.Size {
-			return nil, fmt.Errorf("auth: key %q has no valid sha256 hash (want %d hex-encoded bytes)",
-				key.APIKeyID, sha256.Size)
-		}
-
-		if key.Status != "active" {
-			continue
-		}
-
-		key.hash = hash
-		registry.keys = append(registry.keys, key)
+	set, err := buildKeyset(file.Keys, fmt.Sprintf("key registry %s", path))
+	if err != nil {
+		return nil, err
 	}
 
-	if len(registry.keys) == 0 {
-		return nil, fmt.Errorf("auth: key registry %s holds no active keys", path)
-	}
-
-	return registry, nil
+	return &FileRegistry{keyset: set}, nil
 }
 
 // Lookup hashes the presented key and compares it against every active entry in
@@ -167,7 +196,7 @@ func LoadFileRegistry(path string) (*FileRegistry, error) {
 // Every entry is compared even after a match, so the work done does not depend on which
 // key was presented or on how far down the list it sits. With a registry of this size
 // the cost is irrelevant; the property is not.
-func (r *FileRegistry) Lookup(presented string) (Key, error) {
+func (r *keyset) Lookup(presented string) (Key, error) {
 	if !keyShape.MatchString(presented) {
 		return Key{}, ErrUnknownKey
 	}

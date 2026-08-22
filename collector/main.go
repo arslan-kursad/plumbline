@@ -40,13 +40,20 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	registry, err := auth.LoadFileRegistry(cfg.KeyRegistryPath)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	var registry auth.Registry
+	if cfg.KeyFirestoreProject != "" {
+		log.Info("key registry: firestore", "project", cfg.KeyFirestoreProject, "database", cfg.KeyFirestoreDatabase)
+		registry, err = auth.LoadFirestoreRegistry(ctx, cfg.KeyFirestoreProject, cfg.KeyFirestoreDatabase)
+	} else {
+		log.Info("key registry: file", "path", cfg.KeyRegistryPath)
+		registry, err = auth.LoadFileRegistry(cfg.KeyRegistryPath)
+	}
 	if err != nil {
 		return err
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	pub, err := publisher.NewPubSub(ctx, cfg.ProjectID, cfg.Topic)
 	if err != nil {

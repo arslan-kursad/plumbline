@@ -19,7 +19,13 @@ type Config struct {
 	HTTPAddr string
 	GRPCAddr string
 
-	KeyRegistryPath string
+	// Exactly one key registry backend is configured: a file path (local) or a
+	// Firestore project (cloud). Both set is ambiguous and neither is inert, and a
+	// collector guessing either way would look configured while authenticating against
+	// the wrong registry — so both are startup errors.
+	KeyRegistryPath      string
+	KeyFirestoreProject  string
+	KeyFirestoreDatabase string
 
 	ProjectID string
 	Topic     string
@@ -44,7 +50,9 @@ func FromEnv() (Config, error) {
 	cfg := Config{
 		HTTPAddr:           env("PLUMBLINE_HTTP_ADDR", DefaultHTTPAddr),
 		GRPCAddr:           env("PLUMBLINE_GRPC_ADDR", DefaultGRPCAddr),
-		KeyRegistryPath:    os.Getenv("PLUMBLINE_KEY_REGISTRY"),
+		KeyRegistryPath:      os.Getenv("PLUMBLINE_KEY_REGISTRY"),
+		KeyFirestoreProject:  os.Getenv("PLUMBLINE_KEY_FIRESTORE_PROJECT"),
+		KeyFirestoreDatabase: env("PLUMBLINE_KEY_FIRESTORE_DATABASE", "(default)"),
 		ProjectID:          os.Getenv("PLUMBLINE_PUBSUB_PROJECT"),
 		Topic:              os.Getenv("PLUMBLINE_PUBSUB_TOPIC"),
 		MaxCompressedBytes: DefaultMaxCompressedBytes,
@@ -71,13 +79,21 @@ func FromEnv() (Config, error) {
 	// collector that boots healthy and then rejects everything is the worse failure,
 	// because the health check says it is fine.
 	for name, value := range map[string]string{
-		"PLUMBLINE_KEY_REGISTRY":   cfg.KeyRegistryPath,
 		"PLUMBLINE_PUBSUB_PROJECT": cfg.ProjectID,
 		"PLUMBLINE_PUBSUB_TOPIC":   cfg.Topic,
 	} {
 		if value == "" {
 			return Config{}, fmt.Errorf("config: %s is required", name)
 		}
+	}
+
+	switch {
+	case cfg.KeyRegistryPath == "" && cfg.KeyFirestoreProject == "":
+		return Config{}, fmt.Errorf(
+			"config: a key registry is required — PLUMBLINE_KEY_REGISTRY (file) or PLUMBLINE_KEY_FIRESTORE_PROJECT (Firestore)")
+	case cfg.KeyRegistryPath != "" && cfg.KeyFirestoreProject != "":
+		return Config{}, fmt.Errorf(
+			"config: PLUMBLINE_KEY_REGISTRY and PLUMBLINE_KEY_FIRESTORE_PROJECT are both set; configure exactly one registry")
 	}
 
 	return cfg, nil

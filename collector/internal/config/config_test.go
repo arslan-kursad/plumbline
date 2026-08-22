@@ -45,6 +45,34 @@ func TestEachRequiredSettingFailsAtStartupWhenAbsent(t *testing.T) {
 	}
 }
 
+func TestExactlyOneKeyRegistryBackendIsConfigured(t *testing.T) {
+	t.Run("firestore alone is enough", func(t *testing.T) {
+		setRequired(t)
+		t.Setenv("PLUMBLINE_KEY_REGISTRY", "")
+		t.Setenv("PLUMBLINE_KEY_FIRESTORE_PROJECT", "plumbline-prod")
+
+		cfg, err := FromEnv()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.KeyFirestoreDatabase != "(default)" {
+			t.Fatalf("want the default Firestore database, got %q", cfg.KeyFirestoreDatabase)
+		}
+	})
+
+	t.Run("both backends is a startup failure", func(t *testing.T) {
+		// Ambiguity refused rather than resolved: whichever backend a guess picked,
+		// the collector would look configured while authenticating against the other
+		// one's keys.
+		setRequired(t)
+		t.Setenv("PLUMBLINE_KEY_FIRESTORE_PROJECT", "plumbline-prod")
+
+		if _, err := FromEnv(); err == nil {
+			t.Fatal("a file registry and a Firestore project were both set and the collector started anyway")
+		}
+	})
+}
+
 func TestAnUnparsableOverrideIsRefusedRatherThanIgnored(t *testing.T) {
 	for name, value := range map[string]string{
 		"PLUMBLINE_MAX_COMPRESSED_BYTES":          "4MiB",
