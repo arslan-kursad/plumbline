@@ -86,11 +86,12 @@ services:
       bigquery:
         condition: service_started
     environment:
-      # Development is what permits the stubbed push authentication. The worker refuses
-      # to start with the stub in any other environment (architecture §6.1), so this line
-      # is the local exception rather than a default that could travel.
+      # Development is what permits running with push authentication off — the Pub/Sub
+      # emulator cannot mint Google-signed OIDC tokens. The worker refuses `none` in any
+      # other environment (architecture §6.1), so this line is the local exception rather
+      # than a default that could travel.
       ASPNETCORE_ENVIRONMENT: Development
-      PLUMBLINE_PUSH_AUTH: stub
+      PLUMBLINE_PUSH_AUTH: none
       PLUMBLINE_SINK: bigquery
       PLUMBLINE_BQ_PROJECT: plumbline-local
       PLUMBLINE_BQ_DATASET: plumbline

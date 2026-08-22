@@ -7,14 +7,18 @@ namespace Plumbline.Worker;
 /// <remarks>
 /// The two settings that decide what this process is — how push requests are
 /// authenticated and where rows go — are explicit and have no accidental default. A
-/// worker that silently picked the stub authenticator or a sink that swallows rows would
-/// look identical to a working one.
+/// worker that silently accepted unauthenticated pushes or a sink that swallows rows
+/// would look identical to a working one.
 /// </remarks>
 public sealed record WorkerOptions
 {
     public required string PushPath { get; init; }
 
     public required string PushAuthentication { get; init; }
+
+    public string? PushOidcAudience { get; init; }
+
+    public string? PushOidcServiceAccount { get; init; }
 
     public required string Sink { get; init; }
 
@@ -32,7 +36,7 @@ public sealed record WorkerOptions
     /// </summary>
     public string? BigQueryEmulatorEndpoint { get; init; }
 
-    public required bool AllowStubAuthentication { get; init; }
+    public required bool AllowUnauthenticatedPush { get; init; }
 
     public static WorkerOptions FromConfiguration(IConfiguration configuration, IHostEnvironment environment)
     {
@@ -40,6 +44,8 @@ public sealed record WorkerOptions
         {
             PushPath = configuration["PLUMBLINE_PUSH_PATH"] ?? "/push",
             PushAuthentication = configuration["PLUMBLINE_PUSH_AUTH"] ?? "oidc",
+            PushOidcAudience = configuration["PLUMBLINE_PUSH_OIDC_AUDIENCE"],
+            PushOidcServiceAccount = configuration["PLUMBLINE_PUSH_OIDC_SERVICE_ACCOUNT"],
             Sink = configuration["PLUMBLINE_SINK"] ?? "bigquery",
             LocalSinkDirectory = configuration["PLUMBLINE_LOCAL_SINK_DIR"],
             BigQueryProject = configuration["PLUMBLINE_BQ_PROJECT"],
@@ -47,21 +53,32 @@ public sealed record WorkerOptions
             BigQueryTable = configuration["PLUMBLINE_BQ_TABLE"],
             BigQueryEmulatorEndpoint = configuration["PLUMBLINE_BQ_EMULATOR"],
 
-            // The stub is available only where a human has said the environment is
-            // development. Cloud Run sets no ASPNETCORE_ENVIRONMENT, so the default is
-            // Production and the guard bites by default rather than by configuration.
-            AllowStubAuthentication = environment.IsDevelopment(),
+            // Unauthenticated push is available only where a human has said the
+            // environment is development. Cloud Run sets no ASPNETCORE_ENVIRONMENT, so
+            // the default is Production and the guard bites by default rather than by
+            // configuration.
+            AllowUnauthenticatedPush = environment.IsDevelopment(),
         };
     }
 
-    public IPushAuthenticator CreateAuthenticator() => PushAuthentication.ToLowerInvariant() switch
+    public IPushAuthenticator CreateAuthenticator(ILoggerFactory loggerFactory) => PushAuthentication.ToLowerInvariant() switch
     {
-        "stub" when AllowStubAuthentication => new StubPushAuthenticator(),
+        "oidc" => new OidcPushAuthenticator(
+            PushOidcAudience ?? throw new InvalidOperationException(
+                "PLUMBLINE_PUSH_AUTH=oidc needs PLUMBLINE_PUSH_OIDC_AUDIENCE — the fixed audience the push " +
+                "subscription mints its tokens for"),
+            PushOidcServiceAccount ?? throw new InvalidOperationException(
+                "PLUMBLINE_PUSH_AUTH=oidc needs PLUMBLINE_PUSH_OIDC_SERVICE_ACCOUNT — the only identity whose " +
+                "tokens the endpoint accepts (architecture §6.1)"),
+            loggerFactory.CreateLogger<OidcPushAuthenticator>()),
+        "none" when AllowUnauthenticatedPush => new AcceptAllPushAuthenticator(),
+        "none" => throw new InvalidOperationException(
+            "PLUMBLINE_PUSH_AUTH=none outside a Development environment. It accepts every request, and the push " +
+            "endpoint's only protection is the caller's identity (architecture §6.1). Set " +
+            "ASPNETCORE_ENVIRONMENT=Development for local runs; the cloud uses oidc."),
         "stub" => throw new InvalidOperationException(
-            "PLUMBLINE_PUSH_AUTH=stub outside a Development environment. The stub accepts every request, and " +
-            "the push endpoint's only protection is the caller's identity (architecture §6.1). Set " +
-            "ASPNETCORE_ENVIRONMENT=Development for local runs, or implement OIDC validation (F2)."),
-        "oidc" => new UnimplementedOidcAuthenticator(),
+            "PLUMBLINE_PUSH_AUTH=stub was removed in F2 with the F1 stub it selected. Local runs use " +
+            "PLUMBLINE_PUSH_AUTH=none (Development only); the cloud uses oidc."),
         var other => throw new InvalidOperationException($"PLUMBLINE_PUSH_AUTH={other} is not a known mechanism"),
     };
 
