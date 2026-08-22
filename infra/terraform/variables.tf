@@ -148,10 +148,16 @@ variable "image_tag" {
   EOT
   type        = string
 
-  # Merge commit of #62, the change that first pushed both images (recorded in
-  # issue #63 with the push time). Bumped by the wave pull request to the commit
-  # carrying the OIDC validator and the Firestore registry before Wave 2 is armed.
-  default = "0a0993da1e1453b28b5b9dc6e93a4c82824db676"
+  # Merge commit of #65: the first commit on `main` carrying both of Wave 2's code
+  # prerequisites — the real OIDC push validator (#64) and the Firestore key
+  # registry (#65). Deploying anything earlier would put a worker in the cloud
+  # whose `oidc` mechanism refuses every request.
+  #
+  # The images for this commit exist once CI's `images` job has pushed them. That
+  # job failed on its first attempt with `requires billing to be enabled` during
+  # the 2026-08-22 billing incident, so it is re-run rather than re-triggered by a
+  # new commit — a fresh commit would move this tag again and chase its own tail.
+  default = "ac7b5af132d17bcd8177a805a7dbf743aabf625a"
 
   validation {
     # A full commit SHA, not a moving tag: `latest` or a branch name would make
