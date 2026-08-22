@@ -7,7 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton(Normalizer.Default);
 builder.Services.AddSingleton(WorkerOptions.FromConfiguration(builder.Configuration, builder.Environment));
-builder.Services.AddSingleton(services => services.GetRequiredService<WorkerOptions>().CreateAuthenticator());
+builder.Services.AddSingleton(services => services.GetRequiredService<WorkerOptions>()
+    .CreateAuthenticator(services.GetRequiredService<ILoggerFactory>()));
 builder.Services.AddSingleton(services => services.GetRequiredService<WorkerOptions>().CreateSink());
 builder.Services.AddSingleton<IngestionEndpoint>();
 
@@ -20,12 +21,13 @@ var sink = app.Services.GetRequiredService<ISpanSink>();
 app.Logger.LogInformation("ingestion worker starting: push authentication = {Auth}, sink = {Sink}",
     authenticator.Description, sink.Description);
 
-if (authenticator is StubPushAuthenticator)
+if (authenticator is AcceptAllPushAuthenticator)
 {
-    // Loud on purpose. An endpoint whose only protection is the caller's identity, running
-    // with that check stubbed out, is a fact that has to be visible from outside the
+    // Loud on purpose. An endpoint whose only protection is the caller's identity,
+    // running with that check off, is a fact that has to be visible from outside the
     // process — not a comment in a file someone would have to open.
-    app.Logger.LogWarning("{Warning}", StubPushAuthenticator.Warning);
+    app.Logger.LogWarning("push authentication is off: every request to the push endpoint is accepted. "
+                          + "Local development only — the cloud runs OIDC push validation (architecture §6.1).");
 }
 
 app.MapGet("/healthz", () => Results.Json(new
