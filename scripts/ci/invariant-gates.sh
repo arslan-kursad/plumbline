@@ -233,7 +233,50 @@ gate_f() {
   fi
 }
 
-printf 'invariant gates (F0 spec §W6.2; Gate F from F1 W3, issue #19)\n\n'
+# ---------------------------------------------------------------------------
+# Gate G — the F1 push-authentication stub is gone and the real validator is
+# present (F2 spec Wave 2, DoD 7).
+#
+# Two halves, because absence alone is a rename detector. The scan refuses the
+# stub's class names and its marker string anywhere but documentation — the
+# path allowlist is Gate B's: docs keep naming the symbols they record the
+# removal of, and must never need an exclusion entry. The presence check then
+# requires the worker to contain the OIDC validator and its call into Google's
+# token validation, so deleting both implementations cannot read as done.
+# ---------------------------------------------------------------------------
+gate_g() {
+  local ok=0 pattern
+  local -a scan_paths=()
+
+  for root in "${SOURCE_ROOTS[@]}"; do
+    scan_paths+=("${root}/**/*.go" "${root}/**/*.cs" "${root}/*.go" "${root}/*.cs")
+  done
+  scan_paths+=('*.yml' '*.yaml' '*.json' '.github/workflows/*')
+
+  for pattern in \
+    'Stub[P]ushAuthenticator' \
+    'Unimplemented[O]idcAuthenticator' \
+    'PUSH AUTHENTICATION IS [S]TUBBED'
+  do
+    scan "push-auth stub remnant" "$pattern" "${scan_paths[@]}" || ok=1
+  done
+
+  local present
+  present="$(repo_files 'worker/**/*.cs' \
+    | xargs -0 -r grep -lE -- 'GoogleJsonWebSignature[.]ValidateAsync' 2>/dev/null || true)"
+  if [ -z "$present" ]; then
+    printf '      no worker source calls GoogleJsonWebSignature.ValidateAsync\n'
+    ok=1
+  fi
+
+  if [ "$ok" -eq 0 ]; then
+    pass "Gate G — push-auth stub gone, OIDC validator present"
+  else
+    fail "Gate G — push authentication is not the real OIDC validator"
+  fi
+}
+
+printf 'invariant gates (F0 spec §W6.2; Gate F from F1 W3, issue #19; Gate G from F2 Wave 2)\n\n'
 
 gate_a
 gate_b
@@ -241,6 +284,7 @@ gate_c
 gate_d
 gate_e
 gate_f
+gate_g
 
 printf '\n'
 if [ "${#failed_gates[@]}" -gt 0 ]; then

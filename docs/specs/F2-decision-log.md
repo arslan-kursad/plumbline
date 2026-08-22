@@ -531,6 +531,42 @@ are its inputs and are in the filter. The same rule that `analytics/sql/` had to
 under.
 **Exit review:** no.
 
+### W2.2 — OIDC push validation is real; the stub's capability survives only as guarded local configuration
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** `OidcPushAuthenticator` validates the push subscription's bearer token with
+`GoogleJsonWebSignature.ValidateAsync` — Google's signature, issuer and expiry checks —
+then asserts the audience and that the issuer-verified email is the push service
+account's. The email check is what makes this authentication rather than "a Google-signed
+token exists": any principal with a Google identity can mint a token naming any audience.
+`StubPushAuthenticator` and `UnimplementedOidcAuthenticator` are deleted; Gate G asserts
+the absence of both names and the stub's marker string outside documentation, **and** the
+presence of the real validator call — absence alone is a rename detector, which is not
+the property DoD 7 asks for.
+**The audience is a fixed string, not the service URL.** The subscription (Wave 3) mints
+tokens for what the service (Wave 2) expects; a URL-shaped audience would make the
+earlier apply depend on the later one's output. Pub/Sub's `oidc_token.audience` carries
+any agreed value; `PLUMBLINE_PUSH_OIDC_AUDIENCE` and the subscription must state the same
+one.
+**What remains of the stub, stated rather than slipped past:** the local pipeline still
+runs with push authentication off (`PLUMBLINE_PUSH_AUTH=none`), because the Pub/Sub
+emulator cannot mint Google-signed tokens and F1's `make e2e` must keep passing. The
+guard is unchanged — refusing outside a Development environment, named on `/healthz` and
+in the startup log. What W5.2's announcement marked was a validator that did not exist;
+that condition is gone, and the accept-all path is now deliberate, guarded configuration
+for an environment that cannot do better rather than a placeholder waiting to ship.
+**Alternatives:** validate OIDC locally against a fake issuer — a second issuer
+configuration whose only production effect is widening what the cloud could be
+misconfigured to trust; drop the local push path and test the worker only through unit
+tests — it would retire the F1 e2e's strongest property, the poison path exercised
+through a real push delivery.
+**Interface consequence:** `IsAuthentic` became `IsAuthenticAsync` — certificate fetch is
+IO. The validator seam is injectable and the tests fake only that seam; one test pins the
+real seam refusing a malformed token as a refusal rather than a crash.
+**Not yet proven:** acceptance of a genuine Google-signed token. No test can mint one.
+Wave 3's first real push delivery is the test, and its failure mode is loud — every
+delivery refused, the subscription's backlog alert fires.
+**Exit review:** no.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
@@ -664,3 +700,69 @@ resource classes that end the zero-cost envelope, and these three end nothing.
 the project's only unauthenticated endpoint. It is written in one resource, named
 `collector_public`, so a reader looking for "what is exposed" finds it in one grep.
 **Exit review:** no, unless the exit review wants to revisit the public collector itself.
+
+### W2.9 — The phase is halted: real spend was reported and the kill-switch fired
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** one-way (the charge and
+the detach happened); cheap (the halt)
+**What happened:** at 2026-08-22 02:16:18 UTC a budget notification carrying a **real**
+reported cost of 0.01 TRY — `interval_start=2026-08-01T07:00:00Z`, not one of Wave 0's
+synthetic `LIVE-FIRE*` markers — caused the kill-switch to detach billing from
+`plumbline-19458`. Confirmed at the API: `billingEnabled: false`. Full record in
+[`f2-billing-incident-2026-08-22.md`](../evidence/f2-billing-incident-2026-08-22.md).
+**Stop rule, applied:** spec §2 halts every further wave on any billed cost. Wave 2 was
+Lane-A complete and ready to dispatch; it is **not** armed. `#66` and `#67` are held
+unmerged — permitted under Lane A, but the wave's own ordering needs CI to push images,
+which it cannot do with billing detached.
+**Decision:** investigate read-only, record, and stop. **Billing is not re-attached.**
+That is Lane C, and it is also the wrong first move: re-attaching before the cause is
+known restores the conditions that produced the charge, and the next notification carries
+the same interval's cost, so the switch fires again. The sequence on 2026-08-21 already
+demonstrated that shape — detach, re-attach, detach.
+**What cannot be decided from here:** whether 0.01 TRY is genuine spend beyond Always
+Free or the credit lag ADR-0004 Amendment 1 predicted might exist. The budget measures
+with `INCLUDE_SPECIFIED_CREDITS`/`FREE_TIER`, so the figure is net of Always Free *if* the
+credit had been applied when the line was reported. Distinguishing needs Billing Reports —
+gross versus credited, by service, by day — which is the maintainer's console.
+**Worth more than the incident:** this is the first real observation of Amendment 1's
+premise on this account. W-repo.1 records that the premise had never been observed, and
+that F2 was the first phase where checking it would not be vacuous. It arrived
+unannounced, three waves early, as a real sequence rather than a scheduled look.
+**Follow-up this exposes, independent of the outcome:** nothing alerts on "the kill-switch
+fired". A detached project cannot run the function that detached it, so a *working*
+kill-switch is silent afterwards, and what surfaced this was an unrelated CI job failing
+on an image push. The DLQ depth alert is the project's only notification channel today.
+**Exit review:** yes. This is the phase's most consequential event and the first time a
+cost control acted on something that was not a test.
+
+### W2.10 — The halt is lifted: the cost was the kill-switch's own CPU, fully credited
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Measured:** Billing Reports for `011680-E61D62-C3CAA2`, August 1–22, grouped by SKU. One
+SKU carries a non-zero gross line — *Cloud Run functions CPU (Request-based billing) in
+us-central1*, 30.82 seconds, ₺0.04 gross, -₺0.04 savings, **₺0.00 subtotal**. Every other
+SKU reads zero gross. Total ₺0.00, no tax. The 0.01 TRY that fired the kill-switch was a
+gross line reported before its `FREE_TIER` credit landed.
+**Decision:** lift the halt. Spec §2 names two stop-rule triggers, and they disagree here:
+a notification carrying `costAmount > 0.00` (fired — the *detector*) and *"Billing Reports
+showing gross cost not fully credit-offset"* (not met — the *adjudicator*). The Reports are
+the ground truth about billed cost, so the substantive condition never held. The incident
+note the escape hatch requires was written and merged before this reading, not assembled
+around it.
+**What this settles, which outlives the incident:** ADR-0004 Amendment 1's premise — that
+Always Free is credit-implemented rather than an absence of charge — is **confirmed on this
+account**, for the first time (W-repo.1 records it had never been observed). What the
+amendment did not anticipate is that the gross line and its credit do not land together,
+and the budget publishes in the gap. Amendment 1 deferred the fix pending a real sequence;
+this is that sequence, and it is now #71 with the three options re-read against data.
+**Consequence for the phase, stated rather than deferred:** the trigger can fire again on
+any new gross line, and Wave 2 deploys services that will produce them. A spurious detach
+with services running is an outage — the difference from Wave 0, where the live-fire was
+argued side-effect-free *because* nothing was deployed. #71 should be resolved before Wave
+4's traffic and arguably before Wave 2's apply; that is the maintainer's call because it
+amends an ADR.
+**Not performed, and why:** re-attachment. The 24 stale notifications queued while the
+function could not start must be dropped first — otherwise the function wakes, reads the
+old 0.01, and detaches again. Both that `seek` and the re-attach were refused to the agent
+by its own tooling, so the restart procedure is written out in the evidence note for the
+maintainer to run instead of being executed.
+**Exit review:** yes — a stop rule was invoked and lifted inside one day, and both halves
+should be read together.

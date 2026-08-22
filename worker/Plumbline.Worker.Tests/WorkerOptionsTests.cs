@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Plumbline.Worker;
 using Plumbline.Worker.Push;
 using Plumbline.Worker.Sinks;
@@ -29,40 +30,68 @@ public class WorkerOptionsTests
     }
 
     [Fact]
-    public void TheStubAuthenticatorIsRefusedOutsideDevelopment()
+    public void UnauthenticatedPushIsRefusedOutsideDevelopment()
     {
-        var options = Options(Environments.Production, ("PLUMBLINE_PUSH_AUTH", "stub"));
+        var options = Options(Environments.Production, ("PLUMBLINE_PUSH_AUTH", "none"));
 
-        var error = Assert.Throws<InvalidOperationException>(() => options.CreateAuthenticator());
+        var error = Assert.Throws<InvalidOperationException>(() => options.CreateAuthenticator(NullLoggerFactory.Instance));
         Assert.Contains("outside a Development environment", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TheStubAuthenticatorIsAvailableInDevelopment()
+    public void UnauthenticatedPushIsAvailableInDevelopment()
     {
-        var options = Options(Environments.Development, ("PLUMBLINE_PUSH_AUTH", "stub"));
+        var options = Options(Environments.Development, ("PLUMBLINE_PUSH_AUTH", "none"));
 
-        Assert.IsType<StubPushAuthenticator>(options.CreateAuthenticator());
+        Assert.IsType<AcceptAllPushAuthenticator>(options.CreateAuthenticator(NullLoggerFactory.Instance));
     }
 
     [Fact]
-    public void TheDefaultIsOidcAndOidcCurrentlyRefusesEverything()
+    public void TheDefaultIsOidcAndItNamesItsAudienceAndCaller()
     {
-        // OIDC validation is F2 work. Until it exists the endpoint fails closed rather
-        // than falling back to something permissive, so an incomplete deployment is
-        // visibly broken instead of quietly open (architecture §6.1).
-        var authenticator = Options(Environments.Production).CreateAuthenticator();
+        var authenticator = Options(Environments.Production,
+            ("PLUMBLINE_PUSH_OIDC_AUDIENCE", "plumbline-ingestion-worker"),
+            ("PLUMBLINE_PUSH_OIDC_SERVICE_ACCOUNT", "pubsub-push@plumbline-prod.iam.gserviceaccount.com"))
+            .CreateAuthenticator(NullLoggerFactory.Instance);
 
-        Assert.IsType<UnimplementedOidcAuthenticator>(authenticator);
-        Assert.Contains("not implemented", authenticator.Description, StringComparison.Ordinal);
+        Assert.IsType<OidcPushAuthenticator>(authenticator);
+
+        // The description reaches the startup log and /healthz: which audience this
+        // deployment expects and which identity it will accept are the two facts a
+        // silently undelivered subscription gets debugged with.
+        Assert.Contains("plumbline-ingestion-worker", authenticator.Description, StringComparison.Ordinal);
+        Assert.Contains("pubsub-push@plumbline-prod.iam.gserviceaccount.com", authenticator.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OidcWithoutItsSettingsIsAStartupFailure()
+    {
+        // Fail at startup, not at the first push: a worker that boots and then refuses
+        // every delivery looks healthy while the subscription exhausts its attempts.
+        Assert.Throws<InvalidOperationException>(() => Options(Environments.Production,
+                ("PLUMBLINE_PUSH_OIDC_SERVICE_ACCOUNT", "pubsub-push@plumbline-prod.iam.gserviceaccount.com"))
+            .CreateAuthenticator(NullLoggerFactory.Instance));
+        Assert.Throws<InvalidOperationException>(() => Options(Environments.Production,
+                ("PLUMBLINE_PUSH_OIDC_AUDIENCE", "plumbline-ingestion-worker"))
+            .CreateAuthenticator(NullLoggerFactory.Instance));
+    }
+
+    [Fact]
+    public void TheRemovedStubMechanismNamesItsReplacement()
+    {
+        // A checkout or a runbook from F1 may still say stub; the error should say what
+        // to use now rather than "unknown mechanism".
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            Options(Environments.Development, ("PLUMBLINE_PUSH_AUTH", "stub")).CreateAuthenticator(NullLoggerFactory.Instance));
+        Assert.Contains("removed in F2", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void AnUnknownMechanismIsAStartupFailure()
     {
-        var options = Options(Environments.Development, ("PLUMBLINE_PUSH_AUTH", "none"));
+        var options = Options(Environments.Development, ("PLUMBLINE_PUSH_AUTH", "basic"));
 
-        Assert.Throws<InvalidOperationException>(() => options.CreateAuthenticator());
+        Assert.Throws<InvalidOperationException>(() => options.CreateAuthenticator(NullLoggerFactory.Instance));
     }
 
     [Fact]
