@@ -25,6 +25,28 @@ reported cost of **0.01 TRY**, and the kill-switch detached billing from
                                    previous_billing_account=billingAccounts/011680-E61D62-C3CAA2
 ```
 
+**Billing was attached when this fired, and that is the question a later reader asks
+first** — Wave 0's live-fire on 2026-08-21 deliberately produced `billingEnabled: false`,
+so "is the current state just yesterday's test?" is the obvious reading. It is not, on two
+independent pieces of evidence:
+
+- The function **performed** the detach: `spend reported; detaching billing account`
+  followed by `billing detached ... previous_billing_account=billingAccounts/011680-...`.
+  When it finds billing already off it says so instead — `billing already detached;
+  nothing to do`, which is exactly what it logged for the live-fire redelivery at
+  2026-08-21 20:30:34.
+- The function **ran at all**, repeatedly, in between. A detached project cannot start it.
+  After the hand re-attach recorded in [`kill-switch.md`](../runbooks/kill-switch.md) §4,
+  it processed six notifications reporting `cost=0` — 21:05, 21:48, 22:28, 23:10, 23:51
+  and 00:31 — and Wave 1's gated apply (21:06–21:08) and the image push (21:18) both
+  succeeded, neither of which is possible with billing off.
+
+**So the cost line appeared between 00:31 and 02:16**, on an interval that had read `cost=0`
+for the previous fourteen hours. Nothing of ours ran in that window; Wave 1's resources were
+created at 21:06–21:18. A billing pipeline reporting those resources' first storage lines
+overnight is the shape that fits, which is a concrete thing to look for in the Reports
+rather than a hunch to argue about.
+
 **This is not a live-fire.** The Wave 0 tests are distinguishable in the same log by
 their synthetic `interval_start` markers — `LIVE-FIRE`, `LIVE-FIRE-2`,
 `LIVE-FIRE-2-REDELIVERY`, `LIVE-FIRE-3`, `LIVE-FIRE-3-REDELIVERY`, all on 2026-08-21.
