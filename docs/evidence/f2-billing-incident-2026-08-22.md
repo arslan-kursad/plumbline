@@ -1,6 +1,6 @@
 # Incident — real spend reported, kill-switch fired, phase halted
 
-**Opened:** 2026-08-22 · **Status:** open, awaiting the maintainer's Billing Reports read
+**Opened:** 2026-08-22 · **Status:** cause identified 2026-08-22 — **no billed cost**; halt lifted on the evidence below
 **Trigger:** F2 spec §2 stop rule — *"Any billed cost stops every further wave"* ·
 architecture §7 escape hatch
 **Wave in flight when it fired:** Wave 2 (#63), Lane A complete, not armed
@@ -79,6 +79,36 @@ enabled billing account is therefore failing:
   window §6 describes — "with none deployed the test has no side effects" — is still
   open, which is the one piece of luck in the timeline.
 
+## Resolved: the cost was the kill-switch's own CPU, and it is fully credited
+
+Billing Reports, account `011680-E61D62-C3CAA2`, August 1–22 2026, grouped by SKU. Exactly
+one SKU carries a non-zero gross line, and it is the kill-switch function itself:
+
+| SKU | Service | Usage | Usage cost | Other savings | Subtotal |
+| --- | --- | --- | --- | --- | --- |
+| Cloud Run functions CPU (Request-based billing) in us-central1 | Cloud Run Functions | 30.82 second | ₺0.04 | -₺0.04 | **₺0.00** |
+
+Every other SKU reads ₺0.00 gross — Cloud Storage class A and B operations, Firestore
+reads and writes, Cloud Build minutes, Cloud Run functions memory and invocations, Pub/Sub
+inter-region delivery, Artifact Registry egress. **Subtotal ₺0.00, tax none, total ₺0.00.**
+
+So the answer is reading (2) below: **credit lag.** The 0.01 TRY in the 02:16 notification
+was a gross line that had not yet had its `FREE_TIER` credit applied. The credit has since
+landed and the interval has settled at zero, where it had been for the fourteen hours
+before.
+
+**There is no billed cost, and the stop rule's substantive condition is not met.** Spec §2
+names two triggers: a budget notification carrying `costAmount > 0.00`, which fired and is
+the *detector*; and *"Billing Reports showing gross cost not fully credit-offset"*, which is
+the *adjudicator* — and it says the gross **is** fully offset. The halt is lifted on that
+reading, and this note is the escape hatch's incident record, written before the lifting
+rather than assembled after it.
+
+**The irony is load-bearing rather than decorative.** The only thing in this project that
+has produced a gross cost line is the control that exists to stop gross cost lines. Those
+30.82 CPU-seconds are three live-fire attempts plus a day of ~30-minute budget
+notifications. A pipeline carrying no traffic still pays its watchman.
+
 ## What the number means, and what it does not
 
 The budget measures with `credit_types_treatment = "INCLUDE_SPECIFIED_CREDITS"` and
@@ -98,9 +128,16 @@ Two readings fit the evidence, and this repository cannot tell them apart from t
    choosing before observing real sequences would substitute a guess for a measurement.
 
 **This event is that measurement, and it is the first one this account has produced.**
-W-repo.1 records that Amendment 1's premise had never been observed here; Verification A
-(#17, #18) is the observation, and it needs the Billing Reports console — gross versus
-credited, by service, by day — which is Lane C.
+W-repo.1 records that Amendment 1's premise had never been observed here. It is now
+observed, and it holds: Always Free **is** credit-implemented on this account — a gross
+line appears and a `FREE_TIER` credit of equal size cancels it. Amendment 1's premise was
+right; what it did not anticipate is that the two do not land at the same instant, and the
+budget publishes in between.
+
+**The observed lag: between 00:31 and 02:16 UTC the reported figure read 0.01 with no
+credit; by 15:50 the same interval read 0.00 with a -₺0.04 credit against a ₺0.04 gross.**
+That is one data point for the series the credit-lag procedure is meant to accumulate, and
+it is the first.
 
 ## What was done and what was deliberately not done
 
@@ -116,24 +153,50 @@ Done:
 
 Not done, deliberately:
 
-- **Billing has not been re-attached.** That is Lane C — the billing console, a human with
-  billing permissions — and it is also the wrong first move: re-attaching before the cause
-  is understood restores the conditions that produced the charge, and the kill-switch will
-  fire again on the next notification carrying the same interval's cost. It did precisely
-  that once already: detached at 2026-08-21 20:29 (live-fire 3), re-attached, then
-  detached for real at 02:16.
+- **Billing has not been re-attached.** It was the wrong move before the cause was known —
+  re-attaching restores the conditions that produced the charge — and after the cause was
+  known it became blocked on the step above it: the 24-message backlog has to be dropped
+  first, and that command was refused to the agent by its own tooling. The restart
+  procedure below is therefore written for the maintainer to run rather than performed.
 
-## What the maintainer needs to do, in order
+## Restart procedure, and why the order is not negotiable
 
-1. **Billing Reports, for billing account `011680-E61D62-C3CAA2`, August 2026:** gross
-   cost and credited cost, grouped by service and by day. The question is which service
-   produced a non-credit-offset line, and whether the credit arrives on a lag.
-2. Decide on re-attachment with that in hand. If it is credit lag, the fix is a budget
-   rule change (Amendment 1's deferred question, now with a data point). If it is genuine
-   spend, the service that caused it is the thing to change before billing comes back.
-3. Record the observation against #18 and #17 — this is Verification A arriving
-   unannounced, and it is worth more than the scheduled version because it is a real
-   sequence rather than a quiet month.
+**The stale backlog must be dropped before billing is re-attached.** While the function
+could not start, its Eventarc subscription accumulated **24 undelivered notifications**,
+each carrying the stale `costAmount: 0.01` snapshot. Re-attaching first means the function
+starts, receives one of them, and detaches billing again within two seconds — the control
+flapping on a figure that stopped being true hours earlier.
+
+```
+gcloud pubsub subscriptions seek eventarc-us-central1-billing-killswitch-041365-sub-406 \
+  --project plumbline-19458 --time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+gcloud beta billing projects link plumbline-19458 \
+  --billing-account 011680-E61D62-C3CAA2
+
+gcloud beta billing projects describe plumbline-19458    # expect billingEnabled: true
+```
+
+Then watch one notification arrive (~30 minutes) and confirm it reads `cost=0`:
+
+```
+gcloud logging read \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="billing-killswitch"' \
+  --project plumbline-19458 --freshness=1h --limit=10 --format='value(timestamp,textPayload)'
+```
+
+If it reads `cost=0.01` again, the credit has not landed for the next gross line either and
+the trigger rule — not the billing state — is what needs changing (#71).
+
+## Then, to resume Wave 2
+
+1. Re-run the failed `images` job on
+   [run 32582278023](https://github.com/arslan-kursad/plumbline/actions/runs/32582278023)
+   so both images exist for `ac7b5af132d17bcd8177a805a7dbf743aabf625a`, the commit carrying
+   the OIDC validator and the Firestore registry.
+2. `image_tag` is already bumped to that commit on the Wave 2 branch; the plan job verifies
+   the images exist before the reviewer is asked.
+3. Merge #66 and #67, dispatch `deploy.yml` for wave 2, approve at `gcp-production`.
 
 ## Timeline
 
