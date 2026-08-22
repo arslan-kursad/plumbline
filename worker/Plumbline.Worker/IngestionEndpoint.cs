@@ -45,7 +45,7 @@ public sealed class IngestionEndpoint
 
     public async Task<IResult> HandleAsync(HttpContext context, CancellationToken cancellationToken)
     {
-        if (!authenticator.IsAuthentic(context.Request))
+        if (!await authenticator.IsAuthenticAsync(context.Request))
         {
             log.LogWarning("push request refused by {Auth}", authenticator.Description);
             return Results.StatusCode(StatusCodes.Status401Unauthorized);

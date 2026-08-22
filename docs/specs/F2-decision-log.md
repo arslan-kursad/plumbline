@@ -531,6 +531,42 @@ are its inputs and are in the filter. The same rule that `analytics/sql/` had to
 under.
 **Exit review:** no.
 
+### W2.2 — OIDC push validation is real; the stub's capability survives only as guarded local configuration
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** `OidcPushAuthenticator` validates the push subscription's bearer token with
+`GoogleJsonWebSignature.ValidateAsync` — Google's signature, issuer and expiry checks —
+then asserts the audience and that the issuer-verified email is the push service
+account's. The email check is what makes this authentication rather than "a Google-signed
+token exists": any principal with a Google identity can mint a token naming any audience.
+`StubPushAuthenticator` and `UnimplementedOidcAuthenticator` are deleted; Gate G asserts
+the absence of both names and the stub's marker string outside documentation, **and** the
+presence of the real validator call — absence alone is a rename detector, which is not
+the property DoD 7 asks for.
+**The audience is a fixed string, not the service URL.** The subscription (Wave 3) mints
+tokens for what the service (Wave 2) expects; a URL-shaped audience would make the
+earlier apply depend on the later one's output. Pub/Sub's `oidc_token.audience` carries
+any agreed value; `PLUMBLINE_PUSH_OIDC_AUDIENCE` and the subscription must state the same
+one.
+**What remains of the stub, stated rather than slipped past:** the local pipeline still
+runs with push authentication off (`PLUMBLINE_PUSH_AUTH=none`), because the Pub/Sub
+emulator cannot mint Google-signed tokens and F1's `make e2e` must keep passing. The
+guard is unchanged — refusing outside a Development environment, named on `/healthz` and
+in the startup log. What W5.2's announcement marked was a validator that did not exist;
+that condition is gone, and the accept-all path is now deliberate, guarded configuration
+for an environment that cannot do better rather than a placeholder waiting to ship.
+**Alternatives:** validate OIDC locally against a fake issuer — a second issuer
+configuration whose only production effect is widening what the cloud could be
+misconfigured to trust; drop the local push path and test the worker only through unit
+tests — it would retire the F1 e2e's strongest property, the poison path exercised
+through a real push delivery.
+**Interface consequence:** `IsAuthentic` became `IsAuthenticAsync` — certificate fetch is
+IO. The validator seam is injectable and the tests fake only that seam; one test pins the
+real seam refusing a malformed token as a refusal rather than a crash.
+**Not yet proven:** acceptance of a genuine Google-signed token. No test can mint one.
+Wave 3's first real push delivery is the test, and its failure mode is loud — every
+delivery refused, the subscription's backlog alert fires.
+**Exit review:** no.
+
 ### W-repo.1 — Verification A stays a human touchpoint
 **Made:** 2026-08-21 · **Work item:** W-repo · **Reversibility:** cheap
 **Decision:** the spec's §9 lists Verification A as touchpoint 4, adding it to the
