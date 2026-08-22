@@ -612,3 +612,36 @@ account — no emulator runs on this host, and the unit tests cover parsing and 
 not the wire. Wave 4's cloud e2e with the provisioned `adjudicator-prod` key is that
 test.
 **Exit review:** no.
+
+### W2.9 — The phase is halted: real spend was reported and the kill-switch fired
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** one-way (the charge and
+the detach happened); cheap (the halt)
+**What happened:** at 2026-08-22 02:16:18 UTC a budget notification carrying a **real**
+reported cost of 0.01 TRY — `interval_start=2026-08-01T07:00:00Z`, not one of Wave 0's
+synthetic `LIVE-FIRE*` markers — caused the kill-switch to detach billing from
+`plumbline-19458`. Confirmed at the API: `billingEnabled: false`. Full record in
+[`f2-billing-incident-2026-08-22.md`](../evidence/f2-billing-incident-2026-08-22.md).
+**Stop rule, applied:** spec §2 halts every further wave on any billed cost. Wave 2 was
+Lane-A complete and ready to dispatch; it is **not** armed. `#66` and `#67` are held
+unmerged — permitted under Lane A, but the wave's own ordering needs CI to push images,
+which it cannot do with billing detached.
+**Decision:** investigate read-only, record, and stop. **Billing is not re-attached.**
+That is Lane C, and it is also the wrong first move: re-attaching before the cause is
+known restores the conditions that produced the charge, and the next notification carries
+the same interval's cost, so the switch fires again. The sequence on 2026-08-21 already
+demonstrated that shape — detach, re-attach, detach.
+**What cannot be decided from here:** whether 0.01 TRY is genuine spend beyond Always
+Free or the credit lag ADR-0004 Amendment 1 predicted might exist. The budget measures
+with `INCLUDE_SPECIFIED_CREDITS`/`FREE_TIER`, so the figure is net of Always Free *if* the
+credit had been applied when the line was reported. Distinguishing needs Billing Reports —
+gross versus credited, by service, by day — which is the maintainer's console.
+**Worth more than the incident:** this is the first real observation of Amendment 1's
+premise on this account. W-repo.1 records that the premise had never been observed, and
+that F2 was the first phase where checking it would not be vacuous. It arrived
+unannounced, three waves early, as a real sequence rather than a scheduled look.
+**Follow-up this exposes, independent of the outcome:** nothing alerts on "the kill-switch
+fired". A detached project cannot run the function that detached it, so a *working*
+kill-switch is silent afterwards, and what surfaced this was an unrelated CI job failing
+on an image push. The DLQ depth alert is the project's only notification channel today.
+**Exit review:** yes. This is the phase's most consequential event and the first time a
+cost control acted on something that was not a test.
