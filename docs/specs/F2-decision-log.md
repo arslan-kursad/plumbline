@@ -596,9 +596,9 @@ spec behind it, which §"no scope beyond the active spec" refuses.
 **Consequence for the phase:** F2's DoD sends the constructed corpus over OTLP/HTTP, so
 nothing in this phase is blocked. What is blocked is an agent that speaks gRPC only, and
 F4's dogfooding is where that stops being hypothetical.
-**Raised, not resolved:** proposed back as a spec change (issue filed at Wave 2 close),
-because the honest options are a collector change or an architecture amendment and
-neither belongs inside a wave that is already armed.
+**Raised, not resolved:** proposed back as a spec change in #68, with the three options
+and their costs, because the honest ones are a collector change or an architecture
+amendment and neither belongs inside a wave that is already armed.
 **Exit review:** yes — it is a documented capability that the deployment does not have.
 
 ### W2.5 — Firestore access is project-scoped, and §6.1 is corrected rather than reinterpreted
