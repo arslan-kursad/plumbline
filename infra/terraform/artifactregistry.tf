@@ -67,20 +67,32 @@ resource "google_artifact_registry_repository" "gcf_artifacts" {
   # about for no reason.
   description = "This repository is created and used by Cloud Functions for storing function docker images."
 
-  # **Dry run, deliberately, and this is not timidity.**
+  # Live from Wave 2 (#57). What the dry run was asked and what it answered, in
+  # the order that matters:
   #
-  # The images in here include the one the kill-switch function runs. A Gen2
-  # function scales to zero, so every invocation is a potential cold start and a
-  # potential image pull: deleting the version a deployed function still
-  # references breaks the last cost control in the project, at the moment it is
-  # needed, in a way nothing would report until then.
+  # The question was whether keep-last-2 would ever select the image the
+  # kill-switch function runs — deleting that breaks the last cost control in the
+  # project, at the moment it is needed, and nothing reports it until then.
   #
-  # keep-last-2 should never select a running image — the current one is the most
-  # recent by construction. "Should" is the word this project treats as a warning.
-  # The policy runs in dry-run first, its decisions are read out of the Artifact
-  # Registry logs, and it is switched live in Wave 2 once what it would delete has
-  # been seen rather than reasoned about. Follow-up: #57.
-  cleanup_policy_dry_run = true
+  # **The dry run produced no decisions, because it had nothing to select.** Read
+  # on 2026-08-22: each of the two packages here holds exactly one version, so
+  # keep-last-2 claims both and DELETE selects nothing. There are no cleanup
+  # entries in this project's Artifact Registry logs at all. W1.6 assumed this
+  # repository accumulated an image per function deploy; the measurement says it
+  # holds one image plus one build cache, 93 MB of a project-wide 0.5 GB.
+  #
+  # So the flag is switched on evidence that the policy is *inert today*, not on
+  # evidence that it deletes the right things — and saying otherwise would be the
+  # comfort object ADR-0004 §1 describes. What carries the remaining risk is
+  # structural rather than observed: the running image is the most recent by
+  # construction, keep-last-2 spares the two most recent, and `older_than` gives a
+  # day of grace on top. It is the same protection the `plumbline` repository has
+  # been running live under since Wave 1.
+  #
+  # The first genuine exercise is the third kill-switch deploy, which is when a
+  # version first becomes eligible. docs/runbooks/kill-switch.md §7 is where to
+  # look if a deploy is ever followed by a function that cannot pull its image.
+  cleanup_policy_dry_run = false
 
   cleanup_policies {
     id     = "keep-last-2"
