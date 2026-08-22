@@ -613,6 +613,94 @@ not the wire. Wave 4's cloud e2e with the provisioned `adjudicator-prod` key is 
 test.
 **Exit review:** no.
 
+### W2.4 — Cloud Run serves the collector's OTLP/HTTP only; gRPC is unreachable in the cloud
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap (the setting);
+**costly** (the fix, if F4 needs one)
+**Found rather than chosen.** A Cloud Run service routes to exactly one container port.
+The collector serves OTLP/HTTP on 4318 and OTLP/gRPC on 4317 from two listeners, and
+architecture §2.1 and the §1 diagram both promise agents `OTLP/HTTP+gRPC`. Only HTTP is
+reachable once deployed; the gRPC listener still starts and nothing routes to it.
+**Decision:** expose HTTP on the container port, leave the gRPC listener running, and
+record the gap here rather than deleting the listener or quietly editing the promise.
+Deleting it would remove the local pipeline's gRPC coverage to make a cloud limitation
+tidier; editing §2.1 would retire a capability on the strength of one platform
+constraint nobody has yet tried to work around.
+**Alternatives:** a second Cloud Run service for gRPC — a third service in a phase whose
+spec says two, and a second public endpoint to defend; h2c multiplexing in the collector,
+serving gRPC and HTTP on one port — the right fix and a collector code change with no
+spec behind it, which §"no scope beyond the active spec" refuses.
+**Consequence for the phase:** F2's DoD sends the constructed corpus over OTLP/HTTP, so
+nothing in this phase is blocked. What is blocked is an agent that speaks gRPC only, and
+F4's dogfooding is where that stops being hypothetical.
+**Raised, not resolved:** proposed back as a spec change (issue filed at Wave 2 close),
+because the honest options are a collector change or an architecture amendment and
+neither belongs inside a wave that is already armed.
+**Exit review:** yes — it is a documented capability that the deployment does not have.
+
+### W2.5 — Firestore access is project-scoped, and §6.1 is corrected rather than reinterpreted
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** the collector reads the key registry through `roles/datastore.viewer` at
+**project** scope, and architecture §6.1's "table/collection-scoped least privilege" row
+is split and corrected in the same change (v0.9). Table-scoped is real and is
+implemented — the worker holds `roles/bigquery.dataEditor` on `spans` and not on the
+dataset, so it cannot write the views. Collection-scoped is not a thing Firestore has:
+IAM is granted at project scope (conditions can narrow it to a database, and this project
+has one), and per-collection rules exist only for mobile and web clients, not for the
+server client library the collector uses.
+**Verified how:** Google's Firestore IAM documentation, read at wave time, against the
+claim rather than in support of it.
+**Alternatives:** leave §6.1 as written and implement the widest grant quietly — the
+document would then describe a control nobody built, which is the failure mode this
+project has already paid for twice in the kill-switch; add a database-scoped IAM
+condition to look narrower — with exactly one database it narrows nothing, and a
+condition that is decorative teaches a reader that conditions here are decorative.
+**What actually bounds it:** the collector reads and cannot write, Firestore holds no
+span data by §2.6, and the widest reachable secret is a set of SHA-256 hashes that are
+useless without the plaintext (§6.3).
+**Exit review:** yes — a documented boundary was wider in reality than the document said.
+
+### W2.6 — The image tag lives in the repository, because the approval gate cannot see attributes
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** `var.image_tag` is a full commit SHA with its value defaulted in
+`variables.tf`, and bumping it is a pull request. Both services run
+`<registry>/<component>:<tag>`; a moving tag is refused by a validation rule.
+**Why not a dispatch input, which was the obvious shape:** W1.1 binds the reviewer's
+approval to a fingerprint of sorted `address action` pairs and states its blind spot —
+an attribute change that keeps the same addresses and actions does not move it. The
+image a service runs is exactly such an attribute, and it is the one where the blind spot
+matters most: the same commit could be dispatched twice and deploy different code, with
+an identical fingerprint both times. Keeping the tag in git moves that decision into the
+diff a reviewer has already read.
+**Cost, accepted and stated:** the deployed image lags its own merge by one commit,
+because a commit's images exist only after CI has built them. So arming a wave has an
+ordering: merge the code, let CI push, bump the tag, then dispatch.
+**Also added:** the plan job refuses tags with no images in Artifact Registry. Cloud Run
+resolves a tag when it starts a revision, not when Terraform plans one, so without this
+the failure lands *after* the approval — the reviewer having approved a plan that could
+never apply.
+**Exit review:** no.
+
+### W2.7 — Three IAM types added to the allowlist, each to narrow a grant
+**Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** §7.1 gains `google_cloud_run_v2_service_iam_member`,
+`google_pubsub_topic_iam_member` and `google_bigquery_table_iam_member` (architecture
+v0.9), and the deploy identity gains `roles/run.admin` plus `roles/iam.serviceAccountUser`
+granted **per runtime service account** rather than at project scope — D6's per-wave
+growth, enumerated in #63.
+**Worth naming:** the allowlist already carried `google_cloud_run_service_iam_member`, the
+v1 type, which does not manage a v2 service's IAM policy. A row that looks like coverage
+and is not is worse than an absent row, because the guard would have refused the correct
+resource while the table said the case was handled.
+**Why each earns its place:** all three exist to make a grant *smaller* than the
+project-scoped alternative — publish on `traces` alone rather than every topic including
+`billing-alerts`; write `spans` alone rather than the dataset holding the views; invoker
+on one service rather than `roles/run.invoker` project-wide. The allowlist exists to catch
+resource classes that end the zero-cost envelope, and these three end nothing.
+**On `allUsers` as an invoker:** the collector is deliberately public (§6.1) and this is
+the project's only unauthenticated endpoint. It is written in one resource, named
+`collector_public`, so a reader looking for "what is exposed" finds it in one grep.
+**Exit review:** no, unless the exit review wants to revisit the public collector itself.
+
 ### W2.9 — The phase is halted: real spend was reported and the kill-switch fired
 **Made:** 2026-08-22 · **Work item:** Wave 2 · **Reversibility:** one-way (the charge and
 the detach happened); cheap (the halt)

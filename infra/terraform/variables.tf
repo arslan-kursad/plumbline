@@ -126,6 +126,48 @@ variable "state_bucket" {
   default     = null
 }
 
+variable "image_tag" {
+  description = <<-EOT
+    Commit SHA tagging the collector and worker images Cloud Run runs. CI pushes
+    both images tagged by commit and never as `latest`, so this value answers
+    "which code is running" exactly.
+
+    It lives in the repository rather than arriving at dispatch time on purpose.
+    The approval gate binds the reviewer to a fingerprint of addresses and actions
+    (decision log W1.1), which cannot see an attribute value — so a tag chosen
+    outside the repository would be invisible to the one control that is supposed
+    to make a deploy deliberate. Here, bumping it is a reviewed pull request.
+
+    Consequence, accepted: the deployed image lags the merge that produced it by
+    one commit, because the images for a commit exist only after CI has built it.
+
+    **Bumping it is part of arming a wave, not an afterthought.** The default below
+    must name a commit whose images CI has actually pushed *and* whose code carries
+    what the wave deploys — the plan job verifies the first half against Artifact
+    Registry and refuses if the images are absent; the second half is the reviewer's.
+  EOT
+  type        = string
+
+  # Merge commit of #65: the first commit on `main` carrying both of Wave 2's code
+  # prerequisites — the real OIDC push validator (#64) and the Firestore key
+  # registry (#65). Deploying anything earlier would put a worker in the cloud
+  # whose `oidc` mechanism refuses every request.
+  #
+  # The images for this commit exist once CI's `images` job has pushed them. That
+  # job failed on its first attempt with `requires billing to be enabled` during
+  # the 2026-08-22 billing incident, so it is re-run rather than re-triggered by a
+  # new commit — a fresh commit would move this tag again and chase its own tail.
+  default = "ac7b5af132d17bcd8177a805a7dbf743aabf625a"
+
+  validation {
+    # A full commit SHA, not a moving tag: `latest` or a branch name would make
+    # "which image is running" unanswerable and would silently redeploy on the
+    # next apply.
+    condition     = can(regex("^[0-9a-f]{40}$", var.image_tag))
+    error_message = "image_tag must be a full 40-character commit SHA — the tag CI pushes. Moving tags are refused."
+  }
+}
+
 variable "alert_email" {
   description = <<-EOT
     Destination for the dead-letter depth alert (architecture §3.4). An email

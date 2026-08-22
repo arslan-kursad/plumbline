@@ -37,3 +37,23 @@ output "state_bucket" {
   description = "Value for the GCP_STATE_BUCKET repository variable; the bucket ./bootstrap created."
   value       = local.state_bucket
 }
+
+output "collector_url" {
+  description = "Public OTLP/HTTP endpoint agents send to. OTLP/gRPC is not reachable in the cloud (decision log W2.4)."
+  value       = google_cloud_run_v2_service.collector.uri
+}
+
+output "worker_url" {
+  description = "Ingestion worker endpoint. Internal ingress: reachable by the Wave 3 push subscription, not from the internet."
+  value       = google_cloud_run_v2_service.worker.uri
+}
+
+output "pubsub_push_service_account" {
+  description = "Identity the Wave 3 push subscription mints OIDC tokens as, and the only caller the worker accepts."
+  value       = google_service_account.pubsub_push.email
+}
+
+output "deployed_image_tag" {
+  description = "Commit SHA of the images both services run — the answer to \"which code is in production\"."
+  value       = var.image_tag
+}
