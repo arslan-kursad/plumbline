@@ -276,7 +276,7 @@ gate_g() {
   fi
 }
 
-printf 'invariant gates (F0 spec §W6.2; Gate F from F1 W3, issue #19; Gate G from F2 Wave 2)\n\n'
+printf 'invariant gates (F0 spec §W6.2; Gate F from F1 W3, issue #19; Gates G-H from F2 Wave 2)\n\n'
 
 gate_a
 gate_b
@@ -284,7 +284,35 @@ gate_c
 gate_d
 gate_e
 gate_f
+
+# ---------------------------------------------------------------------------
+# Gate H — the superseded credit filter stays gone (ADR-0004 Amendment 4, D1).
+#
+# Amendment 1 subtracted one enumerated credit type. Live operation showed the
+# filter matched nothing on this account, so the budget reported gross and the
+# kill-switch detached a working project on 0.04 TRY. Amendment 2 replaced it
+# with INCLUDE_ALL_CREDITS, and the failure mode of a regression here is silent:
+# the configuration reads as a tightening, and the control fires on ordinary
+# usage.
+#
+# Scoped to infra/terraform/, because the ADR and the runbooks have to keep
+# naming what they superseded. Patterns are written so they cannot match their
+# own text, which is what lets this gate say the strings it forbids.
+# ---------------------------------------------------------------------------
+gate_h() {
+  local ok=0
+  scan "superseded credit filter" 'credit[_]types[[:space:]]*=' 'infra/terraform/*.tf' || ok=1
+  scan "superseded credit type" 'INCLUDE[_]SPECIFIED_CREDITS' 'infra/terraform/*.tf' || ok=1
+  scan "enumerated free-tier credit" '"FREE[_]TIER"' 'infra/terraform/*.tf' || ok=1
+
+  if [ "$ok" -eq 0 ]; then
+    pass "Gate H — no enumerated credit filter in Terraform"
+  else
+    fail "Gate H — Amendment 1's credit filter is back in Terraform"
+  fi
+}
 gate_g
+gate_h
 
 printf '\n'
 if [ "${#failed_gates[@]}" -gt 0 ]; then

@@ -798,3 +798,101 @@ by its own tooling, so the restart procedure is written out in the evidence note
 maintainer to run instead of being executed.
 **Exit review:** yes — a stop rule was invoked and lifted inside one day, and both halves
 should be read together.
+
+---
+
+## A2-level — ADR-0004 Amendment 4 (#71)
+
+Autonomous choices made executing
+[`F2-directive-kill-switch-amendment-2.md`](F2-directive-kill-switch-amendment-2.md).
+The decisions D1–D5 are the maintainer's; these are the calls the directive left to
+the executor, plus three places where its literal text could not be followed.
+
+### A2.1 — Filed as Amendment 4, because Amendment 2 is taken
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**Decision:** the supplied text was authored as "Amendment 2". `ADR-0004` already has
+an Amendment 2 — the 2026-08-21 entry on the detach permission model — and both
+`killswitch.tf` and `wif.tf` cite it *by number* in load-bearing comments. Filed as
+Amendment 4; every new reference in Terraform, function source, tests, the plan guard
+and the gates written to match.
+**Alternatives:** append verbatim as a second "Amendment 2" — the document would then
+contain two amendments with one number, one about credit filters and one about IAM,
+and every existing citation would become ambiguous; renumber the older one — it is
+cited from configuration and from the runbook, so renumbering it rewrites history to
+protect a draft.
+**Rationale:** a decision record whose numbering collides is a record you cannot cite.
+**Exit review:** no, but the maintainer should know their draft's number moved.
+
+### A2.2 — The gross-cost budget has no `all_updates_rule`, and that is what emails
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**Decision:** the directive's W2 asked for `all_updates_rule` carrying
+`disable_default_iam_recipients = false` and no `pubsub_topic`. The provider refuses
+exactly that shape: the block requires one of `pubsub_topic` or
+`monitoring_notification_channels`, so it cannot be written without handing this
+budget one of the two programmatic paths D3 forbids it. The block is omitted.
+**Consequence, and it is an improvement rather than a compromise:** with no
+`all_updates_rule`, the budget notifies on its threshold rules (50%, 100%) instead of
+on every cost update. An alert that fired every thirty minutes would be muted by the
+third day, and D3's purpose is to be noticed.
+**Verified how:** `terraform validate` refuses the directive's shape with
+`"all_updates_rule.0.pubsub_topic": one of ... must be specified`; it accepts the
+omission.
+**Exit review:** no.
+
+### A2.3 — Gate H, so the superseded filter cannot come back quietly
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**Decision:** the directive asked for a grep gate on `credit_types` and the enumerated
+credit type under `infra/terraform/`. Implemented as Gate H in the existing gate
+framework rather than as a standalone script, with patterns written so they cannot
+match their own text — the convention that lets this repository's gates name the
+strings they forbid without an exclusion list.
+**Why it earns its place:** a regression here reads as a *tightening*. Someone
+restoring an enumerated filter would believe they were narrowing the control, and the
+control would then fire on ordinary usage. That is the same shape as the defect it
+guards against, which is why detection is worth having on top of the ADR.
+**Proven both ways:** a probe resource carrying the old filter fails Gate H; removing
+it passes. Both runs are in the pull request.
+**Exit review:** no.
+
+### A2.4 — The plan-guard assertion reads the attribute, not the resource name
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**Decision:** D3's "exactly one budget references `billing-alerts`" is asserted
+against planned `all_updates_rule.pubsub_topic` values, and the guard reports which
+budget holds the binding on clean runs as well as violating ones.
+**Alternatives:** match on resource name — a rename would defeat it, and what matters
+is where a budget publishes rather than what it is called.
+**Fixtures:** `plan-amendment-2.json` (the intended shape, passes) and
+`plan-two-budgets.json` (a second budget bound to the topic, fails). Both are in the
+guard's self-test, which now runs eight fixtures.
+**Exit review:** no.
+
+### A2.5 — The decision is a pure function, and NaN is not spend
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**Decision:** `shouldDetach(cost, threshold)` is isolated from the CloudEvent, the
+billing client and the network. It refuses NaN, ±Inf and negative costs before
+comparing, rather than relying on NaN comparisons happening to be false.
+**Why explicit:** the accidental version is correct today and silently depends on IEEE
+semantics that a future refactor to `!(cost < threshold)` would invert. A negative
+cost is a refund or a correction, and neither is a reason to take a project offline.
+**Startup guard:** `DETACH_THRESHOLD` has no default. Missing, unparseable, zero,
+negative or non-finite are all startup failures — a threshold nobody chose is either
+zero, which restores the behaviour this amendment removes, or a number invented at the
+moment the control is needed.
+**Exit review:** no.
+
+### A2.6 — The runbook's §1 was rewritten, not just appended to
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**Decision:** the directive asked for a new "credit lag and promotional period"
+section. Adding only that would have left §1 and its "Spend basis" subsection still
+stating the old trigger — that the function fires above zero, and that the budget
+subtracts one named credit type. Both were rewritten to the new rule, with the old one
+named and dated so the change is visible rather than erased.
+**Also updated:** Verification A's record. It read "NOT YET DONE"; it has now been
+attempted and is **inconclusive by construction** — the trial credit absorbs the usage,
+so this account cannot show how it behaves on Always Free alone until 2026-10-05. That
+is written where the verification lives, with the observed figures, rather than left as
+an open checkbox that looks merely undone.
+**Rationale:** a runbook that states the trigger twice, differently, is worse than one
+that states it once and wrongly, because the reader cannot tell which sentence is
+current.
+**Exit review:** no.

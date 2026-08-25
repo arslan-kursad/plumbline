@@ -450,3 +450,133 @@ the thing it documents.
 - ADR-0001, ADR-0002, ADR-0003, ADR-0005 — each names its controls against this taxonomy.
 - Cloud Billing credit types (`FREE_TIER`, `PROMOTION`, …) and the rule that
   `credit_types` is non-empty only under `INCLUDE_SPECIFIED_CREDITS` — Amendment 1.
+
+---
+
+## Amendment 4 (2026-08-25) — Kill-switch trigger semantics under promotional credits
+
+**Status:** Proposed · **Amends:** Amendment 1
+**Related issues:** #71 (budget reports gross), #74 (promotional credit until 2026-10-05)
+
+> **Editorial note, so the record is checkable.** Three changes were made to the
+> authored text on filing; the decision itself is unaltered.
+>
+> 1. **Renumbered.** It was authored as "Amendment 2". That number belongs to the
+>    2026-08-21 amendment on the detach permission model, which `killswitch.tf`
+>    and `wif.tf` both cite by number. Filed as Amendment 4 — the next free number
+>    — with every code and configuration reference written to match.
+> 2. **Date corrected** from 2026-08-25 to 2026-08-22, which is what the function
+>    logs carry for both detach events (02:16 and 17:11).
+> 3. **Two unverified specifics dropped:** the credit's API type string, and a
+>    citation to "the billing export". The credit was read from the console as a
+>    one-time trial credit applied at net pricing; its API type was never
+>    observed, and this project has no BigQuery billing export configured, so
+>    neither claim could be checked. D1 does not depend on either — it subtracts
+>    every credit type precisely so the taxonomy stops mattering.
+
+### Context
+
+Amendment 1 set the kill-switch budget credit filter to `INCLUDE_SPECIFIED_CREDITS`
+with credit type `FREE_TIER` only, on the premise that Always Free usage is
+credit-implemented and therefore net cost after `FREE_TIER` credits is 0.00 during
+entirely free operation.
+
+Live operation on 2026-08-22 falsified that premise **for this billing account**:
+
+- The account carries a promotional trial credit valid until 2026-10-05. Gross usage
+  is absorbed by that credit. No `FREE_TIER` credit lines were observed.
+- 18 minutes after billing was attached, the function detached it on a reported
+  cost of 0.04 TRY with `threshold_exceeded=0`. The `FREE_TIER`-only filter matched
+  nothing, so net equalled gross.
+- Whether the missing `FREE_TIER` lines are structural (promotional credit applied
+  first) or credit lag is not settled by an 18-minute observation window. The
+  decision below is robust to both explanations.
+
+ADR-0004 conflated two properties:
+
+1. **Safety** — no real money leaves the account.
+2. **Evidence** — usage fits within Always Free.
+
+During the promotional period (2) is unobservable on this account. (1) is still
+required, and becomes the only guard on 2026-10-05 when the credit expires.
+
+### Decision
+
+**D1 — Trigger on net cost after all credits.** Kill-switch budget
+`budget_filter.credit_types_treatment = "INCLUDE_ALL_CREDITS"`. Enumerating credit
+types re-creates this failure whenever a credit type appears that was not
+anticipated. On this account only free-tier and promotional credits exist; there is
+no discount type to exclude.
+
+**D2 — Detach threshold is a small epsilon, not `> 0`.** Function-side constant
+`detach_threshold`, exposed as a Terraform variable, default `5.00` in the
+billing-account currency (TRY). Rationale: absorbs credit-lag transients (observed
+magnitude 0.04) with no state, while remaining far below any plausible real charge
+accumulated within one budget notification interval. The `$0.00` claim is measured
+from the invoice, never from the trigger.
+
+**D3 — Second budget: gross cost, notification-only.** A separate
+`google_billing_budget` with `credit_types_treatment = "EXCLUDE_ALL_CREDITS"`,
+threshold `gross_alert_threshold` (Terraform variable, default `100.00` TRY/month),
+email notification to billing admins only. **No Pub/Sub binding, no function path.**
+Purpose: detect runaway usage hidden behind the promotional credit. This budget must
+never publish to the `billing-alerts` topic; a plan-guard check asserts that exactly
+one budget references that topic.
+
+**D4 — Inertness during the promotional period is acknowledged.** While promotional
+credit applies, net cost is 0 by construction and the detach guard cannot fire. This
+is recorded here, in `docs/runbooks/kill-switch.md`, and in the F2 completion note.
+It is not a silent degradation: the gross alert (D3) is the runaway signal in this
+window, and a non-upgraded trial account cannot incur real charges.
+
+**D5 — Verification of the Amendment 1 premise is deferred with a date.** Whether
+`FREE_TIER` credits fully offset gross cost is verified in a dated window after
+2026-10-05 (Verification C; definition owned by the F2 spec DoD amendment, tracked in
+#74). Until then, gross cost during the promotional period is recorded monthly as
+the upper bound of what the system would cost with no free tier at all.
+
+### Alternatives rejected
+
+- **Enumerating both credit types** — same fragility as the Amendment 1 filter;
+  fails on the next unanticipated credit type.
+- **Two-consecutive-notification confirmation rule** — requires persisted state in
+  the function; D2 covers the observed lag magnitude with zero state. Revisit only if
+  a lag transient exceeds `detach_threshold` in practice.
+- **Deliberately consuming the promotional credit to expose Always Free behaviour
+  earlier** — costs wall-clock time, distorts the published cost record with usage
+  that is not the system's, and upgrading the account does not remove remaining
+  credit, so there is no clean way to opt out of it.
+- **Dropping the kill-switch until October** — removes the only guard at the exact
+  moment (credit expiry) it is needed.
+
+### Consequences
+
+- **Before 2026-10-05:** the gross alert is the only runaway signal. The account
+  upgrade decision (Lane C, human-only) must be made before that date. Upgrading with
+  this amendment not yet applied and live-fired is forbidden.
+- **After 2026-10-05:** net = gross − free-tier credits; the trigger behaves as
+  originally designed. Verification C runs in this window.
+- **Terraform:** kill-switch budget filter changes to `INCLUDE_ALL_CREDITS`; new
+  gross-cost budget with email-only notifications; two new variables
+  (`detach_threshold`, `gross_alert_threshold`); plan-guard assertion per D3.
+- **Function:** compare `costAmount >= detach_threshold`; log `currency` alongside;
+  `thresholdExceeded` remains ignored (unchanged from Amendment 1).
+- **Runbook:** `kill-switch.md` gains a "credit lag and promotional period" section
+  and the false-positive re-attach step (F2 DoD item 9).
+- **Architecture §7:** kill-switch row updated to reference this amendment; a new row
+  for the gross-cost alert.
+
+### Verification (live-fire, required before billing re-attach)
+
+1. Publish a synthetic budget notification with `costAmount = detach_threshold −
+   0.01` → function logs WARN, does **not** detach.
+2. Publish `costAmount = detach_threshold` → function detaches billing.
+3. Re-attach per runbook. Observe two consecutive real notification cycles with no
+   detach.
+
+Evidence (function logs, billing page state) archived under
+`docs/runbooks/kill-switch.md`. Wave 2 apply is armed only after step 3.
+
+### Supersedes
+
+The credit-filter clause of Amendment 1. All other Amendment 1 content stands.

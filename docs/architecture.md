@@ -281,7 +281,8 @@ secret-free by construction.
 | Cloud Run `min=0`, `max≤2`, smallest instance, us-central1 | Terraform; CI check on plan diff |
 | Pub/Sub: no topic retention; batched+gzipped | Terraform (topics); collector code + golden tests (batching) |
 | LLM: free-tier Gemini + client-side limiter; bulk on Ollama | Eval engine code; quota config in `eval_definitions` |
-| Billing kill-switch | Budget alert → Pub/Sub → billing-detach function; **fire-tested in F0 (DoD)** |
+| Billing kill-switch | Budget alert (net of all credits) → Pub/Sub → billing-detach function, detaching at `detach_threshold` rather than at any non-zero figure; **fire-tested in F0 (DoD)**, trigger semantics per ADR-0004 Amendment 4 |
+| Runaway detection under promotional credit | `gross-cost-alert` budget, gross cost, notification-only (Terraform). No Pub/Sub binding: the plan guard asserts exactly one budget publishes to `billing-alerts` (ADR-0004 Amendment 4, D3) |
 | Artifact Registry < 0.5 GB | Distroless images; cleanup policy keep-last-2 (Terraform) |
 | No Cloud SQL / custom domain / paid SaaS | Architecture review; Terraform allowlist of resource types |
 | Public repository (Pages + unmetered Actions on Free) | F0 spec §0.2; `main` branch protection; Gate C (no exported SA keys) and Gate D (no `pull_request_target`) |
