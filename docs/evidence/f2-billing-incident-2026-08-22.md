@@ -198,6 +198,45 @@ the trigger rule — not the billing state — is what needs changing (#71).
    the images exist before the reviewer is asked.
 3. Merge #66 and #67, dispatch `deploy.yml` for wave 2, approve at `gcp-production`.
 
+## Restart attempt 1 — 2026-08-25 — failed on the window, not on the fix
+
+ADR-0004 Amendment 4 was merged (#75) and the restart was attempted. It did not
+hold, and the reason is worth more than the attempt:
+
+| When (UTC) | What |
+| --- | --- |
+| 10:51:10 | Backlog seeked away; billing re-attached, `billingEnabled: true` |
+| 10:52–10:56 | Amendment CI re-run green; `targets` input added to `deploy.yml` and merged |
+| 10:54:45, 10:55:38, 10:57:00 | Budget notifications delivered; each aborted — *no available instance* |
+| 10:56:22 | #75 merged |
+| 10:57:37 | Wave 1.5 plan green and **waiting on approval** — `2 to add, 2 to change, 1 to destroy` |
+| **10:58:22** | A notification found a warm instance. **The old code detached billing again**, on `cost=0.04` |
+| 11:00:46 | A narrower re-dispatch failed at the state read; the project has no billing |
+
+**The window is minutes, not half an hour.** First delivery attempt landed **3 minutes
+35 seconds** after the re-attach. Every earlier estimate in this record — including the
+"one notification interval, roughly thirty minutes" in the procedure above — was wrong,
+and the correction is now in [`kill-switch.md`](../runbooks/kill-switch.md) §4a where the
+next operator will read it.
+
+**What that rules out.** The full amendment cannot land inside the window: updating the
+function replaces its source archive and rebuilds the container, which takes minutes by
+construction. Any remediation racing a three-minute clock has to be a single fast
+resource update.
+
+**What it leaves.** The budget's credit filter alone breaks the loop. With
+`INCLUDE_ALL_CREDITS` the published figure is net, net on this account is `0.00`, and
+even the un-amended above-zero rule does not fire on zero. So the next attempt targets
+`google_billing_budget.zero_spend` and nothing else — one API call, seconds — and the
+function's threshold and the gross-cost budget follow in a second, unhurried apply.
+
+**Also learned, and fixed in the same change:** the plan for Wave 1.5 initially carried
+Wave 2's Cloud Run services, because Lane A merges Terraform ahead of its applies. An
+untargeted apply would have deployed services under a control whose replacement had not
+been live-fired. `deploy.yml` gained a `targets` input (decision log A2.7) — the same
+answer W0.3 reached a wave earlier, now expressed in the gated path rather than in a
+laptop command.
+
 ## Timeline
 
 | When (UTC) | What |

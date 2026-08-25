@@ -429,6 +429,25 @@ gcloud pubsub subscriptions seek <eventarc-subscription> \
 
 Then §5's re-attach procedure.
 
+**How long you have, measured rather than assumed.** On 2026-08-25 billing was
+re-attached at 10:51:10 UTC and the first delivery attempt reached the function at
+**10:54:45** — three and a half minutes, not the notification cadence's nominal
+thirty. Three further attempts followed within four minutes; the first one that
+found a warm instance, at 10:58:22, detached billing again.
+
+So a re-attach performed while the trigger is still wrong buys **minutes**. Any
+remediation that has to land inside that window must be a single fast resource
+update — not a function deployment, which rebuilds the container and cannot
+finish in time.
+
+**Breaking the loop takes one resource, not the whole amendment.** The budget's
+credit filter alone is sufficient: with `INCLUDE_ALL_CREDITS` the published figure
+becomes net, which on a credit-covered account is `0.00`, and even the old
+above-zero rule does not fire on zero. Apply
+`google_billing_budget.zero_spend` on its own first — seconds, one API call —
+and the pressure is gone. The function's threshold and the gross-cost budget
+follow in an unhurried second apply.
+
 ### Live-fire for the threshold (required before billing re-attach)
 
 Same message format as §3. Run all three; none is optional.
