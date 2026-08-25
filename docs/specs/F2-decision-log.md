@@ -896,3 +896,29 @@ an open checkbox that looks merely undone.
 that states it once and wrongly, because the reader cannot tell which sentence is
 current.
 **Exit review:** no.
+
+### A2.7 — `deploy.yml` gains a targets input, because Lane A merges ahead of its applies
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**What forced it:** the authenticated plan on this branch reports Wave 2's Cloud Run
+services alongside the amendment's two budget changes — they merged to `main` on the
+Lane A argument that merging mutates nothing. Applying Wave 1.5 untargeted would
+therefore deploy Wave 2, which the directive's §2 puts out of scope and whose §6 step 6
+forbids until the live-fire passes. This is W0.3's situation exactly, one wave later,
+and W0.3 predicted it: *any phase that merges ahead of its applies inherits it.*
+**Decision:** an optional `targets` dispatch input, applied to the plan, the re-plan
+and the post-apply drift check. Empty means the whole configuration, so every previous
+wave's behaviour is unchanged.
+**The post-apply check has to share the scope, and that is the part worth stating.** An
+untargeted convergence check after a targeted apply reports the resources the wave was
+deliberately not allowed to create, and fails a wave that finished correctly. Scoping
+it keeps the check meaningful — the targeted subset converged — rather than turning it
+into noise a future operator learns to ignore.
+**Injection seam closed while touching it:** the input reaches the script through the
+environment rather than being interpolated into the script body. A dispatch input
+pasted into shell source is a command-injection seam, and this is the workflow that
+applies infrastructure.
+**Alternatives:** hold Wave 2's Terraform out of `main` until this applies — it idles
+the repository lane behind one human step and contradicts Lane A's own reasoning;
+apply everything and call it Wave 1.5+2 — it deploys services under a control whose
+replacement has not been live-fired, which is the one ordering the directive names.
+**Exit review:** yes — it changes the gated apply path, which is D1's mechanism.

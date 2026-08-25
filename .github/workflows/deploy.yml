@@ -39,6 +39,15 @@ on:
         description: Wave issue number, so the run and the record point at each other
         required: true
         type: string
+      targets:
+        description: >-
+          Optional space-separated resource addresses to scope this apply to.
+          Empty applies the whole configuration. Use it when `main` describes more
+          infrastructure than this wave is allowed to create — the situation Lane A
+          produces by merging Terraform ahead of its applies (decision log W0.3).
+        required: false
+        default: ""
+        type: string
 
 # Never cancel an apply in flight: a half-applied Terraform run is worse than a
 # queued one.
@@ -143,9 +152,23 @@ jobs:
           TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
           TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+          # Through the environment, not interpolated into the script body: a
+          # dispatch input pasted into shell source is a command-injection seam,
+          # and this workflow is the one that applies infrastructure.
+          TARGETS: ${{ inputs.targets }}
         run: |
           terraform init -input=false -backend-config="bucket=${{ vars.GCP_STATE_BUCKET }}"
-          terraform plan -input=false -out=plan.tfplan
+
+          targets=""
+          for address in $TARGETS; do
+            targets="$targets -target=$address"
+          done
+          if [ -n "$targets" ]; then
+            echo "::notice::targeted apply:${targets}"
+          fi
+
+          # shellcheck disable=SC2086 -- word splitting is the point
+          terraform plan -input=false $targets -out=plan.tfplan
 
       # The guard runs here and again before the apply. It parses the allowlist out
       # of docs/architecture.md §7.1, so it is checking the same source the spec
@@ -251,9 +274,23 @@ jobs:
           TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
           TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+          # Through the environment, not interpolated into the script body: a
+          # dispatch input pasted into shell source is a command-injection seam,
+          # and this workflow is the one that applies infrastructure.
+          TARGETS: ${{ inputs.targets }}
         run: |
           terraform init -input=false -backend-config="bucket=${{ vars.GCP_STATE_BUCKET }}"
-          terraform plan -input=false -out=plan.tfplan
+
+          targets=""
+          for address in $TARGETS; do
+            targets="$targets -target=$address"
+          done
+          if [ -n "$targets" ]; then
+            echo "::notice::targeted apply:${targets}"
+          fi
+
+          # shellcheck disable=SC2086 -- word splitting is the point
+          terraform plan -input=false $targets -out=plan.tfplan
 
       - name: Plan guard
         run: ./scripts/ci/terraform-plan-guard.sh infra/terraform/plan.tfplan
@@ -301,6 +338,7 @@ jobs:
           TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
           TF_VAR_billing_account_id: ${{ secrets.GCP_BILLING_ACCOUNT_ID }}
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+          TARGETS: ${{ inputs.targets }}
         run: |
           rm -f plan.tfplan
 
@@ -308,8 +346,20 @@ jobs:
           # errexit would treat as a failure before the case can distinguish it
           # from a real error. The difference matters: one is drift, the other is a
           # broken plan.
+          targets=""
+          for address in $TARGETS; do
+            targets="$targets -target=$address"
+          done
+          if [ -n "$targets" ]; then
+            echo "::notice::targeted apply:${targets}"
+          fi
+
+          # Same scope as the apply. An untargeted check after a targeted apply
+          # reports the resources this wave was deliberately not allowed to
+          # create, and would fail a wave that finished correctly.
           set +e
-          terraform plan -input=false -detailed-exitcode -no-color
+          # shellcheck disable=SC2086 -- word splitting is the point
+          terraform plan -input=false $targets -detailed-exitcode -no-color
           status=$?
           set -e
 
