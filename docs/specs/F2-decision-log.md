@@ -922,3 +922,27 @@ the repository lane behind one human step and contradicts Lane A's own reasoning
 apply everything and call it Wave 1.5+2 — it deploys services under a control whose
 replacement has not been live-fired, which is the one ordering the directive names.
 **Exit review:** yes — it changes the gated apply path, which is D1's mechanism.
+
+### A2.8 — The restart targets the budget alone, because the window is three minutes
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**Measured, after getting it wrong once:** billing was re-attached at 10:51:10 UTC and
+the first budget notification reached the function at 10:54:45 — three and a half
+minutes. The procedure this log and the runbook both carried said "one notification
+interval, roughly thirty minutes". It is not. The amendment's own apply was still
+waiting at the approval gate when the old code detached billing again at 10:58:22.
+**Decision:** the next restart applies `google_billing_budget.zero_spend` and nothing
+else. The credit filter alone is sufficient — `INCLUDE_ALL_CREDITS` makes the published
+figure net, net on this account is 0.00, and even the un-amended above-zero rule does
+not fire on zero. One resource, one API call, seconds. The function's threshold and the
+gross-cost budget follow in a second apply with no clock on it.
+**Why the full amendment cannot go first:** updating the function replaces its source
+archive and rebuilds the container. That is minutes by construction, so it loses a
+three-minute race every time, and losing it mid-apply is worse than not starting.
+**Alternatives:** update the budget by hand with `gcloud` — it would converge with the
+merged configuration rather than drift from it, and it is still a mutation outside the
+gated path, which spec §2 calls a process violation; raised for the maintainer rather
+than taken, and only worth revisiting if the coordinated attempt fails twice.
+**What this costs:** two approvals instead of one for this remediation. Cheap against
+the alternative, which is a wave that half-applies while the control fires underneath it.
+**Exit review:** yes — the phase's restart procedure was wrong in a way that only firing
+it revealed, which is the same lesson the three live-fires taught, in a new place.
