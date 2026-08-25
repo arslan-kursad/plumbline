@@ -946,3 +946,47 @@ than taken, and only worth revisiting if the coordinated attempt fails twice.
 the alternative, which is a wave that half-applies while the control fires underneath it.
 **Exit review:** yes — the phase's restart procedure was wrong in a way that only firing
 it revealed, which is the same lesson the three live-fires taught, in a new place.
+
+### A2.9 — The budget half of the amendment cannot go through the gated path, by design
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**What happened:** the Wave 1.5 apply reached the gate, was approved, and failed:
+`Error updating Budget "billingAccounts/***/budgets/02d42f8d-...": googleapi: Error 403:
+The caller does not have permission`.
+**Not a defect — W1.5's own boundary, meeting its first real case.** `ci-deploy` holds
+`roles/billing.viewer` on the billing account and nothing else, because W1.5 decided
+that *billing-account writes never belong to a CI identity*. A budget is a
+billing-account resource. So the amendment's central change — the credit filter — can
+never be applied by the gated path, and W1.5 predicted the shape exactly: *"a plan
+needing a billing-account write fails in CI with a permission error. That is intended.
+It is visible, it names the resource, and it routes the change to the only path allowed
+to make it."*
+**Decision:** Wave 1.5 splits by scope rather than by wave. The two budgets are applied
+by the maintainer from their own credentials, targeted — the Wave 0 and W1a precedent,
+which exists for exactly this class of resource. The function and its source object are
+project-scoped and go through the gate as normal.
+**What this says about the directive:** its §6 describes Wave 1.5 as a single armed
+apply. That was not executable, and no amount of care in the plan would have revealed
+it — the permission boundary only announces itself at apply time, which is the third
+time in this project a control's real behaviour differed from its configuration review.
+**Exit review:** yes — the directive's own verification sequence needs this correction
+before anyone follows it again.
+
+### A2.10 — A filter change needs its own seek, because in-flight messages carry the old figure
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**What happened:** the credit filter was applied at ~11:51. At 11:53:03 a notification
+arrived still reading `cost=0.04` and the function detached billing. That looked like
+the fix failing.
+**It was not.** A delivery attempt at 11:47:58 had aborted with *no available instance*,
+and Pub/Sub retries with backoff — so the message delivered at 11:53 was published
+**before** the filter changed and carried a figure computed under the old one. After a
+second seek and re-attach, the first genuinely fresh notification, at **12:11:23**, read
+`cost=0` and billing stayed attached.
+**The rule this establishes:** changing what a budget *measures* does not change messages
+already in flight. A seek belongs **after** the filter apply as well as before the
+re-attach, or the first delivery after the fix re-creates the failure and reads as proof
+that the fix did not work.
+**Why it nearly cost more than a restart:** the false reading pointed at a much larger
+conclusion — that `INCLUDE_ALL_CREDITS` does not subtract this account's credit either,
+which would have left the epsilon as the only remedy and no window to deploy it in. One
+observation was the difference between that and a two-minute retry.
+**Exit review:** no, but the runbook carries it.

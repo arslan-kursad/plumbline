@@ -440,6 +440,20 @@ remediation that has to land inside that window must be a single fast resource
 update — not a function deployment, which rebuilds the container and cannot
 finish in time.
 
+**Two scopes, two paths — the budgets cannot go through CI.** `ci-deploy` holds
+`roles/billing.viewer` on the billing account and nothing else (decision log W1.5), and
+a budget is a billing-account resource. An armed apply that touches one fails with
+`403: The caller does not have permission`, by design. The budgets are applied by the
+maintainer from their own credentials, targeted; the function and its source object are
+project-scoped and go through the gate as normal.
+
+**Seek again after changing the filter, not only before re-attaching.** Changing what a
+budget measures does not change messages already published. On 2026-08-25 the filter
+landed at ~11:51 and a message published at ~11:47 was delivered at 11:53 still carrying
+the old figure — it detached billing and read exactly like the fix having failed. After
+a second seek, the first fresh notification at 12:11:23 read `cost=0` and billing stayed
+attached.
+
 **Breaking the loop takes one resource, not the whole amendment.** The budget's
 credit filter alone is sufficient: with `INCLUDE_ALL_CREDITS` the published figure
 becomes net, which on a credit-covered account is `0.00`, and even the old
