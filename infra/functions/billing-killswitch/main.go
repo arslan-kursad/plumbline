@@ -1,10 +1,16 @@
-// Package killswitch detaches the billing account from this GCP project as soon
-// as any spend is reported against it.
+// Package killswitch detaches the billing account from this GCP project when
+// reported net cost reaches a small threshold.
 //
 // It is the last control in the cost chain (ADR-0004 §2): reaching it means
 // Terraform configuration, CI gates, quotas and alerts have all already failed.
 // Its job is to bound the loss, so it is deliberately one API call with one
 // outcome, and it is live-fired before F0 is closed (F0 spec W4).
+//
+// The trigger is `>= DETACH_THRESHOLD` rather than `> 0` (ADR-0004 Amendment 4).
+// Firing on any non-zero figure sounds stricter and was not: a reported cost can
+// be non-zero while nothing has been billed, and this function detached a live
+// project on 0.04 TRY of its own CPU seconds. The zero-cost claim is measured
+// from the invoice; this threshold only decides when to pull the plug.
 package killswitch
 
 import (
@@ -13,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -49,8 +56,49 @@ type budgetNotification struct {
 	CostIntervalStart      string  `json:"costIntervalStart"`
 }
 
-// HandleBudgetNotification detaches billing when reported cost is strictly
-// greater than zero.
+// shouldDetach is the whole decision, isolated so it can be tested without a
+// CloudEvent, a billing client or a network (ADR-0004 Amendment 4, D2).
+//
+// Detach at or above the threshold, not above zero. Amendment 1 used `> 0` on the
+// premise that a reported figure is net of Always Free; live operation showed a
+// reported figure can be non-zero while nothing has been billed, because a gross
+// line can appear before — or instead of — the credit that cancels it.
+//
+// A cost that is not a number is not evidence of spend: NaN comparisons are false
+// in every direction, so the guard is explicit rather than accidental, and a
+// negative cost is a refund or a correction and never a reason to act.
+func shouldDetach(cost, threshold float64) bool {
+	if math.IsNaN(cost) || math.IsInf(cost, 0) || cost < 0 {
+		return false
+	}
+	return cost >= threshold
+}
+
+// detachThreshold reads the epsilon from the environment.
+//
+// No default. A threshold nobody chose is either zero — which restores the
+// behaviour this amendment exists to remove — or a number invented at the moment
+// the control is needed. Failing at startup is loud, happens before any
+// notification arrives, and cannot be mistaken for a working deployment.
+func detachThreshold() (float64, error) {
+	raw := os.Getenv("DETACH_THRESHOLD")
+	if raw == "" {
+		return 0, errors.New("DETACH_THRESHOLD is not set")
+	}
+
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("DETACH_THRESHOLD=%q is not a number: %w", raw, err)
+	}
+	if value <= 0 || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, fmt.Errorf("DETACH_THRESHOLD=%q must be a positive, finite number", raw)
+	}
+
+	return value, nil
+}
+
+// HandleBudgetNotification detaches billing when reported net cost reaches the
+// configured threshold.
 //
 // Error convention: a returned error makes Pub/Sub redeliver. Errors that
 // redelivery cannot fix — an unparseable payload, a missing permission — are
@@ -60,6 +108,17 @@ func HandleBudgetNotification(ctx context.Context, e event.Event) error {
 	projectID := os.Getenv("TARGET_PROJECT_ID")
 	if projectID == "" {
 		slog.Error("TARGET_PROJECT_ID is not set; refusing to guess the project")
+		return nil
+	}
+
+	threshold, err := detachThreshold()
+	if err != nil {
+		// Fail closed and say so. Redelivery cannot fix a missing environment
+		// variable, so this acks rather than looping — but it is FATAL-shaped:
+		// the deployment is misconfigured and no notification will ever be acted
+		// on until it is fixed.
+		slog.Error("FATAL: refusing to evaluate a budget notification without a detach threshold",
+			"error", err)
 		return nil
 	}
 
@@ -73,16 +132,31 @@ func HandleBudgetNotification(ctx context.Context, e event.Event) error {
 		"budget", notification.BudgetDisplayName,
 		"cost", notification.CostAmount,
 		"currency", notification.CurrencyCode,
+		"threshold", threshold,
 		"threshold_exceeded", notification.AlertThresholdExceeded,
 		"interval_start", notification.CostIntervalStart,
 	)
 
-	if notification.CostAmount <= 0 {
-		slog.Info("no spend reported; billing left attached", "project", projectID)
+	if !shouldDetach(notification.CostAmount, threshold) {
+		if notification.CostAmount <= 0 {
+			slog.Info("no spend reported; billing left attached", "project", projectID)
+			return nil
+		}
+
+		// The case this amendment was written for. Visible on purpose: a figure
+		// below the threshold is the shape of a credit that has not landed yet,
+		// and a run of these is the evidence for revisiting the threshold.
+		slog.Warn("spend reported below detach threshold; no action",
+			"project", projectID,
+			"cost", notification.CostAmount,
+			"currency", notification.CurrencyCode,
+			"threshold", threshold,
+			"interval_start", notification.CostIntervalStart,
+		)
 		return nil
 	}
 
-	return detachBilling(ctx, projectID, notification)
+	return detachBilling(ctx, projectID, notification, threshold)
 }
 
 // parseNotification unwraps the Pub/Sub envelope and the budget notification it
@@ -102,7 +176,7 @@ func parseNotification(e event.Event) (budgetNotification, error) {
 	return notification, nil
 }
 
-func detachBilling(ctx context.Context, projectID string, notification budgetNotification) error {
+func detachBilling(ctx context.Context, projectID string, notification budgetNotification, threshold float64) error {
 	svc, err := cloudbilling.NewService(ctx)
 	if err != nil {
 		slog.Error("cannot create Cloud Billing client", "error", err)
@@ -128,11 +202,12 @@ func detachBilling(ctx context.Context, projectID string, notification budgetNot
 		return nil
 	}
 
-	slog.Warn("spend reported; detaching billing account",
+	slog.Warn("spend reported at or above the detach threshold; detaching billing account",
 		"project", projectID,
 		"billing_account", info.BillingAccountName,
 		"cost", notification.CostAmount,
 		"currency", notification.CurrencyCode,
+		"threshold", threshold,
 	)
 
 	if _, err := svc.Projects.UpdateBillingInfo(resource, &cloudbilling.ProjectBillingInfo{

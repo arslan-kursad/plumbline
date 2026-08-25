@@ -1,8 +1,8 @@
 package killswitch
 
 import (
-	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"testing"
 
@@ -77,35 +77,72 @@ func TestParseNotificationRejectsGarbage(t *testing.T) {
 
 // The zero/non-zero boundary is the whole decision: at or below zero billing is
 // left alone, above zero it is detached.
-func TestDetachDecisionBoundary(t *testing.T) {
+// The decision rule, at its boundary (ADR-0004 Amendment 4, D2).
+//
+// The old rule was `cost > 0` and it is what detached a live project on 0.04 TRY
+// of the kill-switch's own CPU seconds. These cases pin the replacement: the
+// threshold is inclusive, everything under it is inaction, and a figure that is
+// not a number is never evidence of spend.
+func TestShouldDetach(t *testing.T) {
+	const threshold = 5.00
+
 	cases := []struct {
-		name       string
-		costAmount float64
-		want       bool
+		name string
+		cost float64
+		want bool
 	}{
 		{"no spend", 0, false},
 		{"negative adjustment", -0.01, false},
-		{"one cent", 0.01, true},
-		{"smallest reported amount", 0.000001, true},
+		{"the observed false positive", 0.04, false},
+		{"just below the threshold", 4.99, false},
+		{"exactly the threshold detaches", 5.00, true},
+		{"above the threshold", 5.01, true},
+		{"far above", 1000, true},
+		{"NaN is not spend", math.NaN(), false},
+		{"positive infinity is not a cost figure", math.Inf(1), false},
+		{"negative infinity is not a cost figure", math.Inf(-1), false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			raw, err := json.Marshal(map[string]any{"costAmount": tc.costAmount})
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
-
-			notification, err := parseNotification(newBudgetEvent(t, string(raw)))
-			if err != nil {
-				t.Fatalf("parseNotification: %v", err)
-			}
-
-			if got := notification.CostAmount > 0; got != tc.want {
-				t.Errorf("detach decision for cost %v = %v, want %v", tc.costAmount, got, tc.want)
+			if got := shouldDetach(tc.cost, threshold); got != tc.want {
+				t.Errorf("shouldDetach(%v, %v) = %v, want %v", tc.cost, threshold, got, tc.want)
 			}
 		})
 	}
+}
+
+// A threshold nobody chose is either zero — which restores the behaviour the
+// amendment removes — or a number invented when the control is needed. Both are
+// startup failures, and this is the test that says so.
+func TestDetachThresholdRefusesAnythingButAPositiveNumber(t *testing.T) {
+	t.Run("missing is a startup failure", func(t *testing.T) {
+		t.Setenv("DETACH_THRESHOLD", "")
+		if _, err := detachThreshold(); err == nil {
+			t.Fatal("DETACH_THRESHOLD was absent and the function accepted it; " +
+				"a control with an unchosen threshold looks identical to a working one")
+		}
+	})
+
+	for _, raw := range []string{"five", "", "0", "-1", "NaN", "Inf", "5,00"} {
+		t.Run("refuses "+raw, func(t *testing.T) {
+			t.Setenv("DETACH_THRESHOLD", raw)
+			if _, err := detachThreshold(); err == nil {
+				t.Errorf("DETACH_THRESHOLD=%q was accepted", raw)
+			}
+		})
+	}
+
+	t.Run("accepts a positive number", func(t *testing.T) {
+		t.Setenv("DETACH_THRESHOLD", "5.00")
+		value, err := detachThreshold()
+		if err != nil {
+			t.Fatalf("detachThreshold: %v", err)
+		}
+		if value != 5.00 {
+			t.Errorf("threshold = %v, want 5", value)
+		}
+	})
 }
 
 // Redelivery must stop for failures redelivery cannot fix, and must continue for

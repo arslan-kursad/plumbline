@@ -186,3 +186,59 @@ variable "alert_email" {
     error_message = "alert_email must be an email address."
   }
 }
+
+variable "detach_threshold" {
+  description = <<-EOT
+    Net cost in billing-account currency at or above which the kill-switch
+    function detaches billing (ADR-0004 Amendment 4, D2).
+
+    Not `> 0`. Amendment 1's trigger was any reported cost above zero, and live
+    operation showed that a figure can be non-zero while nothing has been billed:
+    a gross line appears before, or instead of, the credit that cancels it. The
+    observed magnitude was 0.04 TRY. Five absorbs that with no state to keep,
+    and stays far below any real charge that could accumulate inside one
+    notification interval.
+
+    The zero-cost claim is measured from the invoice, never from this number.
+  EOT
+  type        = number
+  default     = 5.00
+
+  validation {
+    condition     = var.detach_threshold > 0
+    error_message = "detach_threshold must be positive; a zero or negative threshold detaches on every notification."
+  }
+}
+
+variable "gross_alert_threshold" {
+  description = <<-EOT
+    Monthly gross cost, before any credit, at which the notification-only budget
+    emails the billing administrators (ADR-0004 Amendment 4, D3).
+
+    This is the runaway signal during the promotional period, when net cost is
+    zero by construction and the detach guard cannot fire. It is deliberately
+    not small: its job is to catch usage nobody planned, not to report that the
+    system ran.
+  EOT
+  type        = number
+  default     = 100.00
+
+  validation {
+    condition     = var.gross_alert_threshold > 0
+    error_message = "gross_alert_threshold must be positive."
+  }
+}
+
+variable "billing_currency" {
+  description = <<-EOT
+    ISO 4217 currency of the billing account, used by the gross-cost alert budget.
+
+    Stated rather than inherited, unlike `budget_currency_code` on the kill-switch
+    budget: that budget's amount is not its trigger, so its currency is
+    immaterial. This one's thresholds are percentages of the amount, so the
+    amount has to mean something — and the Budget API rejects a create whose
+    stated currency differs from the billing account's.
+  EOT
+  type        = string
+  default     = "TRY"
+}

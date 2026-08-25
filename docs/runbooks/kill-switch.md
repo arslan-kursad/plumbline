@@ -19,8 +19,14 @@ budget (every cost update) --> Pub/Sub topic billing-alerts --> Cloud Function
 The budget threshold is **not** the trigger. The budget publishes a notification
 to `billing-alerts` on every cost update (roughly every 20–30 minutes) via
 `all_updates_rule`, and the function detaches billing whenever the reported
-`costAmount` is strictly greater than zero. This is what "alert at any spend
-above $0" (F0 spec W4, ADR-0004 §5) means in an API that has no zero threshold.
+`costAmount` reaches `DETACH_THRESHOLD` — a small epsilon, default 5.00 in the
+account's currency, **not** zero (ADR-0004 Amendment 4, §4a below).
+
+It was "strictly greater than zero" until 2026-08-22, which is what "alert at any
+spend above $0" (F0 spec W4, ADR-0004 §5) reads like in an API with no zero
+threshold. That rule detached a working project twice on money that was never
+billed. The epsilon is what replaced it; the zero-cost claim is measured from the
+invoice, and was never this trigger's job.
 
 Consequences, stated rather than discovered later:
 
@@ -28,24 +34,30 @@ Consequences, stated rather than discovered later:
   budget data as delayed; the window between the first billable byte and the
   notification carrying it is real and is not controlled by this project. The
   kill-switch bounds the loss, it does not make it zero.
-- The budget subtracts **Free Tier credits only** — see "Spend basis" below. A
-  promotional credit must not mask spend; Always Free must not be mistaken for it.
-- A cost update below the smallest reported amount is not visible to the
-  function. In practice the first non-zero report fires it.
+- The budget subtracts **every credit** — see "Spend basis" below. Subtracting an
+  enumerated subset is what failed: the one type it named never appeared.
+- A reported figure below the threshold produces a WARN and no action. That line
+  is normal while a credit absorbs usage; §4a says what to watch for instead.
 
 ### Spend basis
 
-The budget measures gross cost minus Free Tier credits only
-(`INCLUDE_SPECIFIED_CREDITS` with `credit_types = ["FREE_TIER"]`). Promotional
-credits — the Free Trial and marketing grants, which Cloud Billing groups under
-`PROMOTION` — are **not** subtracted, so spend beyond the Always Free tier is
-visible immediately even when a promotional credit is paying for it. Free Tier
-usage nets to zero and does not trigger the switch.
+The budget measures gross cost minus **all** credits
+(`INCLUDE_ALL_CREDITS`). Always Free is a credit against a non-zero gross cost
+line rather than an absence of charge, so excluding credits would make the budget
+report spend during entirely free operation — that was the first implementation
+and Amendment 1 removed it.
 
-Always Free is a credit against a non-zero gross cost line, not an absence of
-charge. Excluding all credits — the first implementation — would make the budget
-report spend during entirely free operation, and this chain detaches billing on
-any reported spend. See ADR-0004 Amendment 1.
+Amendment 1 then subtracted one *named* credit type, so that a promotional credit
+could not mask real spend. On this account that filter matched nothing: usage is
+absorbed by a trial credit, no free-tier line appeared, and the budget published
+gross. Enumerating types re-creates that failure for the next type nobody
+anticipated, so the enumeration is gone (Amendment 4, D1).
+
+**The protection Amendment 1 wanted did not disappear with it.** It moved to a
+place that does not depend on guessing a taxonomy: a second budget,
+`plumbline gross-cost alert`, reports **gross** cost and emails the billing
+administrators. It has no Pub/Sub binding and cannot reach the function. That is
+what makes runaway usage visible while a credit is paying for it — see §4a.
 
 **Currency.** The budget's currency is not set in Terraform. The Budget API
 rejects a create whose currency differs from the billing account's, and this
@@ -56,7 +68,7 @@ function compares `costAmount` against zero and never reads `currencyCode`, so a
 mismatch there changes nothing.
 
 **Verification A — documented behaviour. Performed once, after the first apply.
-NOT YET DONE.**
+ATTEMPTED 2026-08-22; INCONCLUSIVE BY CONSTRUCTION — see #74.**
 
 Billing → Reports → clear the savings and credit filters. A non-zero usage cost
 alongside a net total of zero confirms that Free Tier is credit-implemented, which
@@ -72,10 +84,16 @@ same-minute one.
 
 Record the date and the observed figures here:
 
-> Not yet executed. There is no billing account yet. Until this is recorded, the
-> spend basis rests on Google's documentation alone — which states that free-tier
-> services apply credits to implement the free usage — and not on an observation
-> of this account.
+> **2026-08-22.** Billing Reports, August 1–22, grouped by SKU: one non-zero gross
+> line, `TRY 0.04` against Cloud Run functions CPU, offset by `-TRY 0.04` in
+> savings, subtotal `TRY 0.00`. So a credit does implement the free usage on this
+> account — but the credit doing it is a one-time trial credit valid to
+> **2026-10-05**, not an Always Free discount, and while it applies there is no way
+> to observe how this account behaves on Always Free alone.
+>
+> The premise is therefore neither confirmed nor refuted. It is **unobservable
+> until the trial credit expires**, and the dated re-run is Verification C
+> (Amendment 4, D5; tracked in #74).
 
 If the observation contradicts the premise, stop: the amendment is withdrawn, not
 patched.
@@ -361,6 +379,87 @@ exercises Pub/Sub → function → detach. It says nothing about how the budget
 computes the cost figure the function reads: a spend-basis defect sits upstream of
 the boundary this test starts at, and a green live-fire is not evidence against
 one. That segment is covered by Verification B in §1, in F2.
+
+## 4a. Credit lag and the promotional period (ADR-0004 Amendment 4)
+
+**What changed and why.** The trigger used to be "any reported cost above zero".
+On 2026-08-22 that detached a working project twice on figures that were never
+billed — 0.01 TRY at 02:16, then 0.04 TRY at 17:11, eighteen minutes after the
+account was re-attached. Billing Reports for the same interval read
+`TRY 0.00` total: one gross line of TRY 0.04 against the kill-switch function's
+own CPU seconds, fully offset by a credit. The budget's credit filter matched
+nothing, so the figure it published was gross. Full record:
+[`f2-billing-incident-2026-08-22.md`](../evidence/f2-billing-incident-2026-08-22.md).
+
+The trigger is now **`reported net cost >= DETACH_THRESHOLD`**, default 5.00 in
+the billing account's currency, with the budget reporting net of every credit.
+
+**What a below-threshold WARN means.** This line is normal and is not an alert:
+
+```
+WARN spend reported below detach threshold; no action
+     project=... cost=0.04 currency=TRY threshold=5 interval_start=...
+```
+
+It says a non-zero figure was reported and no money is known to have left the
+account. A run of these is the expected shape while a credit absorbs usage. What
+would *not* be normal is the figure climbing across notification cycles — that is
+the case the threshold is deliberately low enough to catch.
+
+**The guard is inert while the promotional credit applies, and that is stated
+rather than discovered.** Net cost is zero by construction until the credit is
+exhausted or expires (2026-10-05), so the detach path cannot fire in that window.
+The runaway signal during it is the second budget — `plumbline gross-cost alert` —
+which reports **gross** cost and emails the billing administrators at 50% and 100%
+of `gross_alert_threshold`. It has no Pub/Sub binding and cannot reach the
+function; the plan guard asserts that exactly one budget publishes to
+`billing-alerts`, so that stays true by mechanism.
+
+**When to re-attach after a detach.** Read the reported figure out of the function
+log first, then Billing Reports for the same interval, gross *and* credited, by
+service. Re-attaching before the cause is known restores the conditions that
+produced the charge — and if notifications piled up while the function could not
+start, the backlog must be dropped first or the function wakes, reads a figure
+that stopped being true hours ago, and detaches again:
+
+```
+gcloud pubsub subscriptions seek <eventarc-subscription> \
+  --project <project> --time "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+Then §5's re-attach procedure.
+
+### Live-fire for the threshold (required before billing re-attach)
+
+Same message format as §3. Run all three; none is optional.
+
+1. `costAmount = detach_threshold - 0.01` → WARN, **no detach**. Billing state
+   must not change.
+2. `costAmount = detach_threshold` → detach within one invocation, confirmed on
+   the billing page.
+3. Re-attach, then observe two consecutive real notification cycles: WARN below
+   threshold, or no spend, and no detach.
+
+Evidence — function logs for steps 1, 2 and 3, plus billing state before and
+after — is archived below. Wave 2 is armed only after step 3.
+
+**Attempt 1 — <date> — <result>**
+
+```
+(evidence placeholder: step 1 log lines)
+```
+
+**Attempt 2 — <date> — <result>**
+
+```
+(evidence placeholder: step 2 log lines, billing state after)
+```
+
+**False-positive regression check — <date> — <result>**
+
+```
+(evidence placeholder: step 3, two consecutive cycles with no detach)
+```
 
 ## 5. Re-attach procedure (manual, human-only)
 

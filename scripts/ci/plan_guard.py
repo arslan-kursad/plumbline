@@ -62,6 +62,28 @@ def nested(mapping, path):
     return mapping
 
 
+def budget_topic_bindings(plan):
+    """Addresses of budgets whose notifications publish to a Pub/Sub topic.
+
+    Read off the planned attribute rather than the resource name, because what
+    matters is where a budget *publishes*, and a resource can be renamed without
+    changing that (ADR-0004 Amendment 4, D3).
+    """
+    bound = []
+    for change in plan.get("resource_changes", []):
+        if change.get("type") != "google_billing_budget":
+            continue
+        actions = change.get("change", {}).get("actions", [])
+        if not ({"create", "update"} & set(actions)):
+            continue
+
+        after = change.get("change", {}).get("after") or {}
+        topic = nested(after, ("all_updates_rule", "pubsub_topic"))
+        if topic:
+            bound.append((change.get("address", "?"), topic))
+    return bound
+
+
 def check(plan, allowed):
     """Returns (violations, checked).
 
@@ -123,6 +145,23 @@ def check(plan, allowed):
                 "retention is a paid feature and is forbidden on every topic"
             )
 
+    # Exactly one budget may reach the kill-switch (ADR-0004 Amendment 4, D3).
+    #
+    # The gross-cost alert budget reports a figure that is non-zero during
+    # entirely free operation. If it ever gained a Pub/Sub binding to the topic
+    # the function listens on, it would detach billing on ordinary usage — the
+    # failure this amendment exists to remove, re-created by a resource that
+    # looks like a notification.
+    bound = budget_topic_bindings(plan)
+    if len(bound) > 1:
+        listed = "; ".join(f"{address} -> {topic}" for address, topic in bound)
+        violations.append(
+            f"{len(bound)} budgets publish to a Pub/Sub topic ({listed}); "
+            "exactly one budget may reach the kill-switch function"
+        )
+    if bound:
+        checked.append(f"{bound[0][0]}: publishes to {bound[0][1]}")
+
     return violations, checked
 
 
@@ -141,11 +180,11 @@ def main():
     # Printed on both paths: on a failure it says what else was examined, and on a
     # clean run it is the only evidence that anything was.
     if checked:
-        print("plan guard: scaling asserted on")
+        print("plan guard: asserted")
         for entry in checked:
             print(f"  {entry}")
     else:
-        print("plan guard: no scalable resource in this plan")
+        print("plan guard: nothing in this plan carries a checked attribute")
 
     if violations:
         print(f"plan guard: {len(violations)} violation(s)")

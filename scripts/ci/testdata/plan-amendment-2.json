@@ -1,0 +1,38 @@
+{
+  "format_version": "1.2",
+  "_comment": "Amendment 2's intended shape: the kill-switch budget keeps its billing-alerts binding; the gross-cost alert budget has no all_updates_rule at all, which is how it reaches the email default without a programmatic path. The guard must pass this.",
+  "resource_changes": [
+    {
+      "address": "google_billing_budget.zero_spend",
+      "type": "google_billing_budget",
+      "name": "zero_spend",
+      "change": {
+        "actions": [
+          "update"
+        ],
+        "after": {
+          "display_name": "plumbline zero-spend",
+          "all_updates_rule": [
+            {
+              "pubsub_topic": "projects/plumbline-19458/topics/billing-alerts",
+              "schema_version": "1.0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "google_billing_budget.gross_cost_alert",
+      "type": "google_billing_budget",
+      "name": "gross_cost_alert",
+      "change": {
+        "actions": [
+          "create"
+        ],
+        "after": {
+          "display_name": "plumbline gross-cost alert"
+        }
+      }
+    }
+  ]
+}

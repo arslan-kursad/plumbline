@@ -107,10 +107,12 @@ self_test() {
   done <<'FIXTURES'
 plan-clean.json pass
 plan-wave2.json pass
+plan-amendment-2.json pass
 plan-forbidden-type.json fail
 plan-scaling.json fail
 plan-region.json fail
 plan-topic-retention.json fail
+plan-two-budgets.json fail
 FIXTURES
 
   printf '\n'

@@ -6,9 +6,13 @@
 #
 # The budget threshold is not the trigger. `all_updates_rule` publishes a
 # notification on every cost update (~30 min cadence), and the function detaches
-# whenever reported cost is strictly greater than zero — which is what "alert at
-# any spend > $0" means operationally. Threshold rules only add a labelled
-# "exceeded" event to the same stream.
+# whenever reported net cost reaches `detach_threshold` — a small epsilon rather
+# than "greater than zero" (ADR-0004 Amendment 4, D2), because a reported figure
+# can be non-zero while nothing has been billed. Threshold rules only add a
+# labelled "exceeded" event to the same stream.
+#
+# A second budget lives at the bottom of this file and reports gross cost. It has
+# no Pub/Sub binding and cannot reach this function: it emails, and that is all.
 
 resource "google_pubsub_topic" "billing_alerts" {
   name    = "billing-alerts"
@@ -216,6 +220,11 @@ resource "google_cloudfunctions2_function" "killswitch" {
 
     environment_variables = {
       TARGET_PROJECT_ID = var.project_id
+
+      # The epsilon (Amendment 4, D2). Passed rather than compiled in so the
+      # value is reviewable in a plan diff; the function refuses to start without
+      # it rather than falling back to a default nobody chose.
+      DETACH_THRESHOLD = var.detach_threshold
     }
   }
 
@@ -256,21 +265,23 @@ resource "google_billing_budget" "zero_spend" {
   budget_filter {
     projects = ["projects/${data.google_project.this.number}"]
 
-    # Counter-intuitive on purpose; do not "correct" this to EXCLUDE_ALL_CREDITS
-    # (ADR-0004 Amendment 1).
+    # Net of every credit (ADR-0004 Amendment 4, D1). Do not narrow this back to
+    # an enumerated list.
     #
-    # Always Free is not an absence of charge: it is a FREE_TIER credit applied
-    # against a non-zero gross cost line. Excluding all credits would therefore
-    # make the budget report spend during entirely free operation, and this chain
-    # detaches billing on any reported spend — a false positive that takes the
-    # project down and cannot be undone by the system, since re-attachment is
-    # human-only by design.
+    # Amendment 1 subtracted one named credit type and nothing else, so that usage
+    # beyond Always Free stayed visible. Live operation falsified its premise: this
+    # account's usage is absorbed by a promotional credit, no matching credit line
+    # appeared, and the filter therefore subtracted nothing. The budget reported
+    # gross, and this chain detaches on any reported spend — so the kill-switch
+    # detached billing 18 minutes after it was attached, on 0.04 TRY of its own
+    # CPU seconds.
     #
-    # Subtracting FREE_TIER and nothing else gives the intended meaning: usage
-    # beyond Always Free is visible immediately, and PROMOTION credits — which
-    # cover the Free Trial and marketing grants — cannot mask it.
-    credit_types_treatment = "INCLUDE_SPECIFIED_CREDITS"
-    credit_types           = ["FREE_TIER"]
+    # Enumerating types re-creates that failure the next time a type appears that
+    # nobody anticipated. Subtracting all of them is the one reading that cannot
+    # be wrong about a category it has not met, and the guard against a credit
+    # masking real spend moves to two places that do not depend on guessing: the
+    # epsilon threshold below, and the gross-cost alert budget in this file.
+    credit_types_treatment = "INCLUDE_ALL_CREDITS"
   }
 
   amount {
@@ -295,6 +306,71 @@ resource "google_billing_budget" "zero_spend" {
     schema_version                 = "1.0"
     disable_default_iam_recipients = false
   }
+
+  depends_on = [google_project_service.required]
+}
+
+# The runaway signal while a promotional credit absorbs everything
+# (ADR-0004 Amendment 4, D3).
+#
+# The kill-switch budget above now reports net of every credit, which is what
+# stops it firing on credit-absorbed usage — and it means that during the
+# promotional period net cost is zero by construction and the detach guard cannot
+# fire at all (D4). That inertness is acknowledged rather than hidden, and this
+# budget is what covers the window: it reports **gross**, so usage hidden behind
+# the credit is still visible to a human.
+#
+# It is notification-only, and the absence of a Pub/Sub binding is the design.
+# Two budgets publishing to `billing-alerts` would mean two independent things
+# could detach billing, one of them on a figure that is non-zero during entirely
+# free operation. The plan guard asserts that exactly one budget references that
+# topic, so this stays true by mechanism rather than by memory.
+resource "google_billing_budget" "gross_cost_alert" {
+  billing_account = var.billing_account_id
+  display_name    = "plumbline gross-cost alert"
+
+  budget_filter {
+    projects               = ["projects/${data.google_project.this.number}"]
+    credit_types_treatment = "EXCLUDE_ALL_CREDITS"
+  }
+
+  amount {
+    specified_amount {
+      # Unlike the kill-switch budget, this amount *is* the trigger: the
+      # thresholds below are percentages of it, so the currency has to be stated
+      # and has to match the billing account's or the API refuses the create.
+      currency_code = var.billing_currency
+      units         = var.gross_alert_threshold
+    }
+  }
+
+  # Two rules rather than one. 50% is the signal that something changed while
+  # there is still room to look at it; 100% is the one that says the month's
+  # gross has reached a figure nobody planned for.
+  threshold_rules {
+    threshold_percent = 0.5
+    spend_basis       = "CURRENT_SPEND"
+  }
+
+  threshold_rules {
+    threshold_percent = 1.0
+    spend_basis       = "CURRENT_SPEND"
+  }
+
+  # No `all_updates_rule` block at all, and that is what delivers the email.
+  #
+  # The directive asked for the block with `disable_default_iam_recipients =
+  # false`. The provider refuses it: `all_updates_rule` requires either
+  # `pubsub_topic` or `monitoring_notification_channels`, so the block cannot be
+  # written without giving this budget one of the two programmatic paths D3
+  # forbids it. Omitting the block leaves the API default — threshold
+  # notifications emailed to the billing account's administrators — which is
+  # exactly what D3 specifies, reached by absence rather than by configuration.
+  #
+  # It also changes the cadence in the right direction: with no `all_updates_rule`
+  # this budget notifies on the threshold rules above rather than on every cost
+  # update. An alert that fired every thirty minutes would be ignored by the third
+  # day.
 
   depends_on = [google_project_service.required]
 }
