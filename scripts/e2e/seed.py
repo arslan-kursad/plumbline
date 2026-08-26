@@ -133,6 +133,15 @@ def bigquery(base: str, sql_dir: pathlib.Path) -> int:
         if path.name.startswith("001_"):
             continue  # created above, through the API the stand-in supports
         status, body = request("POST", queries, {"query": path.read_text(), "useLegacySql": False})
+
+        # A 200 is not success. The stand-in answers some rejected statements with
+        # HTTP 200 and the failure inside the payload, so a DDL that created nothing
+        # was reported `ok` and the next file failed with `Table not found` — the
+        # error arriving one statement after the statement that caused it. Status and
+        # payload are two different claims and both have to be checked.
+        if status < 400 and '"errors"' in body:
+            status = 400
+
         report(f"sql {path.name}", status, body)
         if status >= 400:
             failures += 1
