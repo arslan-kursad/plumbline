@@ -133,11 +133,45 @@ def bigquery(base: str, sql_dir: pathlib.Path) -> int:
         if path.name.startswith("001_"):
             continue  # created above, through the API the stand-in supports
         status, body = request("POST", queries, {"query": path.read_text(), "useLegacySql": False})
+
+        # A 200 is not success. The stand-in answers some rejected statements with
+        # HTTP 200 and the failure inside the payload, and answers others with a
+        # clean 200 while creating nothing at all. Status and payload are two
+        # different claims, and neither is the same claim as "the object exists".
+        if status < 400 and '"errors"' in body:
+            status = 400
+
         report(f"sql {path.name}", status, body)
         if status >= 400:
             failures += 1
+            continue
 
+        # The claim that matters. A DDL reported `ok` that produced no object made
+        # the *next* file fail with `Table not found`, naming a symptom one statement
+        # away from its cause. Ask the stand-in what it actually holds.
+        created = re.findall(r"CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+`?[\w-]*\.?(\w+)`?",
+                             path.read_text(), re.IGNORECASE)
+        for name in created:
+            if name not in existing_tables(base):
+                print(f"  FAILED  sql {path.name}: reported ok but {DATASET}.{name} does not exist",
+                      file=sys.stderr)
+                failures += 1
+
+    print(f"  dataset now holds: {sorted(existing_tables(base))}")
     return failures
+
+
+def existing_tables(base: str) -> set[str]:
+    """What the stand-in actually holds, as opposed to what it accepted."""
+    status, body = request(
+        "GET", f"{base}/bigquery/v2/projects/{PROJECT}/datasets/{DATASET}/tables")
+    if status >= 400:
+        return set()
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return set()
+    return {t.get("tableReference", {}).get("tableId", "") for t in payload.get("tables", [])}
 
 
 def report(what: str, status: int, body: str) -> None:
