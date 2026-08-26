@@ -36,6 +36,23 @@ INGRESS_POSTURE = {
     "ingestion-worker": "INGRESS_TRAFFIC_INTERNAL_ONLY",
 }
 
+# Cloud Run services that may be invoked without authentication, by service name.
+#
+# `allUsers` (or `allAuthenticatedUsers`) holding `roles/run.invoker` *is* what
+# "unauthenticated invocations enabled" means — there is no separate switch. So the
+# worker's protection is the absence of such a member, and an absence is the one
+# thing a configuration review reads past: nothing is on the screen to notice.
+#
+# The collector is deliberately public (architecture §6.1) and is the project's only
+# unauthenticated endpoint. Every other service, in this phase and later ones, is a
+# violation if it acquires one — which is the check DoD 7's "the push service account
+# is the sole invoker" needs, since that claim is false the moment anyone else holds
+# the role regardless of what the push binding says.
+PUBLIC_INVOKER_ALLOWED = {"collector"}
+
+# Members that make a service publicly invokable.
+UNAUTHENTICATED_MEMBERS = {"allUsers", "allAuthenticatedUsers"}
+
 
 def allowlist(architecture_path):
     """Resource types listed in the architecture §7.1 table.
@@ -168,6 +185,43 @@ def check(plan, allowed):
                     violations.append(
                         f"{address}: ingress is {ingress}, must be {expected} "
                         f"for service {name!r} (architecture §6.1)"
+                    )
+
+        if rtype in (
+            "google_cloud_run_v2_service_iam_member",
+            "google_cloud_run_service_iam_member",
+        ):
+            # v2 calls the service `name`; v1 calls it `service`.
+            service = after.get("name") or after.get("service")
+            member = after.get("member")
+            role = after.get("role")
+
+            if role == "roles/run.invoker":
+                # An invoker binding this code cannot read is not a clean binding.
+                # Both fields are known at plan time in this configuration —
+                # verified against a real Wave 3 plan, where `name` renders as
+                # `ingestion-worker` — so an absence means either a value computed
+                # at apply time or a plan shape this check does not understand, and
+                # in both cases it has asserted nothing. Reporting that as clean is
+                # the failure W2.13 found: the control stays green over a gap.
+                if service is None or member is None:
+                    violations.append(
+                        f"{address}: roles/run.invoker binding with "
+                        f"service={service!r} member={member!r}; both must be known "
+                        "at plan time for the public-invoker check to mean anything"
+                    )
+                    continue
+
+                checked.append(f"{address}: invoker {member} on {service}")
+
+                if (
+                    member in UNAUTHENTICATED_MEMBERS
+                    and service not in PUBLIC_INVOKER_ALLOWED
+                ):
+                    violations.append(
+                        f"{address}: {member} holds roles/run.invoker on {service!r}, "
+                        "which is what makes a service publicly invokable; only "
+                        f"{sorted(PUBLIC_INVOKER_ALLOWED)} may be public (§6.1)"
                     )
 
         for key in ("location", "region"):
