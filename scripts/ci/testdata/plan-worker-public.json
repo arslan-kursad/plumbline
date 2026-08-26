@@ -1,0 +1,43 @@
+{
+  "format_version": "1.2",
+  "_comment": "The worker made publicly invokable. Cloud Run has no separate 'allow unauthenticated' switch — this member is that setting, so the worker's protection is the absence of this resource and a review has nothing to look at. Ingress is left INTERNAL_ONLY here on purpose: the ingress guard passes, and this must still fail (decision log W3.x).",
+  "resource_changes": [
+    {
+      "address": "google_cloud_run_v2_service.worker",
+      "type": "google_cloud_run_v2_service",
+      "name": "worker",
+      "change": {
+        "actions": ["update"],
+        "after": {
+          "name": "ingestion-worker",
+          "location": "us-central1",
+          "ingress": "INGRESS_TRAFFIC_INTERNAL_ONLY",
+          "template": [
+            {
+              "scaling": [
+                {
+                  "min_instance_count": 0,
+                  "max_instance_count": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "google_cloud_run_v2_service_iam_member.worker_public",
+      "type": "google_cloud_run_v2_service_iam_member",
+      "name": "worker_public",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "name": "ingestion-worker",
+          "location": "us-central1",
+          "role": "roles/run.invoker",
+          "member": "allUsers"
+        }
+      }
+    }
+  ]
+}

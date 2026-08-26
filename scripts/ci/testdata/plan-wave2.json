@@ -1,18 +1,29 @@
 {
   "format_version": "1.2",
-  "_comment": "Wave 2's shapes: two Cloud Run v2 services inside the guardrails, and the three IAM types added to the §7.1 allowlist for them. Exists so the guard is proven to read `template.scaling` on the real addresses rather than only on a violating fixture — F2 DoD 6.",
+  "_comment": "Wave 2's shapes: two Cloud Run v2 services inside the guardrails, and the three IAM types added to the \u00a77.1 allowlist for them. Exists so the guard is proven to read `template.scaling` on the real addresses rather than only on a violating fixture \u2014 F2 DoD 6. The IAM members carry the same fields a real `terraform show -json` emits, including the service name and the member: this fixture once omitted them, and the first check to read them reported a violation against the fixture rather than against the plan it stands for.",
   "resource_changes": [
     {
       "address": "google_cloud_run_v2_service.collector",
       "type": "google_cloud_run_v2_service",
       "name": "collector",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "after": {
           "name": "collector",
           "location": "us-central1",
           "ingress": "INGRESS_TRAFFIC_ALL",
-          "template": [ { "scaling": [ { "min_instance_count": 0, "max_instance_count": 2 } ] } ]
+          "template": [
+            {
+              "scaling": [
+                {
+                  "min_instance_count": 0,
+                  "max_instance_count": 2
+                }
+              ]
+            }
+          ]
         }
       }
     },
@@ -21,12 +32,23 @@
       "type": "google_cloud_run_v2_service",
       "name": "worker",
       "change": {
-        "actions": ["create"],
+        "actions": [
+          "create"
+        ],
         "after": {
           "name": "ingestion-worker",
           "location": "us-central1",
           "ingress": "INGRESS_TRAFFIC_INTERNAL_ONLY",
-          "template": [ { "scaling": [ { "min_instance_count": 0, "max_instance_count": 2 } ] } ]
+          "template": [
+            {
+              "scaling": [
+                {
+                  "min_instance_count": 0,
+                  "max_instance_count": 2
+                }
+              ]
+            }
+          ]
         }
       }
     },
@@ -35,8 +57,15 @@
       "type": "google_cloud_run_v2_service_iam_member",
       "name": "collector_public",
       "change": {
-        "actions": ["create"],
-        "after": { "location": "us-central1", "role": "roles/run.invoker", "member": "allUsers" }
+        "actions": [
+          "create"
+        ],
+        "after": {
+          "location": "us-central1",
+          "role": "roles/run.invoker",
+          "member": "allUsers",
+          "name": "collector"
+        }
       }
     },
     {
@@ -44,8 +73,14 @@
       "type": "google_pubsub_topic_iam_member",
       "name": "collector_publishes_traces",
       "change": {
-        "actions": ["create"],
-        "after": { "topic": "traces", "role": "roles/pubsub.publisher" }
+        "actions": [
+          "create"
+        ],
+        "after": {
+          "topic": "traces",
+          "role": "roles/pubsub.publisher",
+          "member": "serviceAccount:collector@plumbline-19458.iam.gserviceaccount.com"
+        }
       }
     },
     {
@@ -53,8 +88,15 @@
       "type": "google_bigquery_table_iam_member",
       "name": "worker_writes_spans",
       "change": {
-        "actions": ["create"],
-        "after": { "dataset_id": "plumbline", "table_id": "spans", "role": "roles/bigquery.dataEditor" }
+        "actions": [
+          "create"
+        ],
+        "after": {
+          "dataset_id": "plumbline",
+          "table_id": "spans",
+          "role": "roles/bigquery.dataEditor",
+          "member": "serviceAccount:ingestion-worker@plumbline-19458.iam.gserviceaccount.com"
+        }
       }
     },
     {
@@ -62,8 +104,12 @@
       "type": "google_service_account",
       "name": "collector",
       "change": {
-        "actions": ["create"],
-        "after": { "account_id": "collector" }
+        "actions": [
+          "create"
+        ],
+        "after": {
+          "account_id": "collector"
+        }
       }
     }
   ]

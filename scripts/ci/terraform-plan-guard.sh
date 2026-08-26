@@ -115,6 +115,9 @@ plan-topic-retention.json fail
 plan-two-budgets.json fail
 plan-ingress-inverted.json fail
 plan-ingress-undeclared.json fail
+plan-wave3.json pass
+plan-worker-public.json fail
+plan-invoker-unresolved.json fail
 FIXTURES
 
   printf '\n'
