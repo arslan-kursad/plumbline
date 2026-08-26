@@ -148,16 +148,22 @@ variable "image_tag" {
   EOT
   type        = string
 
-  # Merge commit of #65: the first commit on `main` carrying both of Wave 2's code
-  # prerequisites — the real OIDC push validator (#64) and the Firestore key
-  # registry (#65). Deploying anything earlier would put a worker in the cloud
-  # whose `oidc` mechanism refuses every request.
+  # Current `main`. It carries Wave 2's two code prerequisites — the real OIDC push
+  # validator (#64) and the Firestore key registry (#65) — which landed well before
+  # it, and its images are in Artifact Registry.
   #
-  # The images for this commit exist once CI's `images` job has pushed them. That
-  # job failed on its first attempt with `requires billing to be enabled` during
-  # the 2026-08-22 billing incident, so it is re-run rather than re-triggered by a
-  # new commit — a fresh commit would move this tag again and chase its own tail.
-  default = "ac7b5af132d17bcd8177a805a7dbf743aabf625a"
+  # **This pin ages out, and that is a property of the design rather than an
+  # accident.** The previous value (#65's merge, `ac7b5af`) was verified present on
+  # 2026-08-22 and was gone by 2026-08-26: the repository's own cleanup policy keeps
+  # the last two versions and deletes anything older than a day, so once two newer
+  # images existed the pinned one was collected — while the wave sat blocked behind
+  # the kill-switch incident.
+  #
+  # So a pin that has waited days needs re-checking before the wave is armed. The
+  # plan job's Artifact Registry check is what makes that safe rather than
+  # surprising: it refused this exact case before the reviewer was asked to approve
+  # anything. Decision log A2.13.
+  default = "6a504b417a5740a9138a2a483f4c3f16f6536b28"
 
   validation {
     # A full commit SHA, not a moving tag: `latest` or a branch name would make

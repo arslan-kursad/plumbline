@@ -1049,3 +1049,27 @@ had not survived eighteen minutes attached. The live-fire proves the boundary; t
 prove the premise.
 **Exit review:** yes — with A2.9 through A2.11, this is the record of a control that was
 wrong in production for four days and how it was corrected.
+
+### A2.13 — The pinned image aged out while the wave was blocked
+**Made:** 2026-08-26 · **Work item:** Wave 2 · **Reversibility:** cheap
+**What happened:** the Wave 2 dispatch was refused at the plan job —
+*no image tagged ac7b5af... in Artifact Registry for: collector worker*. That tag was
+verified present on 2026-08-22. In between, the kill-switch incident held the wave for
+four days while three newer commits pushed images, and the `plumbline` repository's
+cleanup policy — keep the last two versions, delete anything older than a day — collected
+it.
+**Two decisions interacting, neither of which anticipated the other.** W2.6 put the image
+tag in the repository so the approval gate could see which code deploys. W1.6 gave the
+image repository a two-version retention to bound a 0.5 GB allowance. Both are right on
+their own; together they mean **a pin has a shelf life**, and a wave that waits outlives it.
+**Decision:** re-pin to current `main` and leave the retention alone. Widening retention
+buys a longer shelf life with storage against a hard free-tier ceiling, for a problem
+that only appears when a wave is blocked for days — and a wave blocked for days should be
+re-examined before arming anyway, which is what re-pinning forces.
+**The guard that caught it was built for something else.** The plan job's Artifact
+Registry check exists because Cloud Run resolves a tag at revision start, so a missing
+image would otherwise fail *after* the approval. It refused this before the reviewer was
+asked. A check written for one failure mode caught a different one, which is the argument
+for asserting the property rather than the scenario.
+**Exit review:** no, but the completion note should carry it — any project pinning
+artefacts in git against a retention policy inherits this.
