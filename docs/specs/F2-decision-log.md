@@ -1164,3 +1164,35 @@ planned attribute and keyed by service name, so the intended posture of each ser
 stated in one place a control reads. Implemented separately from this record so it lands
 with its own fixtures in both directions.
 **Exit review:** no, but it is the answer to "what would have caught this class".
+
+### W2.15 — #61 measured: the fix is one column, and the negative control is why we believe it
+**Made:** 2026-08-26 · **Work item:** W-repo (unblocks Wave 4) · **Reversibility:** cheap
+**Decision (D-61, recorded by ADR-0007):** `start_time` joins the dedup window's
+`PARTITION BY`. No date predicate inside the views, no table-valued function, and
+`require_partition_filter` stays. Consumers keep supplying their own partition filter,
+which is the guardrail doing its job rather than an inconvenience to design around.
+**Measured against the live dataset, one session, one variable:** the existing view with a
+consumer `start_time` filter failed with #61's exact error; the three-column window passed;
+the `spans_real` equivalent stacked on it passed, which mattered because #61 recorded that
+`spans_real` inherited the failure.
+**The negative control is the part worth keeping.** `spans` is empty, so a passing query is
+*also* consistent with the constraint simply not being enforced. Querying the base table
+with no filter at all failed — the guardrail is live on an empty table — and the new shape
+passes anyway. Without that second measurement the first proves nothing, and the test would
+have read as green while answering a different question.
+**What the fix costs, stated rather than buried:** the effective dedup key becomes
+`(trace_id, span_id, start_time)`. Under the premise — duplicates are redeliveries of
+identical OTLP bytes — the two keys are the same. Where it breaks, this shape keeps both
+rows instead of dropping one: visible rather than silent, which is the direction this
+project's stated principle picks.
+**And the premise turned out to have a mechanism, not just a caveat.** OTLP carries
+nanoseconds, BigQuery `TIMESTAMP` holds microseconds, so the write path narrows lossily.
+Two deliveries of the same bytes processed by worker revisions that rounded differently
+would land 1 µs apart and stop deduplicating — and a DLQ replay after a deploy is exactly
+that scenario. Checked rather than assumed: `Timestamps.FromUnixNanos` already truncates
+(integer division on a `ulong`), and the golden file for `langgraph-python/happy-path`
+pins `2026-08-19T10:00:01.612345Z` against a fixture whose nanoseconds end in `678`.
+Switching the conversion to round-half-up as a probe failed that test with
+`actual "2026-08-19T10:00:01.612346Z"`. The enforcement point exists and has been seen to
+fire; the probe was reverted.
+**Exit review:** yes — it changes a data-model decision and ADR-0002's dedup key.
