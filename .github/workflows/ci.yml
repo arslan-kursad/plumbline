@@ -113,6 +113,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          # The fixture-provenance gate asks what this change touched, which
+          # needs a merge base. A shallow checkout has none, and the gate would
+          # then see "nothing changed" and pass over a new hand-authored fixture
+          # — the exact case it exists to refuse.
+          fetch-depth: 0
 
       - name: Gates A-E
         run: ./scripts/ci/invariant-gates.sh
@@ -125,6 +131,23 @@ jobs:
       # regardless of what the change touched.
       - name: Environment guard self-test
         run: ./scripts/ci/environment-guard.sh --self-test
+
+      # Also a deploy-path guard, so it is proven here rather than in the
+      # path-filtered terraform job: it decides whether a wave can be armed.
+      - name: Empty-plan guard self-test
+        run: ./scripts/ci/plan-nonempty-guard.sh --self-test
+
+      # Guard fixtures are derived from real plan output, never authored
+      # (scripts/ci/testdata/README.md). The gate holds the rule; the self-test
+      # proves the gate can refuse each way it is meant to.
+      - name: Fixture provenance gate
+        run: ./scripts/ci/fixture-provenance-guard.sh
+
+      - name: Fixture provenance self-test
+        run: ./scripts/ci/fixture-provenance-guard.sh --self-test
+
+      - name: Scrub tool tests
+        run: python3 scripts/ci/scrub_plan_test.py
 
       - name: Prove every gate can fail
         run: ./scripts/ci/prove-gates.sh
