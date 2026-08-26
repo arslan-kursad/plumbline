@@ -609,7 +609,7 @@ redeploy), and with `min_instances = 0` an idle collector re-reads on its next w
 anyway.
 **Not proven here:** the read path against real Firestore under the collector's service
 account — no emulator runs on this host, and the unit tests cover parsing and selection,
-not the wire. Wave 4's cloud e2e with the provisioned `adjudicator-prod` key is that
+not the wire. Wave 4's cloud e2e with the provisioned `adjudicator-prod-2` key is that
 test.
 **Exit review:** no.
 

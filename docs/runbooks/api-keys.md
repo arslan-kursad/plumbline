@@ -41,6 +41,13 @@ captures the key and nothing else:
 go run ./cmd/keyctl -project "$PROJECT_ID" -id adjudicator-prod > key.txt
 ```
 
+**Redirect by default, not only when it is convenient.** Run without the
+redirection and the key renders in the terminal, where it survives in scrollback
+and in any screenshot of that window. That is how this project leaked two keys in
+one week — not through the repository, which Gate F watches, but through a
+terminal photograph, which nothing watches. The redirection is the only difference
+between the two outcomes, and it costs six characters.
+
 Rehearse with `-dry-run` first if the flags are unfamiliar: it prints the document
 it would create, generates nothing, and writes nothing.
 
@@ -83,6 +90,33 @@ version.** If a key is known leaked and the exposure matters more than the
 traffic, remove the collector's traffic or delete the document and force a
 restart — and record what happened in `docs/`, per the architecture §7 escape
 hatch, because a leaked credential is an incident whether or not it cost money.
+
+### Revocations performed
+
+**2026-08-26 — `adjudicator-prod`, twice, plaintext exposed in a screenshot.**
+The key issued 2026-08-21 was displayed in a terminal capture shared into a chat,
+reissued under the same id, and the reissue was displayed the same way. Both
+documents were deleted and a third key issued as `adjudicator-prod-2` with stdout
+redirected to a file, so its plaintext never rendered.
+
+Registry state afterwards, read back rather than assumed — one key, and neither
+exposed hash present:
+
+```
+1 key(s) in the registry
+  adjudicator-prod-2: status=active dialect=langgraph issued=2026-08-26T10:13:28Z
+```
+
+**Exposure was bounded by luck rather than by design:** no Cloud Run collector
+existed yet, so neither key ever had an endpoint to authenticate against. Deleting
+the documents was therefore sufficient and no traffic analysis was needed. Had
+Wave 2 already applied, this would have been an incident note under architecture
+§7 rather than a runbook entry.
+
+**The id changed, and that is visible downstream.** `api_key_id` travels on every
+published message and lands in `spans` as provenance (§3.2), so rows written
+before and after this revocation carry different values for the same agent. Any
+query grouping by key over that boundary sees two identities.
 
 ## 5. What this does not do
 
