@@ -1073,3 +1073,39 @@ asked. A check written for one failure mode caught a different one, which is the
 for asserting the property rather than the scenario.
 **Exit review:** no, but the completion note should carry it — any project pinning
 artefacts in git against a retention policy inherits this.
+
+### W2.11 — Wave 2's first apply found two more permission defects, both invisible before it
+**Made:** 2026-08-26 · **Work item:** Wave 2 · **Reversibility:** cheap
+**What happened:** the approved apply failed on two errors at once.
+
+*One — a missing role.* `Error setting IAM policy for pubsub topic "traces": User not
+authorized`. `ci-deploy` held `roles/pubsub.editor`, which creates topics and cannot
+scope publish rights on them. Verified against the role definitions rather than
+inferred: `gcloud iam roles describe` shows `pubsub.topics.setIamPolicy` in
+`roles/pubsub.admin` and absent from `editor`. So the identity could build the transport
+and could not apply the grant that keeps the collector off `billing-alerts` — the §6.1
+boundary this wave exists to draw. Fixed by widening to `roles/pubsub.admin`.
+
+*Two — an ordering race the configuration allowed.* `Permission
+'iam.serviceaccounts.actAs' denied on service account collector@...`. The service
+references its runtime identity's *email*, so Terraform ordered it after the service
+account — but not after `ci_deploy_acts_as`, the grant that lets the deployer impersonate
+that account, which is a separate resource with no data dependency between them. The two
+raced and the service lost. Fixed with an explicit `depends_on`.
+**Why `depends_on` and not a re-run:** a re-run would probably have worked, which is the
+trap. The dependency is real and was simply unexpressed; leaving it to retry luck means
+the same apply passes or fails depending on how the provider schedules two independent
+resources. IAM *propagation* delay is a separate problem that ordering cannot fix
+(kill-switch runbook §2), and if it bites, a re-run is the honest remedy — but it should
+be the only thing left to chance.
+**A custom Pub/Sub role was considered and rejected.** W0.4 set the precedent of one
+permission in a custom role rather than a predefined role carrying five. That precedent
+exists for the kill-switch identity, which is the last one in the project that should
+collect incidental rights. `ci-deploy` already holds project IAM administration (W1.5),
+so a custom role here would be ceremony rather than containment.
+**The pattern, now at five:** the kill-switch's two live-fire failures, the budget 403,
+the storage-object 403, and these two. **Every permission defect in this phase has
+announced itself at apply time and none at review time.** That is not a run of bad luck;
+it is what IAM is like, and it is the argument for the gated path — each of these failed
+loudly against a reviewer's approval rather than quietly in production.
+**Exit review:** yes — five for five is a finding about the method, not about the wave.

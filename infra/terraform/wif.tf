@@ -217,8 +217,20 @@ resource "google_project_iam_member" "ci_deploy" {
     # cannot update one, so the second apply that changed a description would fail
     # on a permission the first apply did not need.
     "roles/bigquery.dataOwner",
-    # Wave 1: Pub/Sub topics and the dead-letter subscription.
-    "roles/pubsub.editor",
+    # Wave 1: Pub/Sub topics and the dead-letter subscription. Wave 2 needs
+    # `admin` rather than `editor`, verified against the role definitions rather
+    # than guessed: `pubsub.topics.setIamPolicy` is in admin and not in editor, so
+    # the editor grant could create the `traces` topic and could not scope publish
+    # rights on it — which is the grant §6.1 asks for to keep the collector off
+    # `billing-alerts`.
+    #
+    # A custom role carrying editor's permissions plus that one was considered, on
+    # the W0.4 precedent. Rejected here because that precedent exists for the
+    # kill-switch identity, which is the last one in the project that should
+    # collect incidental rights; this identity already holds project IAM
+    # administration (W1.5), so a custom role would be ceremony rather than
+    # containment.
+    "roles/pubsub.admin",
     # Wave 1: the DLQ depth alert and its notification channel.
     "roles/monitoring.editor",
     # Wave 1: Firestore in native mode.
