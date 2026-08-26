@@ -1,13 +1,22 @@
 # Runbook — the dead-letter path
 
-**Status:** written ahead of the subscription it describes (F2 Wave 1). The push
-subscription that produces dead letters is created in Wave 3, gated on this file
-existing first (#44).
+**Status:** written ahead of the subscription it describes (F2 Wave 1) and now
+live. The push subscription that produces dead letters was gated on this file
+existing first (#44); it was created in Wave 3, two waves after this was merged,
+which is what makes the ordering claim checkable.
 
 A message that fails delivery to the ingestion worker five times is routed to the
 `traces-dlq` topic and waits on the `traces-dlq-pull` subscription, which has no
 consumer. Nothing drains it automatically. The depth alert is the only thing that
 says a message is there.
+
+*Fails* covers more than a poison payload. A 404 from a wrong push path, a 403 from
+a broken invoker binding, and a worker that never became ready all count as failed
+deliveries, so a full DLQ is not by itself evidence that anything was wrong with
+the messages in it — and in those three cases every message is dead-lettered, not
+one. Check the delivery response codes and the worker's logs before concluding the
+payloads are at fault; a queue that filled all at once is a transport failure until
+proven otherwise.
 
 Design and rationale: [ADR-0002](../adr/ADR-0002-pubsub-contract-at-least-once.md),
 [ADR-0006](../adr/ADR-0006-pii-redaction-boundary.md), architecture §3.4.
@@ -131,5 +140,7 @@ mechanism, and the plan guard refuses any topic that declares it (architecture
   not this file.
 - Bulk replay. There is no tooling for it in v0.1, and building some in the middle
   of an incident is how a replay loop gets written.
-- The main push subscription's configuration, which arrives in Wave 3 with its own
-  record.
+- The main push subscription's configuration — `traces-push`, in
+  [`infra/terraform/pubsub.tf`](../../infra/terraform/pubsub.tf), with its reasoning
+  in F2 decision log W3.2–W3.5. What belongs here is what to do with a message once
+  it has arrived; why five delivery attempts rather than fifty belongs there.
