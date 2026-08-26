@@ -990,3 +990,35 @@ conclusion — that `INCLUDE_ALL_CREDITS` does not subtract this account's credi
 which would have left the epsilon as the only remedy and no window to deploy it in. One
 observation was the difference between that and a two-minute retry.
 **Exit review:** no, but the runbook carries it.
+
+### A2.11 — The kill-switch's own resources are human-applied; the gate handles everything else
+**Made:** 2026-08-26 · **Reversibility:** cheap
+**What happened:** with the budget filter live and stable for 21 hours, the function's
+threshold apply was approved and failed:
+`Error deleting contents of object billing-killswitch-...zip: 403:
+ci-deploy@... does not have storage.objects.delete access`.
+Replacing the source archive is a delete plus a create, and `ci-deploy` has no grant on
+that bucket at all. `wif.tf` says why, in words: *"State access scoped to the state
+bucket, not project-wide: this identity must not reach the function-source bucket."*
+**Decision:** keep the boundary and move the resource, rather than widen the boundary to
+fit the resource. The kill-switch function and its source object are applied by the
+maintainer from their own credentials, targeted — the same path the two budgets already
+take. The rule that falls out is worth stating once: **the kill-switch's own resources
+are human-applied; everything else goes through the gate.** The last cost control should
+not be rewritable by the automation it exists to bound.
+**Alternatives:** grant `ci-deploy` `roles/storage.objectAdmin` on the function-source
+bucket — one line, and it dissolves the only stated separation between the deploy
+identity and the code of the control that stops it; apply the whole amendment from Lane
+C — already true for the budgets, and this makes it true for all four resources, which
+is where it lands anyway.
+**The uncomfortable half, stated so nobody mistakes the boundary for a control:**
+`ci-deploy` holds `resourcemanager.projectIamAdmin`, so it can grant itself that bucket
+access whenever it likes. The separation is a *convention this repository keeps*, not
+something Google enforces — exactly the class of claim ADR-0004 Amendment 2 had to
+withdraw once already. Keeping the convention still has value: it means a routine apply
+cannot touch the kill-switch by accident, and reaching it would take a visible,
+reviewable IAM change. Calling it a security boundary would not.
+**Third time this phase a permission announced itself only at apply:** the kill-switch's
+two live-fire failures, the budget 403, and now this. Configuration review has found none
+of them.
+**Exit review:** yes — it changes which resources the gated path owns.

@@ -440,6 +440,20 @@ remediation that has to land inside that window must be a single fast resource
 update — not a function deployment, which rebuilds the container and cannot
 finish in time.
 
+**The kill-switch's own resources are applied by a human; the gate owns the rest.**
+Both budgets are billing-account resources and `ci-deploy` holds only
+`roles/billing.viewer` there. The function and its source archive live in a bucket
+`ci-deploy` has no grant on at all — `wif.tf` puts it plainly: *this identity must not
+reach the function-source bucket*. So all four of the kill-switch's resources are applied
+from the maintainer's own credentials, targeted, and everything else in the project goes
+through the gated path. The last cost control is not rewritable by the automation it
+bounds.
+
+Be clear about what that is, though: `ci-deploy` holds project IAM administration and
+could grant itself the access. The separation is a convention this repository keeps, not
+one Google enforces — it means a routine apply cannot touch the kill-switch by accident,
+and reaching it would take a visible IAM change. It is not a wall.
+
 **Two scopes, two paths — the budgets cannot go through CI.** `ci-deploy` holds
 `roles/billing.viewer` on the billing account and nothing else (decision log W1.5), and
 a budget is a billing-account resource. An armed apply that touches one fails with
