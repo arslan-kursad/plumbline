@@ -20,6 +20,17 @@ locals {
   # One expression, read by both, so the two cannot be edited apart — a mismatch
   # here refuses every delivery with a correct-looking configuration on both sides.
   push_oidc_audience = "plumbline-ingestion-worker"
+
+  # The path the worker serves push deliveries on, by the same argument.
+  #
+  # The worker defaults `PLUMBLINE_PUSH_PATH` to this value, so Wave 2 could leave
+  # it unset and Wave 3 could have written the path into the subscription's
+  # endpoint directly. That would be two places stating one route and agreeing by
+  # inspection — the shape W2.3 refused for the Firestore collection name. The
+  # failure mode is quiet in a way the audience mismatch is not: a wrong path is a
+  # 404 from the worker's own mux, which Pub/Sub retries five times and then
+  # dead-letters, so the first symptom is a DLQ full of healthy messages.
+  push_path = "/push"
 }
 
 # --- identities -------------------------------------------------------------
@@ -241,6 +252,14 @@ resource "google_cloud_run_v2_service" "worker" {
         value = google_service_account.pubsub_push.email
       }
 
+      # Set explicitly, though it repeats the worker's own default: the Wave 3
+      # subscription's push endpoint is built from the same local, so the route
+      # is stated once and read twice rather than matched by hand.
+      env {
+        name  = "PLUMBLINE_PUSH_PATH"
+        value = local.push_path
+      }
+
       env {
         name  = "PLUMBLINE_SINK"
         value = "bigquery"
@@ -269,10 +288,25 @@ resource "google_cloud_run_v2_service" "worker" {
   ]
 }
 
-# No invoker binding for the worker, and its absence is the control: unauthenticated
-# invocation is exactly "allUsers holds roles/run.invoker", so not writing that
-# member is how it stays disabled. Wave 3 adds the push service account as the sole
-# invoker, which is the other half of §6.1's OIDC push row.
+# The worker's sole invoker (Wave 3, DoD 7's second half).
+#
+# Unauthenticated invocation is exactly "allUsers holds roles/run.invoker", so the
+# control is what is *not* written here: no `allUsers` member on this service, in
+# this wave or any later one. What is written is the one principal allowed to call
+# it — the identity the push subscription mints its OIDC tokens as.
+#
+# This is IAM, and it is the outer of two independent checks. Cloud Run refuses a
+# caller that is not this principal; the worker then refuses a token whose audience
+# or issuer-verified email is not the pair it was configured with (W2.2). Either
+# alone would be a defensible boundary. Both is what makes a mistake in one of them
+# a failed delivery rather than an open write path to `spans`.
+resource "google_cloud_run_v2_service_iam_member" "worker_push_invoker" {
+  project  = var.project_id
+  location = google_cloud_run_v2_service.worker.location
+  name     = google_cloud_run_v2_service.worker.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.pubsub_push.email}"
+}
 
 # --- data-plane grants ------------------------------------------------------
 

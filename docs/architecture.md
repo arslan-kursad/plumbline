@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.10 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-26
+**Version:** 0.11 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-26
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -252,7 +252,7 @@ never API keys, customer data, or internal hostnames.
 |---|---|
 | Agent → Collector | API key (header), validated against hashed registry in Firestore; per-key rate limit |
 | Collector → Pub/Sub | Collector service account, `roles/pubsub.publisher` on `traces` only |
-| Pub/Sub → Worker | **OIDC push**: push SA is sole `roles/run.invoker` on the worker; worker ingress `internal-and-cloud-load-balancing` equivalent for Cloud Run (`ingress=all` avoided; unauthenticated invocations disabled) |
+| Pub/Sub → Worker | **OIDC push**, two independent checks: the push SA is the sole `roles/run.invoker` on the worker, and the worker itself validates the token's audience and issuer-verified email (F2 decision log W2.2). Worker ingress is `INGRESS_TRAFFIC_INTERNAL_ONLY` — the *narrower* of the two internal settings, not the `internal-and-cloud-load-balancing` this row named before the worker was deployed; a push subscription in the same project targeting the default `run.app` URL counts as internal, so nothing needs the load-balancer allowance. `ingress=all` avoided; unauthenticated invocations disabled |
 | Worker → BigQuery | Dedicated SA, **table-scoped** grant on `spans` (`roles/bigquery.dataEditor` on the table, not the dataset) |
 | Collector → Firestore | Dedicated SA, `roles/datastore.viewer` at **project scope** — Firestore grants IAM at project (conditionally, database) scope only; per-collection access exists solely through Security Rules, which govern mobile/web clients rather than server client libraries. The narrowest grant that reads `api_keys` therefore reads all Firestore data in the project. Stated because it is wider than least privilege would like, and no configuration can narrow it (F2 decision log W2.5) |
 | GitHub Actions → GCP | **Workload Identity Federation**; no exported SA keys anywhere in the project |
@@ -328,6 +328,7 @@ balancer, a reserved IP, a VM) all arrive as a resource type nobody argued about
 | `google_cloud_run_v2_service` | F2 | `collector`, `ingestion-worker`, `analytics-api` |
 | `google_cloud_run_v2_service_iam_member` | F2 | Invoker grants on v2 services: `allUsers` on the public collector, the push identity as sole invoker on the worker (§6.1) |
 | `google_pubsub_topic_iam_member` | F2 | Publish scoped to `traces` alone, so no data-plane identity can reach `billing-alerts` |
+| `google_pubsub_subscription_iam_member` | F2 | The Pub/Sub service agent's acknowledge right on the push subscription alone, which is what lets a failed delivery reach `traces-dlq` (§3.4) |
 | `google_bigquery_table_iam_member` | F2 | Worker write scoped to the `spans` table rather than the dataset (§6.1) |
 | `google_artifact_registry_repository` | F2 | Distroless images, keep-last-2 cleanup policy (§8) |
 | `google_cloud_scheduler_job` | F3 | Nightly eval batch (§2.5) |
@@ -413,6 +414,26 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.11 — 2026-08-26** — F2 Wave 3.
+
+1. §7.1 gains `google_pubsub_subscription_iam_member`, per D6. Dead-lettering is carried
+   out by Google's Pub/Sub service agent, which holds nothing on this project's
+   subscriptions by default: it needs `roles/pubsub.subscriber` on the subscription
+   carrying the dead-letter policy in order to acknowledge the message it has forwarded.
+   The alternative is the same role at project scope, which would also hand the agent
+   every future subscription — so this row exists to make a grant smaller, which is the
+   test v0.9 applied to the previous three. Both halves of the requirement were read off
+   Google's dead-letter documentation at wave time rather than inferred; the omission's
+   failure mode is silent, which is why it is a row and not a comment.
+
+2. §6.1's "Pub/Sub → Worker" row is corrected to the ingress value that was actually
+   deployed. It named `internal-and-cloud-load-balancing`; Wave 2 deployed
+   `INGRESS_TRAFFIC_INTERNAL_ONLY`, which is narrower, and the plan guard has asserted
+   that value since W2.14. The row was written before the worker existed and the two had
+   never been read against each other. Corrected in the direction W2.5 established — the
+   document states what is built — and the row now also names the second check, since
+   Wave 3 is where the sole-invoker half stops being a plan.
 
 **v0.10 — 2026-08-26** — F2 Wave 2 close-out and the record gaps.
 
