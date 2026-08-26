@@ -1109,3 +1109,58 @@ announced itself at apply time and none at review time.** That is not a run of b
 it is what IAM is like, and it is the argument for the gated path — each of these failed
 loudly against a reviewer's approval rather than quietly in production.
 **Exit review:** yes — five for five is a finding about the method, not about the wave.
+
+### W2.12 — The collector's 404 was the probe path, and `/healthz` is shadowed on the public URL
+**Made:** 2026-08-26 · **Work item:** Wave 2 · **Reversibility:** cheap
+**What it was not:** ingress (`INGRESS_TRAFFIC_ALL`, read back from the API), IAM (a
+missing invoker returns 403, not 404, and `allUsers` holds `roles/run.invoker`), the
+default URL being disabled (both URL forms are present in `urls`), an organisation policy
+(`constraints/run.allowedIngress` is effectively `allValues: ALLOW`), or URL propagation.
+Each was eliminated by a query rather than by waiting.
+**What it was:** the probe path. Cloud Run's request log settles it in one query — and the
+first attempt at that query was wrong, which cost most of the investigation: the log name
+is URL-encoded (`run.googleapis.com%2Frequests`), and a regex against a decoded form
+matches nothing and looks exactly like *no request arrived*.
+
+With the query right, the split is unambiguous:
+
+| Path | Response | Reached the container |
+| --- | --- | --- |
+| `/zzz`, `/health`, `/healthz/` | `404 page not found` (Go's mux) | yes |
+| `/v1/traces` | `405 only POST is accepted` | yes |
+| `/healthz` | Google's HTML 404 | **no** |
+
+**So the service was healthy the entire time**, and `/v1/traces` — the only path that
+matters — answers correctly from its own handler. What is genuinely broken is narrower
+than it looked: **the exact path `/healthz` never reaches the container on the public
+URL**, while `/health` and `/healthz/` do. The collector's health endpoint works locally
+and is unreachable in the cloud.
+**Recorded rather than worked around.** The obvious fix is to move the health path, and
+that is the wrong instinct: it would make the local and cloud surfaces differ for no
+reason the code expresses, and the next reader would find a health endpoint at an unusual
+path with no explanation. The endpoint is not load-bearing — Cloud Run's startup probe is
+a TCP check on the port, and it passed — so this is documented and left alone until
+something needs it.
+**Worth naming for anyone probing a Cloud Run service:** a Google HTML error page and the
+application's own error body are different witnesses. `404 page not found` is Go; a styled
+page with *"That's all we know"* never touched your code.
+**Exit review:** no.
+
+### W2.13 — Wave 2's ingress posture has no guard, and that is the reusable defect
+**Made:** 2026-08-26 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Observation, from the 404 investigation rather than from design review:** the two
+services have deliberately opposite ingress postures — the collector public, the worker
+internal-only — and **nothing asserts either.** The plan guard checks scaling, region,
+resource types and topic retention; ingress is not among them. A worker copied from the
+collector's block, or a collector tightened by a careless edit, changes the project's
+entire exposure surface and every existing control still reports green.
+**Why it matters more than this incident:** the failure modes are asymmetric and both are
+quiet. A worker set to `all` is an open ingestion endpoint whose only protection is the
+OIDC check; a collector set to `internal` is a pipeline that silently accepts nothing from
+the agents it exists to serve — which is precisely the shape the wave issue predicted for
+guessing the worker's setting wrong, and it went unguarded on the other service.
+**Decision:** the plan guard gains a per-service ingress assertion, expressed against the
+planned attribute and keyed by service name, so the intended posture of each service is
+stated in one place a control reads. Implemented separately from this record so it lands
+with its own fixtures in both directions.
+**Exit review:** no, but it is the answer to "what would have caught this class".

@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.9 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-22
+**Version:** 0.10 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-26
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -389,6 +389,8 @@ forbids.
 | ADR-0004 | Zero-cost guardrails & billing kill-switch design | Accepted |
 | ADR-0005 | Static JSON export as v0.1 SPA data path | Accepted |
 | ADR-0006 | PII redaction happens in the worker, after deserialization | Accepted |
+| ADR-0007 | *reserved* — canonical views under `require_partition_filter` (#61) | Not written |
+| ADR-0008 | Single-port OTLP protocol multiplexing on Cloud Run (#68) | Proposed |
 
 Rationale, alternatives, and consequences live in `docs/adr/`; this index carries titles
 and status only. Where this document and an ADR disagree, the ADR is the decision record
@@ -411,6 +413,14 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.10 — 2026-08-26** — F2 Wave 2 close-out and the record gaps.
+
+1. §10 ADR index gains ADR-0008 (single-port OTLP multiplexing, #68) at **Proposed**, and
+   reserves ADR-0007 for the canonical-views decision (#61) so the number is held rather
+   than taken by whatever is written next. ADR-0004's Amendment 4 moves to **Accepted** —
+   it had been running in production against a record that still called it a proposal.
+2. §7 kill-switch rows already carried Amendment 4 from v0.9; no change needed there.
 
 **v0.9 — 2026-08-22** — F2 Wave 2.
 
