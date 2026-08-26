@@ -16,6 +16,26 @@ SCALING_PATHS = {
     "google_cloudfunctions2_function": ("service_config",),
 }
 
+# The ingress posture each Cloud Run service is allowed to have, by service name.
+#
+# The two services are deliberately opposite — the collector is the project's only
+# public endpoint because agents authenticate with an API key rather than a Google
+# identity (architecture §6.1), and the worker is internal-only because its caller
+# is a Pub/Sub push subscription inside this project. Nothing asserted either until
+# a 404 investigation went looking for it, and both failure modes are quiet: a
+# worker set to `all` is an open ingestion endpoint whose only protection is the
+# OIDC check, and a collector set to `internal` accepts nothing from the agents it
+# exists to serve while every dashboard stays green.
+#
+# A service missing from this map is refused rather than skipped. Adding one is
+# then a deliberate line stating its exposure, which is the property worth having:
+# the alternative defaults a new service into whatever was copied from the block
+# above it.
+INGRESS_POSTURE = {
+    "collector": "INGRESS_TRAFFIC_ALL",
+    "ingestion-worker": "INGRESS_TRAFFIC_INTERNAL_ONLY",
+}
+
 
 def allowlist(architecture_path):
     """Resource types listed in the architecture §7.1 table.
@@ -131,6 +151,24 @@ def check(plan, allowed):
                 violations.append(
                     f"{address}: max_instance_count is {maximum}, must be set and at most 2"
                 )
+
+        if rtype == "google_cloud_run_v2_service":
+            name = after.get("name")
+            ingress = after.get("ingress")
+            expected = INGRESS_POSTURE.get(name)
+
+            if expected is None:
+                violations.append(
+                    f"{address}: Cloud Run service {name!r} declares no ingress posture; "
+                    "add it to INGRESS_POSTURE so its exposure is stated rather than inherited"
+                )
+            else:
+                checked.append(f"{address}: ingress={ingress}")
+                if ingress != expected:
+                    violations.append(
+                        f"{address}: ingress is {ingress}, must be {expected} "
+                        f"for service {name!r} (architecture §6.1)"
+                    )
 
         for key in ("location", "region"):
             value = after.get(key)
