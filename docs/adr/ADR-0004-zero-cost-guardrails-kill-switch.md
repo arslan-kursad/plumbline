@@ -455,7 +455,14 @@ the thing it documents.
 
 ## Amendment 4 (2026-08-25) — Kill-switch trigger semantics under promotional credits
 
-**Status:** Proposed · **Amends:** Amendment 1
+**Status:** **Accepted** (2026-08-26) · **Amends:** Amendment 1
+
+> Accepted after the change was applied and live-fired, not before. The three-step
+> live-fire is in [`kill-switch.md`](../runbooks/kill-switch.md) §4a with its evidence;
+> #71 closed on it. The status carried `Proposed` for the hours between the apply and
+> this line, which is the gap the acceptance closes: an amendment running in production
+> against a record that still calls it a proposal is a record that has stopped describing
+> the system.
 **Related issues:** #71 (budget reports gross), #74 (promotional credit until 2026-10-05)
 
 > **Editorial note, so the record is checkable.** Three changes were made to the
