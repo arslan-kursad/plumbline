@@ -1,8 +1,10 @@
 # Runbook — billing kill-switch
 
-**Status:** **live-fired and working**, on the third attempt, 2026-08-21 (§4).
-The first two failed on two different missing permissions; both are fixed
-(ADR-0004 Amendments 2 and 3). F2 entry gate #33 is closed.
+**Status:** **live-fired and working.** The detach path passed on the third attempt,
+2026-08-21 (§4) — the first two failed on two different missing permissions, both fixed
+(ADR-0004 Amendments 2 and 3). The *trigger semantics* were then found wrong in
+production and replaced (Amendment 4); that change passed its own three-step live-fire
+on 2026-08-26 (§4a). F2 entry gate #33 is closed.
 
 The chain, its rationale, and why it is deliberately the *last* control are in
 [ADR-0004](../adr/ADR-0004-zero-cost-guardrails-kill-switch.md) §2 and §5.
@@ -547,12 +549,43 @@ billingEnabled: False
 
 Two seconds from notification to detached.
 
-**Step 3 — false-positive regression check — <date> — <result>**
+**Step 3 — false-positive regression check — 2026-08-26 — PASSED.** Billing
+re-attached 09:48. Two consecutive *real* notification cycles, neither synthetic:
 
 ```
-(evidence placeholder: re-attach, then two consecutive real notification cycles
- reading cost=0 with no detach)
+10:02:56 INFO budget notification received budget="plumbline zero-spend"
+         cost=0 currency=TRY threshold=5 threshold_exceeded=0
+         interval_start=2026-08-01T07:00:00Z
+10:23:29 INFO budget notification received budget="plumbline zero-spend"
+         cost=0 currency=TRY threshold=5 threshold_exceeded=0
+         interval_start=2026-08-01T07:00:00Z
 ```
+
+```
+$ gcloud beta billing projects describe plumbline-19458
+billingEnabled: True   billingAccountName: billingAccounts/011680-E61D62-C3CAA2
+```
+
+No detach, and no below-threshold WARN either — the figure is genuinely zero rather
+than small, which is the filter working rather than the epsilon covering for it.
+**Both halves of the amendment are load-bearing and can be told apart in the logs.**
+
+**Convergence, checked because targeted applies never ran the post-apply drift check.**
+A read-only plan across all four kill-switch resources: *"Terraform has compared your
+real infrastructure against your configuration and found no differences, so no changes
+are needed."*
+
+### What the three steps did and did not establish
+
+They cover the boundary — under, at, and after. They do **not** cover the segment
+upstream of the notification: how the budget computes the figure it publishes. That is
+the segment where the original defect lived, and no synthetic message can reach it,
+which is why §1's Verification A and B exist and why they remain the honest gaps.
+
+The strongest evidence for that upstream segment is not this live-fire at all. It is the
+**38 consecutive real notifications reading `cost=0`** between the filter going live on
+2026-08-25 and this check, against a control that had previously been unable to stay
+attached for eighteen minutes.
 
 ## 5. Re-attach procedure (manual, human-only)
 

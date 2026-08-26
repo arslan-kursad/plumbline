@@ -1022,3 +1022,30 @@ reviewable IAM change. Calling it a security boundary would not.
 two live-fire failures, the budget 403, and now this. Configuration review has found none
 of them.
 **Exit review:** yes — it changes which resources the gated path owns.
+
+### A2.12 — The live-fire passed; what it proves and what it cannot
+**Made:** 2026-08-26 · **Work item:** Amendment 4 (#71) · **Reversibility:** one-way
+(the test happened)
+**Result:** all three steps passed. `4.99` produced `spend reported below detach
+threshold; no action` with billing untouched — the case the pre-amendment rule got
+wrong. `5.00` detached in two seconds, confirmed at the API. After re-attaching, two
+consecutive real notification cycles read `cost=0` with no detach and no
+below-threshold WARN. A read-only plan across all four kill-switch resources found no
+differences.
+**Both halves are separable in the logs, which was not guaranteed.** The real cycles
+report a genuine zero rather than a small figure the epsilon is absorbing, so the credit
+filter is doing its own work and the threshold is not quietly covering for it. Had the
+figure come back as 0.04 with a WARN, the amendment would have been one fix wearing two
+hats.
+**What it does not establish, stated because the last time this was glossed the phase
+lost three days:** the live-fire starts at the notification. It says nothing about how
+the budget computes the figure it publishes — the exact segment where the original
+defect lived. `kill-switch.md` §4 already carried that caveat before any of this, and it
+was right. No synthetic message can reach that segment; only Verification A and B can,
+and #74 says neither can answer before the promotional credit expires.
+**The stronger evidence is not the test.** It is the 38 consecutive real notifications
+reading `cost=0` between the filter going live and this check, against a control that
+had not survived eighteen minutes attached. The live-fire proves the boundary; the 38
+prove the premise.
+**Exit review:** yes — with A2.9 through A2.11, this is the record of a control that was
+wrong in production for four days and how it was corrected.
