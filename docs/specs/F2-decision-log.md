@@ -1164,3 +1164,27 @@ planned attribute and keyed by service name, so the intended posture of each ser
 stated in one place a control reads. Implemented separately from this record so it lands
 with its own fixtures in both directions.
 **Exit review:** no, but it is the answer to "what would have caught this class".
+
+### W2.14 — The ingress guard refuses an undeclared service, not just a wrong one
+**Made:** 2026-08-26 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** `plan_guard.py` gains `INGRESS_POSTURE`, a map from Cloud Run service name
+to the ingress value that service is allowed to have, asserted against the planned
+attribute. `collector` must be `INGRESS_TRAFFIC_ALL`; `ingestion-worker` must be
+`INGRESS_TRAFFIC_INTERNAL_ONLY`.
+**The part that does the work is the third case.** A service *absent* from the map is a
+violation. Checking only the two known services would leave the next one — `analytics-api`
+in F3 — to inherit whatever posture was copied from the block above it, which is the
+mechanism W2.13 describes rather than a hypothetical. Refusing an undeclared service makes
+adding one a deliberate line stating its exposure.
+**Why a map in the guard rather than parsed from architecture §6.1:** the allowlist is
+parsed from §7.1 because that section is a table of resource types and reads as data.
+§6.1 is a prose table about boundaries, and a parser over it would be a second, weaker
+statement of what the prose means. The map is small, it sits beside the assertion that
+reads it, and the reasoning is in the comment above it.
+**Proven in three directions:** the intended postures pass (`plan-wave2.json`), the worker
+opened to the internet fails (`plan-ingress-inverted.json`), and an undeclared third
+service fails (`plan-ingress-undeclared.json`). The self-test now runs ten fixtures.
+**What this would have caught:** not the 404 — that was a probe path — but the class the
+404 investigation exposed. Both services' exposure was correct by luck of authorship and
+unasserted by anything.
+**Exit review:** no.

@@ -113,6 +113,8 @@ plan-scaling.json fail
 plan-region.json fail
 plan-topic-retention.json fail
 plan-two-budgets.json fail
+plan-ingress-inverted.json fail
+plan-ingress-undeclared.json fail
 FIXTURES
 
   printf '\n'

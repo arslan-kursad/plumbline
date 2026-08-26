@@ -1,0 +1,20 @@
+{
+  "format_version": "1.2",
+  "_comment": "The worker opened to the internet. Its only protection is the OIDC token check, and nothing else in the project would report this — which is why the guard asserts ingress per service (architecture §6.1, decision log W2.13).",
+  "resource_changes": [
+    {
+      "address": "google_cloud_run_v2_service.worker",
+      "type": "google_cloud_run_v2_service",
+      "name": "worker",
+      "change": {
+        "actions": ["update"],
+        "after": {
+          "name": "ingestion-worker",
+          "location": "us-central1",
+          "ingress": "INGRESS_TRAFFIC_ALL",
+          "template": [ { "scaling": [ { "min_instance_count": 0, "max_instance_count": 2 } ] } ]
+        }
+      }
+    }
+  ]
+}
