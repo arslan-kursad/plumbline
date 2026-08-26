@@ -1,8 +1,10 @@
 # Runbook — billing kill-switch
 
-**Status:** **live-fired and working**, on the third attempt, 2026-08-21 (§4).
-The first two failed on two different missing permissions; both are fixed
-(ADR-0004 Amendments 2 and 3). F2 entry gate #33 is closed.
+**Status:** **live-fired and working.** The detach path passed on the third attempt,
+2026-08-21 (§4) — the first two failed on two different missing permissions, both fixed
+(ADR-0004 Amendments 2 and 3). The *trigger semantics* were then found wrong in
+production and replaced (Amendment 4); that change passed its own three-step live-fire
+on 2026-08-26 (§4a). F2 entry gate #33 is closed.
 
 The chain, its rationale, and why it is deliberately the *last* control are in
 [ADR-0004](../adr/ADR-0004-zero-cost-guardrails-kill-switch.md) §2 and §5.
@@ -440,6 +442,34 @@ remediation that has to land inside that window must be a single fast resource
 update — not a function deployment, which rebuilds the container and cannot
 finish in time.
 
+**The kill-switch's own resources are applied by a human; the gate owns the rest.**
+Both budgets are billing-account resources and `ci-deploy` holds only
+`roles/billing.viewer` there. The function and its source archive live in a bucket
+`ci-deploy` has no grant on at all — `wif.tf` puts it plainly: *this identity must not
+reach the function-source bucket*. So all four of the kill-switch's resources are applied
+from the maintainer's own credentials, targeted, and everything else in the project goes
+through the gated path. The last cost control is not rewritable by the automation it
+bounds.
+
+Be clear about what that is, though: `ci-deploy` holds project IAM administration and
+could grant itself the access. The separation is a convention this repository keeps, not
+one Google enforces — it means a routine apply cannot touch the kill-switch by accident,
+and reaching it would take a visible IAM change. It is not a wall.
+
+**Two scopes, two paths — the budgets cannot go through CI.** `ci-deploy` holds
+`roles/billing.viewer` on the billing account and nothing else (decision log W1.5), and
+a budget is a billing-account resource. An armed apply that touches one fails with
+`403: The caller does not have permission`, by design. The budgets are applied by the
+maintainer from their own credentials, targeted; the function and its source object are
+project-scoped and go through the gate as normal.
+
+**Seek again after changing the filter, not only before re-attaching.** Changing what a
+budget measures does not change messages already published. On 2026-08-25 the filter
+landed at ~11:51 and a message published at ~11:47 was delivered at 11:53 still carrying
+the old figure — it detached billing and read exactly like the fix having failed. After
+a second seek, the first fresh notification at 12:11:23 read `cost=0` and billing stayed
+attached.
+
 **Breaking the loop takes one resource, not the whole amendment.** The budget's
 credit filter alone is sufficient: with `INCLUDE_ALL_CREDITS` the published figure
 becomes net, which on a credit-covered account is `0.00`, and even the old
@@ -462,23 +492,100 @@ Same message format as §3. Run all three; none is optional.
 Evidence — function logs for steps 1, 2 and 3, plus billing state before and
 after — is archived below. Wave 2 is armed only after step 3.
 
-**Attempt 1 — <date> — <result>**
+**Preconditions, verified before firing.** The budget filter went live 2026-08-25
+~11:51 and the function's threshold 2026-08-26 09:34:53. Both confirmed at the API
+rather than from state:
 
 ```
-(evidence placeholder: step 1 log lines)
+$ gcloud functions describe billing-killswitch --region us-central1 \
+    --format='value(serviceConfig.environmentVariables)'
+DETACH_THRESHOLD=5;LOG_EXECUTION_ID=true;TARGET_PROJECT_ID=plumbline-19458
 ```
 
-**Attempt 2 — <date> — <result>**
+And confirmed in behaviour — the first real notification after the deploy carried the
+threshold in its log line, which is how you tell the new code is the one running:
 
 ```
-(evidence placeholder: step 2 log lines, billing state after)
+09:40:20 INFO budget notification received budget="plumbline zero-spend"
+         cost=0 currency=TRY threshold=5 threshold_exceeded=0
+         interval_start=2026-08-01T07:00:00Z
 ```
 
-**False-positive regression check — <date> — <result>**
+**Step 1 — 2026-08-26 — PASSED.** `costAmount = 4.99`, one cent under. Note
+`threshold_exceeded=1`: the synthetic message claims a budget threshold *was* crossed,
+and the function ignores that field by design (Amendment 1, unchanged). Only the figure
+against `DETACH_THRESHOLD` decides.
 
 ```
-(evidence placeholder: step 3, two consecutive cycles with no detach)
+09:40:54 INFO budget notification received ... cost=4.99 currency=TRY threshold=5
+         threshold_exceeded=1 interval_start=AMENDMENT-4-BELOW-THRESHOLD
+09:40:54 WARN spend reported below detach threshold; no action
+         project=plumbline-19458 cost=4.99 currency=TRY threshold=5
+         interval_start=AMENDMENT-4-BELOW-THRESHOLD
 ```
+
+Billing unchanged: `billingEnabled: true`. **The pre-amendment rule would have detached
+here**, which is the whole point of the case.
+
+**Step 2 — 2026-08-26 — PASSED.** `costAmount = 5.00`, exactly the threshold. The
+boundary is inclusive by decision (A2.5), so this must detach.
+
+```
+09:45:03 INFO budget notification received ... cost=5 currency=TRY threshold=5
+         interval_start=AMENDMENT-4-AT-THRESHOLD
+09:45:04 WARN spend reported at or above the detach threshold; detaching billing account
+         project=plumbline-19458 billing_account=billingAccounts/011680-E61D62-C3CAA2
+         cost=5 currency=TRY threshold=5
+09:45:05 WARN billing detached project=plumbline-19458
+         previous_billing_account=billingAccounts/011680-E61D62-C3CAA2
+```
+
+Confirmed at the API, not only in the logs:
+
+```
+$ gcloud beta billing projects describe plumbline-19458
+billingEnabled: False
+```
+
+Two seconds from notification to detached.
+
+**Step 3 — false-positive regression check — 2026-08-26 — PASSED.** Billing
+re-attached 09:48. Two consecutive *real* notification cycles, neither synthetic:
+
+```
+10:02:56 INFO budget notification received budget="plumbline zero-spend"
+         cost=0 currency=TRY threshold=5 threshold_exceeded=0
+         interval_start=2026-08-01T07:00:00Z
+10:23:29 INFO budget notification received budget="plumbline zero-spend"
+         cost=0 currency=TRY threshold=5 threshold_exceeded=0
+         interval_start=2026-08-01T07:00:00Z
+```
+
+```
+$ gcloud beta billing projects describe plumbline-19458
+billingEnabled: True   billingAccountName: billingAccounts/011680-E61D62-C3CAA2
+```
+
+No detach, and no below-threshold WARN either — the figure is genuinely zero rather
+than small, which is the filter working rather than the epsilon covering for it.
+**Both halves of the amendment are load-bearing and can be told apart in the logs.**
+
+**Convergence, checked because targeted applies never ran the post-apply drift check.**
+A read-only plan across all four kill-switch resources: *"Terraform has compared your
+real infrastructure against your configuration and found no differences, so no changes
+are needed."*
+
+### What the three steps did and did not establish
+
+They cover the boundary — under, at, and after. They do **not** cover the segment
+upstream of the notification: how the budget computes the figure it publishes. That is
+the segment where the original defect lived, and no synthetic message can reach it,
+which is why §1's Verification A and B exist and why they remain the honest gaps.
+
+The strongest evidence for that upstream segment is not this live-fire at all. It is the
+**38 consecutive real notifications reading `cost=0`** between the filter going live on
+2026-08-25 and this check, against a control that had previously been unable to stay
+attached for eighteen minutes.
 
 ## 5. Re-attach procedure (manual, human-only)
 

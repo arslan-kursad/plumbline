@@ -609,7 +609,7 @@ redeploy), and with `min_instances = 0` an idle collector re-reads on its next w
 anyway.
 **Not proven here:** the read path against real Firestore under the collector's service
 account — no emulator runs on this host, and the unit tests cover parsing and selection,
-not the wire. Wave 4's cloud e2e with the provisioned `adjudicator-prod` key is that
+not the wire. Wave 4's cloud e2e with the provisioned `adjudicator-prod-2` key is that
 test.
 **Exit review:** no.
 
@@ -946,3 +946,106 @@ than taken, and only worth revisiting if the coordinated attempt fails twice.
 the alternative, which is a wave that half-applies while the control fires underneath it.
 **Exit review:** yes — the phase's restart procedure was wrong in a way that only firing
 it revealed, which is the same lesson the three live-fires taught, in a new place.
+
+### A2.9 — The budget half of the amendment cannot go through the gated path, by design
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**What happened:** the Wave 1.5 apply reached the gate, was approved, and failed:
+`Error updating Budget "billingAccounts/***/budgets/02d42f8d-...": googleapi: Error 403:
+The caller does not have permission`.
+**Not a defect — W1.5's own boundary, meeting its first real case.** `ci-deploy` holds
+`roles/billing.viewer` on the billing account and nothing else, because W1.5 decided
+that *billing-account writes never belong to a CI identity*. A budget is a
+billing-account resource. So the amendment's central change — the credit filter — can
+never be applied by the gated path, and W1.5 predicted the shape exactly: *"a plan
+needing a billing-account write fails in CI with a permission error. That is intended.
+It is visible, it names the resource, and it routes the change to the only path allowed
+to make it."*
+**Decision:** Wave 1.5 splits by scope rather than by wave. The two budgets are applied
+by the maintainer from their own credentials, targeted — the Wave 0 and W1a precedent,
+which exists for exactly this class of resource. The function and its source object are
+project-scoped and go through the gate as normal.
+**What this says about the directive:** its §6 describes Wave 1.5 as a single armed
+apply. That was not executable, and no amount of care in the plan would have revealed
+it — the permission boundary only announces itself at apply time, which is the third
+time in this project a control's real behaviour differed from its configuration review.
+**Exit review:** yes — the directive's own verification sequence needs this correction
+before anyone follows it again.
+
+### A2.10 — A filter change needs its own seek, because in-flight messages carry the old figure
+**Made:** 2026-08-25 · **Reversibility:** cheap
+**What happened:** the credit filter was applied at ~11:51. At 11:53:03 a notification
+arrived still reading `cost=0.04` and the function detached billing. That looked like
+the fix failing.
+**It was not.** A delivery attempt at 11:47:58 had aborted with *no available instance*,
+and Pub/Sub retries with backoff — so the message delivered at 11:53 was published
+**before** the filter changed and carried a figure computed under the old one. After a
+second seek and re-attach, the first genuinely fresh notification, at **12:11:23**, read
+`cost=0` and billing stayed attached.
+**The rule this establishes:** changing what a budget *measures* does not change messages
+already in flight. A seek belongs **after** the filter apply as well as before the
+re-attach, or the first delivery after the fix re-creates the failure and reads as proof
+that the fix did not work.
+**Why it nearly cost more than a restart:** the false reading pointed at a much larger
+conclusion — that `INCLUDE_ALL_CREDITS` does not subtract this account's credit either,
+which would have left the epsilon as the only remedy and no window to deploy it in. One
+observation was the difference between that and a two-minute retry.
+**Exit review:** no, but the runbook carries it.
+
+### A2.11 — The kill-switch's own resources are human-applied; the gate handles everything else
+**Made:** 2026-08-26 · **Reversibility:** cheap
+**What happened:** with the budget filter live and stable for 21 hours, the function's
+threshold apply was approved and failed:
+`Error deleting contents of object billing-killswitch-...zip: 403:
+ci-deploy@... does not have storage.objects.delete access`.
+Replacing the source archive is a delete plus a create, and `ci-deploy` has no grant on
+that bucket at all. `wif.tf` says why, in words: *"State access scoped to the state
+bucket, not project-wide: this identity must not reach the function-source bucket."*
+**Decision:** keep the boundary and move the resource, rather than widen the boundary to
+fit the resource. The kill-switch function and its source object are applied by the
+maintainer from their own credentials, targeted — the same path the two budgets already
+take. The rule that falls out is worth stating once: **the kill-switch's own resources
+are human-applied; everything else goes through the gate.** The last cost control should
+not be rewritable by the automation it exists to bound.
+**Alternatives:** grant `ci-deploy` `roles/storage.objectAdmin` on the function-source
+bucket — one line, and it dissolves the only stated separation between the deploy
+identity and the code of the control that stops it; apply the whole amendment from Lane
+C — already true for the budgets, and this makes it true for all four resources, which
+is where it lands anyway.
+**The uncomfortable half, stated so nobody mistakes the boundary for a control:**
+`ci-deploy` holds `resourcemanager.projectIamAdmin`, so it can grant itself that bucket
+access whenever it likes. The separation is a *convention this repository keeps*, not
+something Google enforces — exactly the class of claim ADR-0004 Amendment 2 had to
+withdraw once already. Keeping the convention still has value: it means a routine apply
+cannot touch the kill-switch by accident, and reaching it would take a visible,
+reviewable IAM change. Calling it a security boundary would not.
+**Third time this phase a permission announced itself only at apply:** the kill-switch's
+two live-fire failures, the budget 403, and now this. Configuration review has found none
+of them.
+**Exit review:** yes — it changes which resources the gated path owns.
+
+### A2.12 — The live-fire passed; what it proves and what it cannot
+**Made:** 2026-08-26 · **Work item:** Amendment 4 (#71) · **Reversibility:** one-way
+(the test happened)
+**Result:** all three steps passed. `4.99` produced `spend reported below detach
+threshold; no action` with billing untouched — the case the pre-amendment rule got
+wrong. `5.00` detached in two seconds, confirmed at the API. After re-attaching, two
+consecutive real notification cycles read `cost=0` with no detach and no
+below-threshold WARN. A read-only plan across all four kill-switch resources found no
+differences.
+**Both halves are separable in the logs, which was not guaranteed.** The real cycles
+report a genuine zero rather than a small figure the epsilon is absorbing, so the credit
+filter is doing its own work and the threshold is not quietly covering for it. Had the
+figure come back as 0.04 with a WARN, the amendment would have been one fix wearing two
+hats.
+**What it does not establish, stated because the last time this was glossed the phase
+lost three days:** the live-fire starts at the notification. It says nothing about how
+the budget computes the figure it publishes — the exact segment where the original
+defect lived. `kill-switch.md` §4 already carried that caveat before any of this, and it
+was right. No synthetic message can reach that segment; only Verification A and B can,
+and #74 says neither can answer before the promotional credit expires.
+**The stronger evidence is not the test.** It is the 38 consecutive real notifications
+reading `cost=0` between the filter going live and this check, against a control that
+had not survived eighteen minutes attached. The live-fire proves the boundary; the 38
+prove the premise.
+**Exit review:** yes — with A2.9 through A2.11, this is the record of a control that was
+wrong in production for four days and how it was corrected.
