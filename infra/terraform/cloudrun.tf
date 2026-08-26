@@ -138,7 +138,15 @@ resource "google_cloud_run_v2_service" "collector" {
     }
   }
 
-  depends_on = [google_project_service.required]
+  # The actAs binding, explicitly. A service references its runtime identity's
+  # email, so Terraform orders it after the service account — but not after the
+  # grant that lets this deployer impersonate it, which is a separate resource.
+  # Without this the two race, and the apply fails with `iam.serviceaccounts.actAs
+  # denied` on an account it created moments earlier.
+  depends_on = [
+    google_project_service.required,
+    google_service_account_iam_member.ci_deploy_acts_as,
+  ]
 }
 
 # Public, because agents authenticate with an API key and not with Google
@@ -255,7 +263,10 @@ resource "google_cloud_run_v2_service" "worker" {
     }
   }
 
-  depends_on = [google_project_service.required]
+  depends_on = [
+    google_project_service.required,
+    google_service_account_iam_member.ci_deploy_acts_as,
+  ]
 }
 
 # No invoker binding for the worker, and its absence is the control: unauthenticated
