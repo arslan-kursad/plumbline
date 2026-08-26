@@ -11,6 +11,10 @@ bin/
 obj/
 *.user
 
+# Python — the CI guards are scripts, not a package; bytecode is never committed
+__pycache__/
+*.pyc
+
 # Terraform — environment-specific inputs and state, never the pinned lock file
 .terraform/
 *.tfstate

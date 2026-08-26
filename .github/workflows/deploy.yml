@@ -170,6 +170,26 @@ jobs:
           # shellcheck disable=SC2086 -- word splitting is the point
           terraform plan -input=false $targets -out=plan.tfplan
 
+      # Asked before anything else, because every other assertion in this job is
+      # about the changes a plan makes and all of them are vacuously true of a
+      # plan that makes none. On 2026-08-26 two dispatches planned a `main` that
+      # had not yet taken the wave's merge: both changed nothing, both passed
+      # every guard here, and both reached the approval gate asking a human to
+      # approve an apply that would do nothing. Approving one spends an arming and
+      # records that ref as the commit a wave was applied from.
+      - name: Refuse a plan that would apply nothing
+        id: nonempty
+        working-directory: infra/terraform
+        run: |
+          terraform show -json plan.tfplan > "$RUNNER_TEMP/plan.json"
+
+          # Captured so the summary below reports the same counts this guard
+          # computed, rather than a second reading of the same file.
+          counts=$("$GITHUB_WORKSPACE/scripts/ci/plan-nonempty-guard.sh" "$RUNNER_TEMP/plan.json" | head -1)
+          echo "counts=$counts" >> "$GITHUB_OUTPUT"
+
+          rm -f "$RUNNER_TEMP/plan.json"
+
       # The guard runs here and again before the apply. It parses the allowlist out
       # of docs/architecture.md §7.1, so it is checking the same source the spec
       # cites rather than a copy of it.
@@ -227,6 +247,16 @@ jobs:
 
           {
             echo "### Planned changes — wave ${{ inputs.wave }}"
+            echo
+            # Which commit produced the artifact being approved. The fingerprint
+            # binds the reviewer to a *diff*; it says nothing about where the diff
+            # came from, and a stale ref is what put two empty plans in front of
+            # this gate. One line, above the diff, so it is read before the click.
+            echo "Planned from \`${{ github.ref_name }}\` at commit \`${{ github.sha }}\`."
+            echo
+            echo '```'
+            echo "${{ steps.nonempty.outputs.counts }}"
+            echo '```'
             echo
             echo '```'
             [ -n "$changed" ] && echo "$changed" || echo "(no changes)"

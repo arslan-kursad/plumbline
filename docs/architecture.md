@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.11 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-26
+**Version:** 0.12 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-26
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -343,12 +343,28 @@ this design solves differently: `google_sql_*` (no Cloud SQL — §9),
 domain), and `google_service_account_key` — an exported key is what §6.1 exists to
 avoid, and Gate C only detects one after it has been written.
 
-Three further plan-time assertions ride along with the type check, because each
-enforces a `CLAUDE.md` hard invariant that otherwise had no mechanical control:
-Cloud Run and Cloud Functions scaling stays `min = 0` and `max <= 2`; every
-resource carrying a region or location is `us-central1`; and no Pub/Sub topic
-declares `message_retention_duration`, which is the paid retention feature §2.2
-forbids.
+Five further plan-time assertions ride along with the type check, because each
+enforces an invariant that otherwise had no mechanical control: Cloud Run and
+Cloud Functions scaling stays `min = 0` and `max <= 2`; every resource carrying a
+region or location is `us-central1`; no Pub/Sub topic declares
+`message_retention_duration`, which is the paid retention feature §2.2 forbids;
+each Cloud Run service carries the ingress posture §6.1 gives it; and no service
+but the deliberately public `collector` may have `allUsers` as an invoker, which
+is what "unauthenticated invocations disabled" actually means — Cloud Run has no
+separate switch, so the worker's protection is the *absence* of that member and an
+absence is what configuration review reads past.
+
+**The last two deny a service they have not been told about, and F3 will meet
+that.** Both are keyed by service name, and a Cloud Run service absent from either
+map is a violation rather than a skip: defaulting a new service into whatever was
+copied from the block above it is the mechanism both assertions exist to stop
+(F2 decision log W2.14, W3.6). So **`analytics-api`'s first pull request will be
+red**, and that is the guards working rather than a broken gate — the fix is to
+declare its ingress and invoker posture as an F3 design decision, in the same
+change that introduces it. **Loosening either guard to turn a pull request green
+is a governance regression, not a fix**, and it is the specific move the fixture
+provenance rule (`scripts/ci/testdata/README.md`) was written to make harder,
+because it is always the cheapest thing available under schedule pressure.
 
 ---
 
@@ -414,6 +430,17 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.12 — 2026-08-26** — F2 directive W3C (post-Wave-3 consolidation).
+
+1. §7's plan-time assertion paragraph said "three" and listed three; there have been
+   five since W2.14 and W3.6 added per-service ingress and public-invoker checks. A
+   register that undercounts its own controls is the failure mode §7 exists to prevent,
+   so the paragraph now names all five.
+2. §7 gains the F3 entry note. Both per-service assertions deny a service absent from
+   their map, so `analytics-api`'s first pull request will be red by design. Written
+   down because an undocumented red gate under schedule pressure invites the one fix
+   that must not be taken — loosening the guard.
 
 **v0.11 — 2026-08-26** — F2 Wave 3.
 
