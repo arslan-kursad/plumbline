@@ -396,8 +396,21 @@ Terraform in the wave:
    a bug), and zero resources were created outside the gated CI path.
 6. Cloud Run configurations are inside the guardrails, and the plan-diff guard is shown
    to actually evaluate them.
-7. The OIDC stub is mechanically verified gone and push authentication is real — the push
-   service account is the sole invoker.
+7a. **Push transport established.** The `traces` → `ingestion-worker` OIDC push
+   subscription exists with audience `plumbline-ingestion-worker`, max delivery attempts 5,
+   dead-lettering to `traces-dlq`, and `pubsub-push@` as sole `roles/run.invoker` on the
+   worker. No stub endpoint. Verified by reading the live resource configuration from the
+   API, not from the plan. **Satisfied** — Wave 3, run `32969025343`.
+
+7b. **Push transport exercised.** The worker's OIDC validator has accepted a real
+   Google-signed token from a delivery originating in the `traces` topic, and the resulting
+   span is present in `plumbline.spans`. **Open** — owner: Wave 4, first delivery. F2 does
+   not exit with 7b open.
+
+   No message was published to `traces` during Wave 3, and that was a choice rather than an
+   oversight: publication is irreversible, it lies outside the gated path, and a message
+   landing in the dead-letter queue now would consume the triage rehearsal criterion 4
+   specifies against Wave 4's own poison fixture.
 8. Verification B satisfied inside the watch window, or escalated. Never skipped (#18).
 9. The credit-lag procedure is live with at least one data point.
 10. Billing Reports for the period are fully credit-offset at $0.00 billed; the September
