@@ -490,22 +490,68 @@ Same message format as §3. Run all three; none is optional.
 Evidence — function logs for steps 1, 2 and 3, plus billing state before and
 after — is archived below. Wave 2 is armed only after step 3.
 
-**Attempt 1 — <date> — <result>**
+**Preconditions, verified before firing.** The budget filter went live 2026-08-25
+~11:51 and the function's threshold 2026-08-26 09:34:53. Both confirmed at the API
+rather than from state:
 
 ```
-(evidence placeholder: step 1 log lines)
+$ gcloud functions describe billing-killswitch --region us-central1 \
+    --format='value(serviceConfig.environmentVariables)'
+DETACH_THRESHOLD=5;LOG_EXECUTION_ID=true;TARGET_PROJECT_ID=plumbline-19458
 ```
 
-**Attempt 2 — <date> — <result>**
+And confirmed in behaviour — the first real notification after the deploy carried the
+threshold in its log line, which is how you tell the new code is the one running:
 
 ```
-(evidence placeholder: step 2 log lines, billing state after)
+09:40:20 INFO budget notification received budget="plumbline zero-spend"
+         cost=0 currency=TRY threshold=5 threshold_exceeded=0
+         interval_start=2026-08-01T07:00:00Z
 ```
 
-**False-positive regression check — <date> — <result>**
+**Step 1 — 2026-08-26 — PASSED.** `costAmount = 4.99`, one cent under. Note
+`threshold_exceeded=1`: the synthetic message claims a budget threshold *was* crossed,
+and the function ignores that field by design (Amendment 1, unchanged). Only the figure
+against `DETACH_THRESHOLD` decides.
 
 ```
-(evidence placeholder: step 3, two consecutive cycles with no detach)
+09:40:54 INFO budget notification received ... cost=4.99 currency=TRY threshold=5
+         threshold_exceeded=1 interval_start=AMENDMENT-4-BELOW-THRESHOLD
+09:40:54 WARN spend reported below detach threshold; no action
+         project=plumbline-19458 cost=4.99 currency=TRY threshold=5
+         interval_start=AMENDMENT-4-BELOW-THRESHOLD
+```
+
+Billing unchanged: `billingEnabled: true`. **The pre-amendment rule would have detached
+here**, which is the whole point of the case.
+
+**Step 2 — 2026-08-26 — PASSED.** `costAmount = 5.00`, exactly the threshold. The
+boundary is inclusive by decision (A2.5), so this must detach.
+
+```
+09:45:03 INFO budget notification received ... cost=5 currency=TRY threshold=5
+         interval_start=AMENDMENT-4-AT-THRESHOLD
+09:45:04 WARN spend reported at or above the detach threshold; detaching billing account
+         project=plumbline-19458 billing_account=billingAccounts/011680-E61D62-C3CAA2
+         cost=5 currency=TRY threshold=5
+09:45:05 WARN billing detached project=plumbline-19458
+         previous_billing_account=billingAccounts/011680-E61D62-C3CAA2
+```
+
+Confirmed at the API, not only in the logs:
+
+```
+$ gcloud beta billing projects describe plumbline-19458
+billingEnabled: False
+```
+
+Two seconds from notification to detached.
+
+**Step 3 — false-positive regression check — <date> — <result>**
+
+```
+(evidence placeholder: re-attach, then two consecutive real notification cycles
+ reading cost=0 with no detach)
 ```
 
 ## 5. Re-attach procedure (manual, human-only)
