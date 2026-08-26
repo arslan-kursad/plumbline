@@ -1376,3 +1376,54 @@ be defensible; both is what makes a mistake in one a failed delivery rather than
 open write path to `spans`.
 **Exit review:** yes — it is a boundary the document described differently from the
 deployment for four days.
+
+### W3.8 — Wave 3 applied first time, which is the first time this phase that a permission did not announce itself at apply
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** one-way (the apply)
+**Result:** [run 32969025343](https://github.com/arslan-kursad/plumbline/actions/runs/32969025343)
+— `Apply complete! Resources: 4 added, 1 changed, 0 destroyed`, fingerprint matched
+the approved plan, post-apply plan `No changes`. Verified at the API rather than
+from the plan: the subscription carries the endpoint, audience, service account,
+dead-letter topic, five attempts, 60s deadline, seven-day retention, no expiration
+and the 10s/600s backoff it was configured with; the worker's **only** invoker is
+`pubsub-push@`; the service agent holds publisher on `traces-dlq` and subscriber on
+`traces-push`; the worker runs revision `00002-j29` with `PLUMBLINE_PUSH_PATH=/push`
+and the audience and service-account pair matching the subscription exactly.
+**One dispatch, no split by scope, no targeting** — the first wave since W0.3 for
+which that was true. None of the kill-switch's four human-applied resources (A2.11)
+appear in a Wave 3 plan, so the boundary that forced Wave 1.5 into two applies did
+not touch this one.
+**The streak ended, and the reason is not luck.** W2.11 counted five permission
+defects in this phase, every one surfacing at apply and none at review. This wave
+needed four new IAM operations and got none of them wrong, because the roles were
+already in place from the waves that discovered they were needed: W2.7's per-service-account
+`actAs` deliberately included `pubsub_push` for a subscription that did not exist
+yet, and W2.11's widening to `roles/pubsub.admin` — made for a topic binding —
+covers subscription creation and subscription IAM as well. **Least privilege granted
+one wave early is what a clean apply looks like from the inside.** That is worth
+recording precisely because five-for-five was starting to read as a law rather than
+as a symptom of granting permissions at the moment they are first needed.
+**Two claims this apply does not support, stated because the phase has already paid
+for glossing one:**
+
+*The OIDC path is wired, not proven.* W2.2 recorded that no test can mint a
+genuine Google-signed token, and named Wave 3's first real push delivery as the
+test. Nothing has published to `traces`, so no delivery has been attempted and the
+worker's validator has still never seen a real token. The subscription existing is
+not the evidence; a delivery is.
+
+*No test message was published to close that gap, and the decision is deliberate.*
+Publishing to `traces` would answer the question in one message — the worker's logs
+separate an auth rejection from a deserialization failure cleanly, even though both
+end in the DLQ after five attempts. It was not done for three reasons, in order of
+weight: a published Pub/Sub message cannot be unpublished, which this log's
+preamble names as one of the phase's few genuinely one-way acts; publishing outside
+the gated path is the process violation spec §2 defines, and Lane A's authority
+does not extend to cloud mutations; and a message landing in the DLQ now would
+pre-empt Wave 4's triage rehearsal, which is specified against *its* poison fixture
+and would otherwise begin by explaining an artefact from a previous wave.
+**So the honest status of DoD 7 is split**, and the wave issue should say so rather
+than tick it: the stub is mechanically gone and the sole-invoker binding is live and
+verified, while "push authentication is real" is proven for the code path (W2.2's
+tests, Gate G) and unproven end-to-end until Wave 4's first delivery.
+**Exit review:** yes — a clean apply is worth as much attention as a failed one when
+five preceding ones failed, and the reason it was clean is a finding about method.
