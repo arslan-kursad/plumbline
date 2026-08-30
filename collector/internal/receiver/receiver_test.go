@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -200,6 +201,31 @@ func TestHTTPStatusCodesSayWhatWentWrong(t *testing.T) {
 		NewHTTP(in, quietLogger()).ServeHTTP(response, request)
 		if response.Code != http.StatusMethodNotAllowed {
 			t.Fatalf("want 405, got %d", response.Code)
+		}
+	})
+
+	// F4's uptime check binds `GET /v1/traces` and matches on this body
+	// (docs/runbooks/collector-endpoints.md §3). The status code alone cannot carry
+	// that check: 405 is also what Cloud Run's edge or any future middleware would
+	// return, while this string is written by the handler above and by nothing else
+	// in the path, so matching it is what distinguishes "something answered" from
+	// "the collector answered".
+	//
+	// Reword the message and the uptime check reports a healthy collector until
+	// somebody looks. That is why the string is pinned here rather than left to the
+	// status assertion above.
+	t.Run("wrong method body is the uptime check's probe string", func(t *testing.T) {
+		in, _ := newIngestor(t)
+		request := httptest.NewRequest(http.MethodGet, TracesPath, nil)
+		response := httptest.NewRecorder()
+		NewHTTP(in, quietLogger()).ServeHTTP(response, request)
+
+		const probe = "only POST is accepted"
+		if got := strings.TrimSpace(response.Body.String()); got != probe {
+			t.Fatalf("want body %q, got %q\n\nF4's uptime check matches this string; "+
+				"changing it silently breaks that check. If the change is intended, update "+
+				"the uptime check binding and docs/runbooks/collector-endpoints.md in the "+
+				"same commit.", probe, got)
 		}
 	})
 

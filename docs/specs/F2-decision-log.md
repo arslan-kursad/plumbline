@@ -1165,6 +1165,30 @@ stated in one place a control reads. Implemented separately from this record so 
 with its own fixtures in both directions.
 **Exit review:** no, but it is the answer to "what would have caught this class".
 
+### W2.14 — The ingress guard refuses an undeclared service, not just a wrong one
+**Made:** 2026-08-26 · **Work item:** Wave 2 · **Reversibility:** cheap
+**Decision:** `plan_guard.py` gains `INGRESS_POSTURE`, a map from Cloud Run service name
+to the ingress value that service is allowed to have, asserted against the planned
+attribute. `collector` must be `INGRESS_TRAFFIC_ALL`; `ingestion-worker` must be
+`INGRESS_TRAFFIC_INTERNAL_ONLY`.
+**The part that does the work is the third case.** A service *absent* from the map is a
+violation. Checking only the two known services would leave the next one — `analytics-api`
+in F3 — to inherit whatever posture was copied from the block above it, which is the
+mechanism W2.13 describes rather than a hypothetical. Refusing an undeclared service makes
+adding one a deliberate line stating its exposure.
+**Why a map in the guard rather than parsed from architecture §6.1:** the allowlist is
+parsed from §7.1 because that section is a table of resource types and reads as data.
+§6.1 is a prose table about boundaries, and a parser over it would be a second, weaker
+statement of what the prose means. The map is small, it sits beside the assertion that
+reads it, and the reasoning is in the comment above it.
+**Proven in three directions:** the intended postures pass (`plan-wave2.json`), the worker
+opened to the internet fails (`plan-ingress-inverted.json`), and an undeclared third
+service fails (`plan-ingress-undeclared.json`). The self-test now runs ten fixtures.
+**What this would have caught:** not the 404 — that was a probe path — but the class the
+404 investigation exposed. Both services' exposure was correct by luck of authorship and
+unasserted by anything.
+**Exit review:** no.
+
 ### W2.15 — #61 measured: the fix is one column, and the negative control is why we believe it
 **Made:** 2026-08-26 · **Work item:** W-repo (unblocks Wave 4) · **Reversibility:** cheap
 **Decision (D-61, recorded by ADR-0007):** `start_time` joins the dedup window's
@@ -1196,3 +1220,242 @@ Switching the conversion to round-half-up as a probe failed that test with
 `actual "2026-08-19T10:00:01.612346Z"`. The enforcement point exists and has been seen to
 fire; the probe was reverted.
 **Exit review:** yes — it changes a data-model decision and ADR-0002's dedup key.
+
+### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
+**Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
+**Checked before anything was written, because the gate is on the apply and not on
+the pull request:** both ADR-0006 obligations landed in `f7d6ca3`, Wave 1's transport
+commit, two waves before the subscription that makes them binding exists.
+
+*Obligation 1* — `docs/runbooks/dead-letter.md` §1 states, at the point it tells an
+operator to inspect, that a dead-lettered message carries `user.id`, `user.email`,
+`organization.id`, `session.id` and `workspace.host_paths`; that inspection happens
+on a workstation and never in an issue, a pull request or a chat transcript; and
+that replay is preferred because a replayed message passes through the redaction
+stage. *Obligation 2* — `message_retention_duration = "604800s"` on
+`traces-dlq-pull`, with both pressures named in the resource and, as #44's "Done
+when" specifically requires, **in the commit message**: exposure window against
+evidence window, a part-time maintainer, and why equalling the API default is not
+an argument for inheriting it.
+**Why this is worth an entry rather than a checkbox:** #44's own framing is that
+the obligations are what make ADR-0006's acceptance defensible, and the defence is
+worthless if it is written after the exposure. The ordering is checkable by anyone
+with the repository — `git log --diff-filter=A -- docs/runbooks/dead-letter.md`
+against the commit that adds `google_pubsub_subscription.traces_push` — which is
+the property the spec asked for when it said *checkable rather than narrated*.
+**Exit review:** yes — it is one of the two phase entry gates.
+
+### W3.2 — The push path is stated once and read twice, so Wave 2's default stops being load-bearing
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** cheap
+**Found while writing the subscription:** the worker serves push on
+`PLUMBLINE_PUSH_PATH`, defaulted to `/push` in `WorkerOptions`, and Wave 2 left the
+variable unset. The subscription needs a path in its endpoint. Writing `/push`
+there would have made two places state one route and agree by inspection — the
+shape W2.3 refused for the Firestore collection name and W2.2 refused for the OIDC
+audience.
+**Decision:** a `push_path` local in `cloudrun.tf`, set as the worker's
+`PLUMBLINE_PUSH_PATH` and interpolated into the subscription's `push_endpoint`.
+**Why it matters more here than for the audience:** an audience mismatch fails
+loudly and specifically — every delivery refused by the worker's own validator,
+with a log line naming the audience. A path mismatch fails as a **404 from the
+worker's mux**, which Pub/Sub counts as a failed delivery like any other, so five
+of them dead-letter a message that nothing was ever wrong with. The DLQ then fills
+with healthy payloads and the depth alert reports a poison-message incident. The
+runbook now says so at the top, because that is where someone reads it at 2am.
+**Cost, stated:** the worker takes a new revision in this wave for an environment
+variable whose value it already had. The plan is therefore `4 to add, 1 to change`
+rather than `4 to add`, and the changed resource is a service the reviewer already
+approved once.
+**Exit review:** no.
+
+### W3.3 — Five delivery attempts is the floor, and the floor is correct; the retry policy is what needed choosing
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** cheap
+**Decision:** `max_delivery_attempts = 5`, which is simultaneously the spec's
+figure, the API minimum and the API default — set explicitly on #44's reasoning
+that a number nobody argued for is one a future change has nothing to argue
+against.
+**The argument for the floor:** the worker's failure modes divide cleanly. A
+payload that fails to deserialize fails identically on the hundredth attempt, so
+extra attempts buy no recovery — they buy latency to the DLQ, CPU on a message that
+will not succeed, and more copies of unredacted personal data in flight, which
+ADR-0006 counts as a cost. What the five *do* cover is the transient case: a cold
+start, a redeploy, an instance evicted mid-request.
+**What actually needed a decision was the retry policy, and leaving it unset would
+have been the defect.** Pub/Sub's default is immediate redelivery, and immediate is
+wrong against `min_instance_count = 0`: a cold start that refuses three deliveries
+while the container boots would spend most of a five-attempt budget before the
+worker had answered once, and dead-letter a healthy message for arriving early.
+`minimum_backoff = 10s` is longer than a warm instance needs and shorter than a
+cold one takes; `maximum_backoff = 600s` stops a genuine outage retrying tightly
+for a week.
+**Verified how:** Google's dead-letter documentation read at wave time — default 5,
+minimum 5, maximum 100, and forwarding described as best-effort, so the number is
+approximate by the platform's own account.
+**Exit review:** no.
+
+### W3.4 — No token-creator grant is written, because two already carry it and the wider one is Google's
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** cheap
+**The obvious resource, not written.** An OIDC push subscription needs its minting
+principal — Google's Pub/Sub service agent — to hold `iam.serviceAccounts.getOpenIdToken`
+on `pubsub-push@`, or `roles/iam.serviceAccountTokenCreator` on that account or an
+ancestor. The obvious move is a `google_service_account_iam_member` saying so.
+**Two grants already carry it, and one cannot be removed.** `gcloud iam roles
+describe roles/pubsub.serviceAgent` lists `iam.serviceAccounts.getOpenIdToken`
+among ten permissions; that role is Google's automatic grant to the agent and is a
+precondition of Pub/Sub working at all. Separately, `killswitch.tf` grants
+project-scoped `roles/iam.serviceAccountTokenCreator` to the same principal for
+Eventarc's invocation of the kill-switch function.
+**Decision:** write the fact where the dependency is — a comment at the
+subscription — and not a third resource. A narrow grant here cannot make the
+subscription work in any case where it does not already, because the widest of the
+three is not ours to withdraw. It would look like the control without being it,
+which is precisely the argument W2.5 used to decline a decorative Firestore IAM
+condition: a grant that narrows nothing teaches the next reader that grants here
+are decorative.
+**Alternatives:** add it anyway for locality — defensible, and it would survive a
+future narrowing of the kill-switch's grant; rejected because the surviving grant
+would still be Google's, so the robustness is imaginary. A comment naming both
+existing grants gives a reader the same locality without the false statement.
+**Raised, not resolved:** `google_project_iam_member.pubsub_token_creator` in
+`killswitch.tf` may itself be redundant for the same reason — `roles/pubsub.serviceAgent`
+already carries the permission its comment says it grants. Narrowing or removing it
+touches the kill-switch's own configuration, needs its own re-verification of
+Eventarc, and is outside this spec. Filed rather than taken.
+**Exit review:** no.
+
+### W3.5 — Two dead-letter grants, both of which fail silently when absent
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** cheap
+**Decision:** the Pub/Sub service agent gets `roles/pubsub.publisher` on
+`traces-dlq` and `roles/pubsub.subscriber` on `traces-push`, both at resource
+scope. `google_pubsub_subscription_iam_member` is not in architecture §7.1, so it
+arrives as a spec change with a changelog entry (architecture v0.11), per D6.
+**Verified how, and why verification was not optional:** Google's dead-letter
+documentation, read at wave time — the agent publishes the message to the
+dead-letter topic and acknowledges the original on the subscription, and it holds
+neither right by default. Confirmed against the project as well: `traces-dlq` had
+an empty IAM policy, and `roles/pubsub.serviceAgent` — checked with `gcloud iam
+roles describe` rather than assumed to be broad — carries neither
+`pubsub.topics.publish` nor `pubsub.subscriptions.consume`. So unlike W3.4's grant,
+these two are genuinely missing.
+**The failure mode is what makes them worth a decision entry.** Omitting either
+applies cleanly. The subscription is created, the plan is clean, the drift check
+passes, and dead-lettering simply never happens: Pub/Sub retries the message past
+its attempt limit and it stays in the backlog. The one path in this design that is
+supposed to catch everything else would be the path that was never exercised, and
+the DLQ depth alert — the project's only notification channel (W2.9) — would report
+nothing, because nothing arrives.
+**Ordered, not just present:** `depends_on` puts the publisher grant before the
+subscription. Terraform has no data dependency between them, so without it the two
+race, and losing the race produces exactly the silent state above rather than an
+error. W2.11 is the precedent — a real dependency left unexpressed is decided by
+provider scheduling.
+**Exit review:** no.
+
+### W3.6 — The public-invoker guard, and the fixture that made it look broken
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** cheap
+**Decision:** `plan_guard.py` gains `PUBLIC_INVOKER_ALLOWED = {"collector"}` and
+refuses `allUsers` or `allAuthenticatedUsers` holding `roles/run.invoker` on any
+other Cloud Run service. This is DoD 7's *"the push service account is the sole
+invoker"* expressed as a control: that claim is false the moment anyone else holds
+the role, whatever the push binding says, and Cloud Run has no separate
+"unauthenticated" switch — the member **is** the setting. The worker's protection is
+therefore an *absence*, which is the one thing a configuration review reads past,
+because nothing is on the screen to notice.
+**What the new check immediately reported: a violation in `plan-wave2.json`, a
+fixture that is supposed to pass.** The temptation is to adjust the check until the
+fixture is quiet. The question is whether Terraform populates `after.name` on an
+invoker binding, and it is answerable in one command rather than by argument — a
+real authenticated plan of this wave renders
+`google_cloud_run_v2_service_iam_member.worker_push_invoker` with
+`name = "ingestion-worker"`. So the fixture was wrong: hand-written, carrying only
+the fields the checks of the day happened to read. It is now completed from real
+plan output, along with the two other IAM members that were missing their `member`.
+**The reusable half.** A fixture that omits what no current check reads is a trap
+for the next check, and it fails in the direction that costs most — the new check
+looks broken and the reflex is to weaken it. This is the same lesson as W2.8 in a
+new place: evidence gathered for one question does not automatically answer the
+next one.
+**Third case, on W2.14's pattern:** an invoker binding whose service or member the
+guard cannot read is a **violation**, not a skip. Both are known at plan time here,
+so this costs nothing today; what it buys is that the guard can never report clean
+over a binding it did not understand. Proven in three directions —
+`plan-wave3.json` passes with the push identity on the worker and `allUsers` on the
+collector, `plan-worker-public.json` fails with the worker opened up *while its
+ingress stays internal and the ingress guard passes*, and
+`plan-invoker-unresolved.json` fails on an unreadable binding. The self-test now
+runs thirteen fixtures.
+**Exit review:** no.
+
+### W3.7 — §6.1's ingress row named a wider setting than the one deployed
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** cheap
+**Observation, from writing the row's other half rather than from review:** §6.1's
+"Pub/Sub → Worker" row said the worker's ingress was the
+`internal-and-cloud-load-balancing` equivalent. Wave 2 deployed
+`INGRESS_TRAFFIC_INTERNAL_ONLY`, which is narrower, and the plan guard has asserted
+that exact value since W2.14. The row was written before the worker existed and the
+two had never been read against each other.
+**Decision:** correct the document to what is built, on W2.5's rule. The direction
+is the comfortable one this time — reality is *tighter* than the document, not
+wider — and it is still worth correcting, because a reader checking the deployment
+against §6.1 finds a different value and cannot tell which is authoritative. The
+row now also names the load-balancer allowance as unnecessary: verified at wave
+time, a push subscription in the same project targeting the default `run.app` URL
+counts as internal traffic, so nothing needs the wider setting.
+**Also folded in:** the row now names both checks rather than one. Wave 3 is where
+the sole-invoker half stops being a plan, and the worker's own audience and
+issuer-email validation (W2.2) is the second, independent one. Either alone would
+be defensible; both is what makes a mistake in one a failed delivery rather than an
+open write path to `spans`.
+**Exit review:** yes — it is a boundary the document described differently from the
+deployment for four days.
+
+### W3.8 — Wave 3 applied first time, which is the first time this phase that a permission did not announce itself at apply
+**Made:** 2026-08-26 · **Work item:** Wave 3 · **Reversibility:** one-way (the apply)
+**Result:** [run 32969025343](https://github.com/arslan-kursad/plumbline/actions/runs/32969025343)
+— `Apply complete! Resources: 4 added, 1 changed, 0 destroyed`, fingerprint matched
+the approved plan, post-apply plan `No changes`. Verified at the API rather than
+from the plan: the subscription carries the endpoint, audience, service account,
+dead-letter topic, five attempts, 60s deadline, seven-day retention, no expiration
+and the 10s/600s backoff it was configured with; the worker's **only** invoker is
+`pubsub-push@`; the service agent holds publisher on `traces-dlq` and subscriber on
+`traces-push`; the worker runs revision `00002-j29` with `PLUMBLINE_PUSH_PATH=/push`
+and the audience and service-account pair matching the subscription exactly.
+**One dispatch, no split by scope, no targeting** — the first wave since W0.3 for
+which that was true. None of the kill-switch's four human-applied resources (A2.11)
+appear in a Wave 3 plan, so the boundary that forced Wave 1.5 into two applies did
+not touch this one.
+**The streak ended, and the reason is not luck.** W2.11 counted five permission
+defects in this phase, every one surfacing at apply and none at review. This wave
+needed four new IAM operations and got none of them wrong, because the roles were
+already in place from the waves that discovered they were needed: W2.7's per-service-account
+`actAs` deliberately included `pubsub_push` for a subscription that did not exist
+yet, and W2.11's widening to `roles/pubsub.admin` — made for a topic binding —
+covers subscription creation and subscription IAM as well. **Least privilege granted
+one wave early is what a clean apply looks like from the inside.** That is worth
+recording precisely because five-for-five was starting to read as a law rather than
+as a symptom of granting permissions at the moment they are first needed.
+**Two claims this apply does not support, stated because the phase has already paid
+for glossing one:**
+
+*The OIDC path is wired, not proven.* W2.2 recorded that no test can mint a
+genuine Google-signed token, and named Wave 3's first real push delivery as the
+test. Nothing has published to `traces`, so no delivery has been attempted and the
+worker's validator has still never seen a real token. The subscription existing is
+not the evidence; a delivery is.
+
+*No test message was published to close that gap, and the decision is deliberate.*
+Publishing to `traces` would answer the question in one message — the worker's logs
+separate an auth rejection from a deserialization failure cleanly, even though both
+end in the DLQ after five attempts. It was not done for three reasons, in order of
+weight: a published Pub/Sub message cannot be unpublished, which this log's
+preamble names as one of the phase's few genuinely one-way acts; publishing outside
+the gated path is the process violation spec §2 defines, and Lane A's authority
+does not extend to cloud mutations; and a message landing in the DLQ now would
+pre-empt Wave 4's triage rehearsal, which is specified against *its* poison fixture
+and would otherwise begin by explaining an artefact from a previous wave.
+**So the honest status of DoD 7 is split**, and the wave issue should say so rather
+than tick it: the stub is mechanically gone and the sole-invoker binding is live and
+verified, while "push authentication is real" is proven for the code path (W2.2's
+tests, Gate G) and unproven end-to-end until Wave 4's first delivery.
+**Exit review:** yes — a clean apply is worth as much attention as a failed one when
+five preceding ones failed, and the reason it was clean is a finding about method.

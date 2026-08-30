@@ -1,0 +1,19 @@
+{
+  "format_version": "1.2",
+  "_comment": "An invoker binding whose service name the guard cannot read. In this configuration both fields are known at plan time — verified against a real Wave 3 plan — so this stands for a plan shape the check does not understand rather than a legitimate one. It must fail: a public-invoker check that skips the binding it cannot parse reports clean over the exact case it exists for.",
+  "resource_changes": [
+    {
+      "address": "google_cloud_run_v2_service_iam_member.mystery",
+      "type": "google_cloud_run_v2_service_iam_member",
+      "name": "mystery",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "location": "us-central1",
+          "role": "roles/run.invoker",
+          "member": "allUsers"
+        }
+      }
+    }
+  ]
+}

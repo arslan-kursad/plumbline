@@ -1,0 +1,20 @@
+{
+  "format_version": "1.2",
+  "_comment": "A third Cloud Run service with no declared posture. Refused rather than skipped: a new service must state its exposure instead of inheriting whatever was copied from the block above it.",
+  "resource_changes": [
+    {
+      "address": "google_cloud_run_v2_service.analytics_api",
+      "type": "google_cloud_run_v2_service",
+      "name": "analytics_api",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "name": "analytics-api",
+          "location": "us-central1",
+          "ingress": "INGRESS_TRAFFIC_INTERNAL_ONLY",
+          "template": [ { "scaling": [ { "min_instance_count": 0, "max_instance_count": 2 } ] } ]
+        }
+      }
+    }
+  ]
+}

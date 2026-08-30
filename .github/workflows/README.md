@@ -78,6 +78,29 @@ Four properties are worth stating because each was a choice:
   job on every CI run: once the environment is configured correctly the check passes
   forever, so the only place it can be observed failing is against a fixture.
 
+### Arming a wave
+
+Ordering, and each step exists because skipping it has cost something:
+
+1. **Merge the wave's code first.** `deploy.yml` plans the ref it is dispatched
+   against, and a dispatch that precedes the merge plans a `main` without the wave.
+   That happened twice on 2026-08-26; both runs changed nothing and both still
+   reached the approval gate. The plan job now refuses an empty plan, so the
+   failure is loud, but it still costs a dispatch.
+2. **Let CI push the images, then bump `image_tag`** if the wave deploys code. A
+   pin has a shelf life: the repository's cleanup policy keeps the last two
+   versions and deletes anything older than a day, so a wave that waits outlives
+   its own pin (decision log A2.13).
+3. **Dispatch, naming the wave and its issue.** The reviewer reads the plan job's
+   log and the summary above the gate, which carries the ref, the commit and the
+   change counts.
+4. **Reconcile the wave's issue in the same pull request or commit that carries
+   the wave's evidence — not afterwards.** An issue that disagrees with the applied
+   state is a false entry in the audit trail, and the audit trail is the only
+   artefact that outlives the session that produced it. #63 spent four days saying
+   Wave 2's collector endpoint was unverified after the investigation that
+   explained it had already been merged.
+
 Branch protection requires `ci complete` only — see
 `docs/runbooks/branch-protection.md` for why the aggregate exists and how to
 recover if a broken workflow file deadlocks `main`.

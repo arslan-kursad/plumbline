@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.11 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-26
+**Version:** 0.13 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-30
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -268,7 +268,7 @@ never API keys, customer data, or internal hostnames.
 |---|---|
 | Agent → Collector | API key (header), validated against hashed registry in Firestore; per-key rate limit |
 | Collector → Pub/Sub | Collector service account, `roles/pubsub.publisher` on `traces` only |
-| Pub/Sub → Worker | **OIDC push**: push SA is sole `roles/run.invoker` on the worker; worker ingress `internal-and-cloud-load-balancing` equivalent for Cloud Run (`ingress=all` avoided; unauthenticated invocations disabled) |
+| Pub/Sub → Worker | **OIDC push**, two independent checks: the push SA is the sole `roles/run.invoker` on the worker, and the worker itself validates the token's audience and issuer-verified email (F2 decision log W2.2). Worker ingress is `INGRESS_TRAFFIC_INTERNAL_ONLY` — the *narrower* of the two internal settings, not the `internal-and-cloud-load-balancing` this row named before the worker was deployed; a push subscription in the same project targeting the default `run.app` URL counts as internal, so nothing needs the load-balancer allowance. `ingress=all` avoided; unauthenticated invocations disabled |
 | Worker → BigQuery | Dedicated SA, **table-scoped** grant on `spans` (`roles/bigquery.dataEditor` on the table, not the dataset) |
 | Collector → Firestore | Dedicated SA, `roles/datastore.viewer` at **project scope** — Firestore grants IAM at project (conditionally, database) scope only; per-collection access exists solely through Security Rules, which govern mobile/web clients rather than server client libraries. The narrowest grant that reads `api_keys` therefore reads all Firestore data in the project. Stated because it is wider than least privilege would like, and no configuration can narrow it (F2 decision log W2.5) |
 | GitHub Actions → GCP | **Workload Identity Federation**; no exported SA keys anywhere in the project |
@@ -344,6 +344,7 @@ balancer, a reserved IP, a VM) all arrive as a resource type nobody argued about
 | `google_cloud_run_v2_service` | F2 | `collector`, `ingestion-worker`, `analytics-api` |
 | `google_cloud_run_v2_service_iam_member` | F2 | Invoker grants on v2 services: `allUsers` on the public collector, the push identity as sole invoker on the worker (§6.1) |
 | `google_pubsub_topic_iam_member` | F2 | Publish scoped to `traces` alone, so no data-plane identity can reach `billing-alerts` |
+| `google_pubsub_subscription_iam_member` | F2 | The Pub/Sub service agent's acknowledge right on the push subscription alone, which is what lets a failed delivery reach `traces-dlq` (§3.4) |
 | `google_bigquery_table_iam_member` | F2 | Worker write scoped to the `spans` table rather than the dataset (§6.1) |
 | `google_artifact_registry_repository` | F2 | Distroless images, keep-last-2 cleanup policy (§8) |
 | `google_cloud_scheduler_job` | F3 | Nightly eval batch (§2.5) |
@@ -358,12 +359,28 @@ this design solves differently: `google_sql_*` (no Cloud SQL — §9),
 domain), and `google_service_account_key` — an exported key is what §6.1 exists to
 avoid, and Gate C only detects one after it has been written.
 
-Three further plan-time assertions ride along with the type check, because each
-enforces a `CLAUDE.md` hard invariant that otherwise had no mechanical control:
-Cloud Run and Cloud Functions scaling stays `min = 0` and `max <= 2`; every
-resource carrying a region or location is `us-central1`; and no Pub/Sub topic
-declares `message_retention_duration`, which is the paid retention feature §2.2
-forbids.
+Five further plan-time assertions ride along with the type check, because each
+enforces an invariant that otherwise had no mechanical control: Cloud Run and
+Cloud Functions scaling stays `min = 0` and `max <= 2`; every resource carrying a
+region or location is `us-central1`; no Pub/Sub topic declares
+`message_retention_duration`, which is the paid retention feature §2.2 forbids;
+each Cloud Run service carries the ingress posture §6.1 gives it; and no service
+but the deliberately public `collector` may have `allUsers` as an invoker, which
+is what "unauthenticated invocations disabled" actually means — Cloud Run has no
+separate switch, so the worker's protection is the *absence* of that member and an
+absence is what configuration review reads past.
+
+**The last two deny a service they have not been told about, and F3 will meet
+that.** Both are keyed by service name, and a Cloud Run service absent from either
+map is a violation rather than a skip: defaulting a new service into whatever was
+copied from the block above it is the mechanism both assertions exist to stop
+(F2 decision log W2.14, W3.6). So **`analytics-api`'s first pull request will be
+red**, and that is the guards working rather than a broken gate — the fix is to
+declare its ingress and invoker posture as an F3 design decision, in the same
+change that introduces it. **Loosening either guard to turn a pull request green
+is a governance regression, not a fix**, and it is the specific move the fixture
+provenance rule (`scripts/ci/testdata/README.md`) was written to make harder,
+because it is always the cheapest thing available under schedule pressure.
 
 ---
 
@@ -430,7 +447,7 @@ raised rather than resolved silently.
 
 ## 11. Changelog
 
-**v0.11 — 2026-08-26** — ADR-0007, the canonical views (#61).
+**v0.13 — 2026-08-30** — ADR-0007, the canonical views (#61).
 
 1. §4.1's view definition gains `start_time` in the dedup window, with the reason: the
    two-column window made the views unqueryable under `require_partition_filter`, not
@@ -439,6 +456,37 @@ raised rather than resolved silently.
 2. §3.3's "dedup is downstream" bullet names the three-column key and points at the
    invariant it now rests on.
 3. §10 index: ADR-0007 moves from *reserved* to **Proposed**.
+
+**v0.12 — 2026-08-26** — F2 directive W3C (post-Wave-3 consolidation).
+
+1. §7's plan-time assertion paragraph said "three" and listed three; there have been
+   five since W2.14 and W3.6 added per-service ingress and public-invoker checks. A
+   register that undercounts its own controls is the failure mode §7 exists to prevent,
+   so the paragraph now names all five.
+2. §7 gains the F3 entry note. Both per-service assertions deny a service absent from
+   their map, so `analytics-api`'s first pull request will be red by design. Written
+   down because an undocumented red gate under schedule pressure invites the one fix
+   that must not be taken — loosening the guard.
+
+**v0.11 — 2026-08-26** — F2 Wave 3.
+
+1. §7.1 gains `google_pubsub_subscription_iam_member`, per D6. Dead-lettering is carried
+   out by Google's Pub/Sub service agent, which holds nothing on this project's
+   subscriptions by default: it needs `roles/pubsub.subscriber` on the subscription
+   carrying the dead-letter policy in order to acknowledge the message it has forwarded.
+   The alternative is the same role at project scope, which would also hand the agent
+   every future subscription — so this row exists to make a grant smaller, which is the
+   test v0.9 applied to the previous three. Both halves of the requirement were read off
+   Google's dead-letter documentation at wave time rather than inferred; the omission's
+   failure mode is silent, which is why it is a row and not a comment.
+
+2. §6.1's "Pub/Sub → Worker" row is corrected to the ingress value that was actually
+   deployed. It named `internal-and-cloud-load-balancing`; Wave 2 deployed
+   `INGRESS_TRAFFIC_INTERNAL_ONLY`, which is narrower, and the plan guard has asserted
+   that value since W2.14. The row was written before the worker existed and the two had
+   never been read against each other. Corrected in the direction W2.5 established — the
+   document states what is built — and the row now also names the second check, since
+   Wave 3 is where the sole-invoker half stops being a plan.
 
 **v0.10 — 2026-08-26** — F2 Wave 2 close-out and the record gaps.
 
