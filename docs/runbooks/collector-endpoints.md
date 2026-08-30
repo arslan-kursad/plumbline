@@ -89,6 +89,36 @@ taken here because each is a decision outside this runbook:
 pointed at an odd path with no comment is indistinguishable from a mistake, and
 this one would be copied forward.
 
+## 3a. The selection rule: on this collector, path behaviour is measured
+
+**A priori reasoning about which paths work here has been wrong twice.** First that
+`/healthz` would serve because ingress, IAM, routes and traffic split all read
+correct — it does not. Then that `/health` was available to bind an uptime check to
+— it reaches the container and returns Go's 404, because the collector registers
+nothing there. Both readings were defensible from the configuration and both were
+wrong, and each cost a cycle to find out.
+
+So the rule for anything in §3, and for anything that comes after it: **curl it and
+read the body, then decide.** Not the status code alone — the body is what
+distinguishes Google's edge from Go's mux, and that distinction is the whole
+diagnosis (§1).
+
+**This gets harder, not easier, when ADR-0008 lands.** Today path behaviour has
+exactly one determinant beyond the application: the Cloud Run edge. The deployed
+collector runs two separate listeners on separate ports with a plain
+`net/http.ServeMux` on 8080 — there is no `h2c.NewHandler` and no per-request
+protocol dispatch anywhere in `collector/`, and ADR-0008 is `Proposed` and
+unimplemented (architecture §10). So the multiplexer cannot be part of today's
+explanation.
+
+It becomes part of the next one. Single-port multiplexing puts a second
+independent determinant in front of every path, and a per-request dispatch that
+inspects the request before routing it is exactly the kind of thing that can treat
+one path differently from its neighbours. **Every option in §3 must therefore be
+re-measured after ADR-0008 is implemented, not carried forward on today's
+result** — including whichever one is chosen, and including `/v1/traces`, whose
+`405` is the current evidence that the container serves at all.
+
 ## 4. Where else this matters
 
 The push-delivery decision tree in
