@@ -1,6 +1,7 @@
 # F2 — Minimal GCP Footprint: Work Package Spec
 
-**Version:** 0.1 · **Status:** Approved on handoff (2026-08-21) · **Date:** 2026-08-21
+**Version:** 0.2 · **Status:** Approved on handoff (2026-08-21), Amendment 1 proposed
+2026-08-30 · **Date:** 2026-08-21
 **Phase budget:** ~15 h · **Executor:** Claude Code (graduated mode, §2) + maintainer (§9)
 **Predecessor:** F1 complete ([`F1-completion-note.md`](F1-completion-note.md)); the
 claude-code capture (#10) is still open and stays non-blocking — it gates F4's
@@ -415,10 +416,68 @@ Terraform in the wave:
 9. The credit-lag procedure is live with at least one data point.
 10. Billing Reports for the period are fully credit-offset at $0.00 billed; the September
     boundary check absorbs the pending F0 criterion 11 (#17).
+
+    > *Items 8–10 are evaluated against billed cost while a promotional trial credit is
+    > active. They establish that the period was fully credit-offset. They do **not**
+    > establish that gross cost is zero, and are not evidence for the project's zero-cost
+    > claim. That claim is carried by item 13.*
 11. The decision log is complete: every Lane-A decision of consequence recorded with
     rationale and reversibility class.
 12. Gates A–F green throughout, and no gate, allowlist or protection rule loosened beyond
     D6's per-wave additions.
+
+13. **Verification C — post-credit confirmation.** After the promotional trial credit
+    ends (2026-10-05) and the account state has settled, all three of the following
+    hold, each recorded with evidence:
+    - **13a.** Billing Reports for a full period show **gross cost $0.00**, not merely
+      $0.00 billed after credit offset.
+    - **13b.** The three-step kill-switch live fire has been re-run **after** the account
+      upgrade and passed. Every prior firing occurred behind the credit; this is the
+      first time the `INCLUDE_ALL_CREDITS` trigger arms against a real charge.
+    - **13c.** 13a holds continuously across a 14-day window during which ingest is
+      running.
+
+    Owner: Lane C. F2's completion note is written before Verification C and records it
+    as an open dated obligation, naming this item. F2 is not re-opened by it; the
+    zero-cost claim is not published until it closes.
+
+### 7.1 Calendar constraints
+
+Written down because they were held in one person's memory, and the chain they constrain
+is serial: #82 merge → Wave 4 arm → first delivery → 7b → F2 exit → Verification C.
+
+| # | Constraint | Owner |
+|---|---|---|
+| C1 | Account upgrade decided and executed **no later than 2026-09-28** — one week before credit end. Later risks resource suspension mid-window, which costs the ingest data; earlier wastes credit. | Lane C |
+| C2 | Kill-switch live fire (13b) re-run immediately after upgrade, **before** the window opens. | Lane C |
+| C3 | The 14-day window opens only after C2 passes, and **must not straddle 2026-10-05**. Earliest open 2026-10-05; earliest close 2026-10-19. | — |
+| C4 | **Verification C's 14-day window (13c) and F4's 14-day continuous-ingest window are the same calendar block.** Both require post-credit operation and continuous ingest. Planned separately, they cost a month. | — |
+| C5 | F3 (~20 h) sits between Wave 4's first delivery and the window opening. It is the **only slack in the chain**. Schedule delay is absorbed there or nowhere. | — |
+| C6 | The F4 window carries the Claude Code emitter's human-initiated-session constraint: captures requiring tool/hook spans route through the operator's terminal. Fourteen consecutive days of that source is a staffing constraint, not a technical one, and belongs in the plan as such. | Lane C |
+
+### 7.2 Closing-note requirements
+
+Content requirements on the F2 completion note, not suggested wording.
+
+- **CN1 — the credit sentence.** F2's $0.00 is credit-offset. Free Tier usage is
+  credit-implemented in GCP, so gross cost is non-zero during entirely free operation
+  (ADR-0004 Amendment 4). F2's billing evidence does not establish the zero-cost claim;
+  item 13 does.
+- **CN2 — the calendar block.** State C4 explicitly: Verification C's 14-day window and
+  F4's are one block, opening on or after 2026-10-05.
+- **CN3 — Wave 1 drift, root cause recorded.** Not "unexplained". W1.8 identifies it:
+  sources where the API normalises a value and the configuration insists on writing it
+  back — Monitoring lowercases the notification address while the secret was written in
+  uppercase; `older_than = "0s"` is not persisted and was re-added on every plan run.
+  Both named, both fixed (`lower(var.alert_email)`, `older_than = "86400s"`), verified by
+  `terraform plan -detailed-exitcode` returning 0 with no changes on 2026-08-30.
+- **CN4 — provenance rule for status claims.** Any claim in the closing note that an item
+  is open must cite **where and when it was verified open**. Carrying a status forward
+  from a prior document is not verification. This phase has already produced one such
+  error — the Wave 1 drift root cause was carried as "unexplained" out of a summary table
+  into a directive and then into a second directive, after W1.8 had explained and fixed
+  it. The rule extends W3C.2's fixture-provenance principle to prose: **a hand-authored
+  status table is a hand-authored fixture, and it fails the same way.**
 
 ## 8. Decision authority
 
@@ -481,6 +540,30 @@ detection-fidelity claim, not anything in F2.
 | #36 | Freeze A alignment in `eval-plan.md` | No — context only; F2 does not touch that file |
 
 ## 12. Changelog
+
+**Amendment 1 — 2026-08-30** — Verification C, the credit qualification, and the shared
+calendar block (source decision D-74; #17, #18, #74, ADR-0004 Amendment 4).
+
+**Numbering, checked rather than assumed.** The amendment text warned against assuming
+this is Amendment 1, citing the ADR-0004 sequence that was misnumbered once by assuming a
+gap. Verified: this spec carries no prior amendment. Every occurrence of "Amendment" in it
+before today refers to ADR-0004's, and §12 held one entry (v0.1). So it is Amendment 1
+because the sequence is empty, not because nothing suggested otherwise.
+
+1. §7 items 8–10 gain a qualifier, their text unchanged: they are evaluated against
+   **billed** cost while a promotional trial credit is active, so they establish that the
+   period was fully credit-offset and are not evidence for the zero-cost claim.
+2. §7 gains item 13, **Verification C** — gross cost $0.00 after the credit ends, a
+   kill-switch live fire re-run against a real charge for the first time, and both holding
+   across a 14-day window with ingest running. No existing item is renumbered.
+3. §7.1 records the calendar constraints C1–C6, including that Verification C's 14-day
+   window and F4's are **one** calendar block.
+4. §7.2 records the four closing-note content requirements.
+
+**Placement corrected.** The amendment's header names "§5 (Definition of Done)". §5 of
+this spec is *Out of scope (hard)*; the Definition of Done is **§7**, and its §3.3 would
+have filed the calendar constraints under the section listing what the phase will not do.
+Applied to §7.
 
 **v0.1 — 2026-08-21** — the handoff directive rendered into the repository as the phase's
 source of truth. Content follows the directive. Nine things are stated here that the
