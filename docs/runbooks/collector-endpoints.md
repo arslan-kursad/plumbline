@@ -85,9 +85,32 @@ taken here because each is a decision outside this runbook:
    option that ends the finding rather than routing around it, and the only one
    that cannot be scheduled, because nothing here explains the behaviour.
 
-**Whichever is chosen, the reason goes next to the binding.** An uptime check
-pointed at an odd path with no comment is indistinguishable from a mistake, and
-this one would be copied forward.
+**Decided 2026-08-30: option 1.** F4's uptime check binds `GET /v1/traces` and
+matches on the **response body**, expecting `405` with `only POST is accepted`.
+
+The reason it is not option 2 is timing rather than merit. Option 2 is cleaner and
+may still be right later, but it is a collector change with no spec behind it, and
+it would land inside the window it exists to monitor. Option 3 finishes the finding
+and cannot be scheduled, so it must not gate a dated window (§7.1 C3).
+
+**Why the body and not the status code.** `405` alone is also what Cloud Run's edge
+would return if it ever started rejecting the method itself, and it is what any
+future middleware would return. The string `only POST is accepted` is written by
+the collector's own handler and by nothing else in the path, so matching it is the
+difference between "something answered" and "the collector answered" — the same
+two-witnesses distinction that §1 turns on.
+
+**That makes the string load-bearing, so it is pinned by tests.** Two, in
+`collector/internal/receiver/receiver_test.go`: one asserts the status, one asserts
+the exact body. Before this decision only the status was pinned, so a reworded
+error message would have kept every test green while silently breaking the uptime
+check — the check would report the collector healthy for as long as nobody looked.
+The body test names the uptime check in its failure message, so whoever changes the
+string is told what else they are changing.
+
+**Re-measure after ADR-0008.** Per §3a this binding is not carried forward on
+today's result: `/v1/traces` gains a second determinant the moment single-port
+multiplexing lands, and its `405` is the very evidence being relied on.
 
 ## 3a. The selection rule: on this collector, path behaviour is measured
 
