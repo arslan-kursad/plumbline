@@ -187,13 +187,15 @@ which makes this runbook's own §5 the most likely way to trigger it.
 Where the premise breaks, the design retains both rows rather than dropping one —
 visible rather than silent — which is why this query is a check and not an alarm.
 
-**Status of the record this belongs to:** the decision is #82, which also measured
-that `Timestamps.FromUnixNanos` truncates rather than rounds, verified against the
-code with a golden test proven to fire on a 1 µs boundary. ADR-0007 is **reserved
-and unwritten** in `main` (architecture §10) and is filed by that pull request. If
-#82 has not merged when this runbook is executed, the views are still the
-two-column shape and are unqueryable under the partition filter — which is another
-reason this section reads the base table.
+**The record this belongs to is [ADR-0007](../adr/ADR-0007-canonical-dedup-views.md)
+(#61, #82).** Its status is the ADR index's to state (architecture §10) and is
+deliberately not repeated here: a fact kept in two places is a fact one of which
+will be stale, and the one that goes stale is always the copy.
+
+What this section does depend on is the *shape* of the views, and that is why it
+reads the base table regardless: under the two-column dedup window the views are
+unqueryable against a partition-filtered table (#61), so verifying through them
+would confuse a view defect with a delivery that never landed.
 
 ### The views come later
 
