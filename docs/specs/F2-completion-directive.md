@@ -1,6 +1,6 @@
 # F2 — Completion Directive
 
-**Version:** 1.5 (Amendment 5) · **Status:** Approved · **Date:** 2026-08-30
+**Version:** 1.6 (Amendment 6) · **Status:** Approved · **Date:** 2026-08-30
 **Canonical copy:** `docs/specs/F2-completion-directive.md` in the repo. The chat-side copy
 is a snapshot and loses its tie to the repo the moment it is not re-committed (Project
 Brief, working model). Every amendment is committed before it is executed against, and the
@@ -18,6 +18,31 @@ adds the checks the current plan does not yet contain.
 **Authority order on conflict:** `docs/specs/F2-minimal-gcp-footprint.md` §7 (DoD) →
 `F2-decision-log.md` (decisions) → `docs/architecture.md` §10 (ADR status) → this
 document. If any of those contradict a line here, they win and this line is stale.
+
+### Amendment 6 (2026-08-30, sequencing `make e2e-cloud`)
+
+Answers the ordering question and fixes what asking it exposed.
+
+- **Order: harness, then runbook.** `make e2e-cloud` is written and merged first; F2C-09's
+  runbook correction follows and is written *from the harness as built*. Writing the
+  runbook first would document intent and let the harness diverge from it silently — the
+  error class that produced F2C-01, the #61 claim and F2C-23's apply-path assertion.
+  F2C-09 conflated two layers and is corrected below: the **decision** is already recorded
+  (Decision 2), the **harness** sets the flag, the **runbook** documents it.
+- **F2C-04 was reported and accepted as satisfied while half of it was open.** The
+  `make e2e-cloud` clause sits in the task body, and the Amendment 2 correction touched only
+  the acceptance criterion, so nothing recorded the open half. It is Lane A work standing
+  between here and F2C-06 arming. §6 corrected accordingly.
+- **Running the harness against the cloud is not "another send-shaped action"** — it is
+  F2C-11, and it is already gated by Wave 4 arming. But the harness's *first* cloud
+  execution is the DoD 7b exam, so writing it creates a way to spend that exam by accident.
+  Constraint added below: write it, merge it, do not run it against the cloud until F2C-11.
+- **§4's send rule was ambiguous.** "Publishing" read as "publishing a message"; it meant
+  publishing outside the project. Reworded below around the test that actually matters —
+  whether the effect reaches a party outside the project.
+- **ADR-0006 wording corrected to the executor's, which is more precise.** Not a gap this
+  directive fills in a defective ADR: the boundary is correctly drawn for its own path, and
+  the DLQ path was never inside it. An accepted ADR is not implied defective in passing.
 
 ### Amendment 5 (2026-08-30, permission and send boundaries)
 
@@ -212,13 +237,15 @@ A pre-granted Lane C approval (F2C-03, F2C-21) is valid only against the precond
 named with it. Preconditions are machine-checkable by construction; a precondition that
 requires judgement to evaluate has not been pre-approved and returns to Lane C.
 
-**Send-shaped actions (Amendment 5).** An action whose effect leaves both the repo and the
-project's own GCP state — sending, notifying, publishing, purchasing — requires a
-per-instance go-ahead even when this directive names it. Naming an action in an approved
-plan is not arming it. Everything confined to the repo and to project state is covered by
-the directive and needs no further confirmation; the no-mid-phase-interruptions property
-holds for all of it. In F2 the send-shaped actions are exactly three: F2C-06 (dispatch),
-F2C-08.2 (channel test) and F2C-14 (the drill's alert).
+**Send-shaped actions (Amendment 5, reworded by Amendment 6).** The test is whether the
+effect **reaches a party outside the project** — an inbox, the public web, a vendor. Those
+require a per-instance go-ahead even when this directive names them, because naming an
+action in an approved plan is not arming it. Everything confined to the repo and to the
+project's own GCP state is covered by the directive and needs no further confirmation, and
+that explicitly includes publishing OTLP into our own collector: it reaches nobody outside,
+and it is gated by Wave 4 arming instead. The no-mid-phase-interruptions property holds for
+all of it. In F2 the send-shaped actions are exactly three: F2C-06 (dispatch), F2C-08.2
+(channel test) and F2C-14 (the drill's alert).
 
 ---
 
@@ -261,10 +288,22 @@ choosing which of the two is authoritative is a Lane C decision, not an executio
 
 ### Track B — Wave 4 preparation · Lane A · runs in parallel with Track A; dispatch blocked by F2C-03
 
-**F2C-04 — Wave 4 Terraform. Acceptance corrected by Amendment 2.**
-`bigquery.tf` reads the SQL files, so the views enter the plan; `make e2e-cloud` is merged.
+**F2C-04 — Wave 4 Terraform. Acceptance corrected by Amendment 2; split by Amendment 6.**
+Two halves, only the first of which is done:
+
+1. *Terraform — satisfied.* `bigquery.tf` reads the SQL files, so the views enter the plan.
+2. *`make e2e-cloud` — open, Lane A, prerequisite of F2C-06 arming.* The spec requires it
+   merged before arming, and the reason is not convenience: the first delivery is DoD 7b's
+   exam, and an exam executed by an ad-hoc command is weaker evidence than one executed by
+   reviewed, committed code. It also carries the `synthetic=true` flag (Decision 2), so it
+   is the artefact F2C-09's runbook correction documents.
+   *Constraint:* write it and merge it; **do not run it against the cloud before F2C-11.**
+   Its first cloud execution is the 7b exam, and the exam can only be taken once. A dry or
+   emulator run to validate the harness is fine and is labelled emulator per §8.
+
 *Acceptance:* `terraform plan -detailed-exitcode` in the gated path shows the view
-resources and nothing else — no Cloud Run configuration delta.
+resources and nothing else — no Cloud Run configuration delta; `make e2e-cloud` merged and
+unrun against the cloud.
 *Withdrawn:* the second half of the original acceptance ("the guard output shows the Cloud
 Run guardrails were actually evaluated") was self-contradictory and is void. A plan with no
 Cloud Run delta cannot carry a Cloud-Run-shaped attribute for the guard to evaluate; the
@@ -319,7 +358,8 @@ here can be authored before Wave 4 exists.
 *Fixture:* a payload published directly to `traces` that the worker cannot deserialize
 (non-gzip bytes or truncated protobuf), carrying attributes that make it identifiable in
 the DLQ without opening the payload.
-*Redaction rule — fills a gap in ADR-0006:* ADR-0006 places redaction post-deserialize,
+*Redaction rule — a scope gap, not a defect in ADR-0006 (Amendment 6):* ADR-0006 places
+redaction post-deserialize,
 pre-write. A poison message never reaches that stage, so the redaction boundary does not
 cover it. Rule: DLQ evidence never contains payload bytes. Archive metadata only —
 `message_id`, `publish_time`, delivery attempt count, message attributes, payload size,
@@ -360,8 +400,11 @@ F4 has no cheap way to clean afterwards.
 1. DoD 3 is verified against `spans_deduped` under a partition filter.
 2. `spans_real` is asserted to **exclude** those rows — the first live test of the
    walled-off-synthetic invariant, taken while it is free.
-3. `wave4-first-delivery.md` sets the flag and names which view proves which claim.
-   Amend it if it does not.
+3. The flag is set by `make e2e-cloud` (F2C-04.2), not by the runbook. Three layers, in
+   order: the **decision** is recorded here and needs nothing further; the **harness** sets
+   the flag; the **runbook** documents it and names which view proves which claim.
+   *Sequencing (Amendment 6):* the runbook correction is written after the harness is
+   merged, from the harness as built — not before it, from intent.
 
 **F2C-10 — Draft the closure-note skeleton** (CN1–CN4 per spec §7.2) with placeholders.
 Filled from measurement after the chain completes — authored now, not authored later.
@@ -462,8 +505,8 @@ if it fits; carry it forward if it does not. No urgency is manufactured for it.
 **F2C-20 — DoD 11.** Close the decision log: D1–D6, W0.\*–W3.8, A2.1–A2.13, plus entries
 created by this directive (F2C-02 premise, F2C-09 synthetic decision, F2C-07 redaction
 rule, F2C-05 permission ledger, W2.16 and W2.17, Decisions 1–4, and the Amendment 2
-through Amendment 5 corrections, W2.18, and the deny-list shape defect). Close #63 and
-#47; #91 closes with F2C-23.
+through Amendment 6 corrections, W2.18 through W2.20, and the deny-list shape defect).
+Close #63 and #47; #91 closes with F2C-23.
 
 **F2C-21 — Closure note (CN1–CN4).** Carries forward as **dated open obligations**:
 DoD 13 / Verification C (gross $0.00 after credit exhaustion, post-upgrade live-fire,
@@ -510,8 +553,10 @@ Not serial, and currently scheduled as if it were:
 Only *verification* is serial. Preparation is not. Running Track C during the wait for
 #82 and for `gcp-production` approval removes it from the critical path entirely.
 
-**Revised critical path after Amendment 1.** F2's own critical path is two human actions:
-the #82 precondition check and Wave 4 arming. But the *project's* critical path to
+**Revised critical path after Amendment 1, corrected by Amendment 6.** F2's own critical
+path is not two human actions. `make e2e-cloud` (F2C-04.2) is unwritten Lane A work
+standing between here and arming, so the path is: write and merge the harness → arm →
+first delivery. The #82 check is spent; Wave 4 arming remains. But the *project's* critical path to
 2026-10-05 no longer runs through F2 at all — it runs through the Adjudicator
 ground-truth-labelability question → Freeze A → F3 exit → emitter instrumentation → C7.
 F2 completion has roughly five weeks of runway against that date; F3 entry, which is
