@@ -149,6 +149,13 @@ jobs:
       - name: Scrub tool tests
         run: python3 scripts/ci/scrub_plan_test.py
 
+      # The readout is the only tool here that talks to the cloud, so its
+      # self-test deliberately does not: it exercises the read-only guard and the
+      # redaction rules, both of which are what make the tool safe to point at a
+      # live project and safe to archive in a public repository.
+      - name: State readout self-test
+        run: ./scripts/state-readout.sh --self-test
+
       - name: Prove every gate can fail
         run: ./scripts/ci/prove-gates.sh
 
