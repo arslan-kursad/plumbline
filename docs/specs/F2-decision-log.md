@@ -1642,3 +1642,70 @@ verified, while "push authentication is real" is proven for the code path (W2.2'
 tests, Gate G) and unproven end-to-end until Wave 4's first delivery.
 **Exit review:** yes — a clean apply is worth as much attention as a failed one when
 five preceding ones failed, and the reason it was clean is a finding about method.
+
+### W3.9 — Amendment 7: four of its own claims were wrong, and the envelope is why that was found
+**Made:** 2026-08-31 · **Work item:** W-repo (F2 completion directive) · **Reversibility:** cheap
+**Decision:** directive v1.7 (Amendment 7) at **`6d80c39d9639ff36542bd4f8ff7a579c3baddcd1`**. Chain: W2.17 `9d3b334` (v1.3),
+W2.18 `2d0ac7d` (v1.4), W2.19 `3cf6259` (v1.5), W2.22 `442d08e` (v1.6), W3.9 this commit.
+Decisions 5–17 recorded in §9, the autonomy envelope in §4, the ordered chain in §6.
+
+**The amendment arrived as a design document and was executed as a verification task
+first.** Four of its claims did not survive being read against the repo. Each was carried
+in good faith from a prior summary, which is the CN4 error class, and none of them would
+have been caught by asking — only by reading.
+
+**The deny-list does not refuse monitoring reads, and that was the premise of its largest
+decision.** The proposal moved read-only verification into a new WIF-authenticated CI
+workflow because `.claude/settings.json` was said to permit Cloud Run reads and refuse
+monitoring reads. It carries no monitoring rule at all. What denied F2C-08.1 is
+`Bash(gcloud alpha:*)`, and the evidence file records the command as
+`gcloud alpha monitoring policies list` — the alpha *surface* was the block, not the
+monitoring *verb*. Measured 2026-08-31 from Lane A, `gcloud monitoring policies list`
+returned the `traces-dlq` policy enabled, and IAM policy, Pub/Sub subscription config, the
+Cloud Run service list, Artifact Registry tags and the deployed view DDL all read from the
+same lane the same day. Decision 5 keeps the artefact and drops the workflow: its stated
+purpose was to close a class that was never closed, and it would have put an unverified set
+of CI read grants on the critical path to buy a run number.
+**The real shape defect survives, restated correctly.** Denial is by command surface rather
+than by effect, so an alpha-only read is refused while an equivalent GA read is not. Still
+carried to F3 entry, still not fixed inside F2 because DoD 12 asserts nothing was loosened.
+The closure note's description of it was corrected in the same branch; it had been carried
+forward without being read against the file.
+
+**F4's uptime check is not decided to bind `/health`.** The proposal asked the closure note
+to carry `/health` as a constraint F4 inherits, on the grounds that the decision lived only
+in conversation. It lives in two repo files and says the opposite: W3C consolidation §5
+measured `/health` returning Go's `404 page not found` — the collector registers `/healthz`
+and `/v1/traces` and nothing else — and recorded the binding as *undecided rather than
+written down wrong*, with §6 listing the path as Open. Committing the proposed sentence
+would have written down the exact binding that document refused. What the note now carries
+is the open question and its three options.
+
+**The closure note already schedules DoD 1, 2, 5 and 12, and holds 16 placeholders rather
+than 18.** The higher figure counts two prose lines that describe placeholders instead of
+being ones. The bucket defect the proposal found in the ledger is real; its remedy was
+already in the repo.
+
+**The Wave 4 pin has decayed a second time — A2.13, recurring exactly as A2.13 predicted.**
+F2C-05 asked for the `6a504b4` images. Read 2026-08-31, neither image carries that tag: the
+`plumbline` repository holds `0117848d`…`c9391033`, with current `main` (`490beac4`) present
+and `6a504b4` (2026-08-26) collected. The registry also holds one repository, and the second
+image is `worker` — the directive had been asking for `ingestion-worker`, which does not
+exist, so step 1 of the flight check would have failed twice over.
+**Decision 17 stops carrying a SHA rather than refreshing it.** Updating `6a504b4` to
+`490beac4` repeats the defect one commit later: retention keeps the last two versions and
+deletes anything older than a day, while Wave 4's wait is measured in days. The pin is
+re-derived from current `main` at dispatch, and no SHA written in a directive is confirmed
+as a pin. Widening retention was rejected in A2.13 and is not reopened.
+
+**The autonomy envelope, and what makes it safe.** §4 now sorts the executor's work into
+three classes: decide-and-record, decide-record-and-open-an-issue, and stop. The trade is
+*audit after* in place of *ask before*, and it holds only while each entry records the
+alternative not taken and the **residual uncertainty** — an entry carrying only its outcome
+leaves nothing to audit. Decisions 5–17 are written in that form. This entry is the worked
+example of why the envelope is not a loosening: the four corrections above were produced by
+reading the repo under standing authority, and a per-step confirmation round-trip would have
+confirmed the proposal's own wrong premises faster.
+**Exit review:** yes — a document that would have shipped four claims refuting the repo is
+worth naming, and the reusable finding is that a permission defect can be inherited through
+three documents without anyone opening the file it describes.
