@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.12 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-26
+**Version:** 0.13 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-30
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -152,8 +152,12 @@ Any future proposal to persist raw bytes is a scope change and requires an ADR.
 - **At-least-once.** Exactly-once subscriptions are not used (complexity + regional
   constraints, no zero-cost benefit).
 - **Dedup is downstream:** duplicates land in BigQuery and are eliminated at query time
-  and gate time on `(trace_id, span_id)`. Canonical views (§4.1) encapsulate the dedup
-  so dashboards and the eval engine never see duplicates.
+  and gate time on `(trace_id, span_id, start_time)`. That third column is not a
+  refinement of the key but the reason the views can be queried under
+  `require_partition_filter`, and it rests on duplicates carrying identical timestamps —
+  an invariant with an enforcement point, not an assumption (ADR-0007 D7). Canonical
+  views (§4.1) encapsulate the dedup so dashboards and the eval engine never see
+  duplicates.
 - **Write path:** Storage Write API **default stream** (at-least-once, matches the
   above; no exactly-once committed-stream complexity in v0.1).
 
@@ -207,9 +211,21 @@ never API keys, customer data, or internal hostnames.
 
 - **Options:** time partitioning on `start_time` (daily); clustering
   `(trace_id, span_id)`; `require_partition_filter = true`.
-- **Views:** `spans_deduped` (QUALIFY ROW_NUMBER over `(trace_id, span_id)` keeping
+- **Views:** `spans_deduped` (ROW_NUMBER over `(trace_id, span_id, start_time)` keeping
   latest `ingest_time`) and `spans_real` (`synthetic = false`). All consumers (Looker,
   eval engine, SPA export) read views, never the base table.
+- **The window includes `start_time`, and that is what makes the views queryable at all**
+  (ADR-0007, #61). A predicate may only be pushed below a window function when it
+  references the window's `PARTITION BY` columns, so the earlier two-column window left
+  the inner scan without a partition predicate and `require_partition_filter` refused
+  every query against the views. The effective dedup key is therefore
+  `(trace_id, span_id, start_time)`; duplicates arise from redelivery of identical OTLP
+  bytes and already share a `start_time`, so under that premise it is the same dedup.
+  Where the premise breaks, this shape retains both rows rather than dropping one —
+  visible rather than silent.
+- **Consumers supply their own `start_time` predicate.** The views carry no embedded time
+  bound. Hiding the cost guardrail behind a convenience filter inside the view is what
+  ADR-0007 rejects, so a query with no partition filter fails loudly at query time.
 - **`eval_results` table:** required for dashboarding but its schema is owned by the F3
   eval-engine spec; intentionally not fixed here (see §10 Open Questions).
 
@@ -406,7 +422,7 @@ because it is always the cheapest thing available under schedule pressure.
 | ADR-0004 | Zero-cost guardrails & billing kill-switch design | Accepted |
 | ADR-0005 | Static JSON export as v0.1 SPA data path | Accepted |
 | ADR-0006 | PII redaction happens in the worker, after deserialization | Accepted |
-| ADR-0007 | *reserved* — canonical views under `require_partition_filter` (#61) | Not written |
+| ADR-0007 | Canonical dedup views under `require_partition_filter` | Proposed |
 | ADR-0008 | Single-port OTLP protocol multiplexing on Cloud Run (#68) | Proposed |
 
 Rationale, alternatives, and consequences live in `docs/adr/`; this index carries titles
@@ -430,6 +446,16 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.13 — 2026-08-30** — ADR-0007, the canonical views (#61).
+
+1. §4.1's view definition gains `start_time` in the dedup window, with the reason: the
+   two-column window made the views unqueryable under `require_partition_filter`, not
+   merely awkward. Two sentences record the effective dedup key and that consumers supply
+   their own partition filter.
+2. §3.3's "dedup is downstream" bullet names the three-column key and points at the
+   invariant it now rests on.
+3. §10 index: ADR-0007 moves from *reserved* to **Proposed**.
 
 **v0.12 — 2026-08-26** — F2 directive W3C (post-Wave-3 consolidation).
 
