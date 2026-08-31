@@ -1,6 +1,6 @@
 # F2 — Completion Directive
 
-**Version:** 1.4 (Amendment 4) · **Status:** Approved · **Date:** 2026-08-30
+**Version:** 1.5 (Amendment 5) · **Status:** Approved · **Date:** 2026-08-30
 **Canonical copy:** `docs/specs/F2-completion-directive.md` in the repo. The chat-side copy
 is a snapshot and loses its tie to the repo the moment it is not re-committed (Project
 Brief, working model). Every amendment is committed before it is executed against, and the
@@ -18,6 +18,36 @@ adds the checks the current plan does not yet contain.
 **Authority order on conflict:** `docs/specs/F2-minimal-gcp-footprint.md` §7 (DoD) →
 `F2-decision-log.md` (decisions) → `docs/architecture.md` §10 (ADR status) → this
 document. If any of those contradict a line here, they win and this line is stale.
+
+### Amendment 5 (2026-08-30, permission and send boundaries)
+
+Answers two questions raised during F2C-08 and generalises both so they do not recur
+per-task.
+
+- **Send-shaped actions need a per-instance go-ahead even when an approved directive names
+  them.** Added to §4. The executor was right to stop: a directive approves a plan, not the
+  moment of firing. This is the same shape as Lane B — the plan is approved, the apply is
+  still armed separately.
+- **F2C-14 is also send-shaped** and nobody had noticed. The drill fires a real alert into
+  a real inbox. Flagged below so it is not discovered mid-drill.
+- **F2C-08's API read stays an API read when a human runs the command.** Provenance clause
+  added below. Reading the policy out of `pubsub.tf` would be reading intent, not state,
+  which is the substitution this whole task exists to refuse.
+- **Deny-list shape defect recorded, deliberately not fixed during F2.** See below.
+
+**Deny-list shape defect.** The Lane A permission layer allows reading Cloud Run services
+from the API (F2C-04b did exactly that) and denies reading monitoring policies from the
+API. Same class, opposite verdicts: the list is enumerated, not principled. It will recur
+one command at a time — Scheduler reads in F3, uptime-check reads in F4.
+*Not fixed here, on purpose.* DoD 12 requires that no gate, allowlist or protection rule was
+loosened during the phase. The `.claude/settings.json` deny-list is a different artefact
+from the Terraform resource-type allowlist DoD 12 names, and resolving the tension by that
+technicality is worse than the one manual step it saves. The shaped rule — read-only
+`describe`/`list` on project resources is Lane A; anything that mutates, sends, spends, or
+touches billing or secrets is not — goes to F3 entry with the `CLAUDE.md` principles work
+already queued there.
+*Also correct:* refusing to retry the same read under a different `gcloud` spelling. A deny
+attaches to the intent, not to the string.
 
 ### Amendment 4 (2026-08-30, post-measurement)
 
@@ -98,6 +128,7 @@ corrections to this directive, not to the work.
   which converts *a test exists* into *the test discriminates*. The cases that survive
   substitution are the ones where truncation and rounding agree; that is expected, not a gap.
 - **F2C-23** — added: fix the SQL scanner that reads comments as code (decision log W2.16).
+  *Superseded by Amendment 4: there is no scanner of ours; the defect is in the emulator.*
   The keyword ban proposed as an alternative is rejected; rationale in the task.
 - **Evidence labelling** — emulator results are labelled as emulator in every archive.
   `dataset now holds: ['spans', 'spans_deduped', 'spans_real']` with 13 rows per view is an
@@ -180,6 +211,14 @@ not proceed on inference. No mid-phase interruptions otherwise.
 A pre-granted Lane C approval (F2C-03, F2C-21) is valid only against the precondition
 named with it. Preconditions are machine-checkable by construction; a precondition that
 requires judgement to evaluate has not been pre-approved and returns to Lane C.
+
+**Send-shaped actions (Amendment 5).** An action whose effect leaves both the repo and the
+project's own GCP state — sending, notifying, publishing, purchasing — requires a
+per-instance go-ahead even when this directive names it. Naming an action in an approved
+plan is not arming it. Everything confined to the repo and to project state is covered by
+the directive and needs no further confirmation; the no-mid-phase-interruptions property
+holds for all of it. In F2 the send-shaped actions are exactly three: F2C-06 (dispatch),
+F2C-08.2 (channel test) and F2C-14 (the drill's alert).
 
 ---
 
@@ -300,6 +339,14 @@ ADR-0006 and the gap it fills.
 3. *Out of scope here:* that the policy itself fires end-to-end. That is proven only by
    F2C-14, and it is the drill's job, not this task's.
 
+*Provenance (Amendment 5):* if the Lane A permission layer denies the read, a human runs
+the command and hands back the **raw, unedited output together with the exact command
+line**. That is still reading from the API; a human at the keyboard changes who typed it,
+not what was read. Reading the policy definition out of `pubsub.tf` is not a substitute —
+that is intent, and this task exists to refuse the substitution of intent for state.
+*Send-shaped:* claim 2 requires a go-ahead per §4. Record the channel test's timestamp; it
+is needed by F2C-13.
+
 *Acceptance:* both artefacts archived. A drill that discovers a misconfigured alert has
 proven nothing about the alert and has already spent the clean-DLQ precondition.
 
@@ -345,8 +392,12 @@ never from the fact that the apply succeeded.
 Drain the DLQ and clear the alert **before** the drill, and record the pre-drill depth as
 0. Otherwise "the alert fired" is not attributable to the drill, and the DoD 4 evidence is
 indistinguishable from first-delivery fallout.
+*Added by Amendment 5:* leave a clear gap between F2C-08's channel test and the drill, and
+record both timestamps. Two notifications arriving close together into the same inbox are
+not separable after the fact, and attribution is the entire point of this task.
 
-**F2C-14 — Execute the poison drill. Closes DoD 4.**
+**F2C-14 — Execute the poison drill. Closes DoD 4. Send-shaped (Amendment 5): needs its
+own go-ahead — the drill fires a real alert into a real inbox.**
 *Acceptance:* message reaches `traces-dlq` after 5 attempts; alert fires; triage rehearsal
 performed and archived under the metadata-only rule (F2C-07); and — the step usually
 omitted — a subsequent valid delivery still succeeds, proving the main subscription
@@ -411,7 +462,8 @@ if it fits; carry it forward if it does not. No urgency is manufactured for it.
 **F2C-20 — DoD 11.** Close the decision log: D1–D6, W0.\*–W3.8, A2.1–A2.13, plus entries
 created by this directive (F2C-02 premise, F2C-09 synthetic decision, F2C-07 redaction
 rule, F2C-05 permission ledger, W2.16 and W2.17, Decisions 1–4, and the Amendment 2
-through Amendment 4 corrections). Close #63 and #47; #91 closes with F2C-23.
+through Amendment 5 corrections, W2.18, and the deny-list shape defect). Close #63 and
+#47; #91 closes with F2C-23.
 
 **F2C-21 — Closure note (CN1–CN4).** Carries forward as **dated open obligations**:
 DoD 13 / Verification C (gross $0.00 after credit exhaustion, post-upgrade live-fire,
