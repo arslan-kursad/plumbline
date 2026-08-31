@@ -1709,3 +1709,48 @@ confirmed the proposal's own wrong premises faster.
 **Exit review:** yes — a document that would have shipped four claims refuting the repo is
 worth naming, and the reusable finding is that a permission defect can be inherited through
 three documents without anyone opening the file it describes.
+
+### W3.10 — F2C-23: the comment strip lands, and our own scanner had the same bug one function down
+**Made:** 2026-08-31 · **Work item:** F2C-23 (#91) · **Reversibility:** cheap
+**Decision:** strip `--` line comments and `/* */` blocks in `scripts/e2e/seed.py` before a
+statement is POSTed to the local stand-in, then revert the circumlocution in
+`002_spans_deduped.sql` to plain wording. Both halves are the point; the first without the
+second would leave the workaround in place and fix nothing anyone reads.
+
+**The standing rejection holds.** A gate forbidding the partitioning keywords in
+`analytics/sql/*.sql` comments encodes the wrong invariant: F2C-02 requires an explanatory
+premise comment in exactly those files, so a keyword ban makes them hostile to the
+documentation this directive mandates. The translation belongs in our code, where the
+third-party parser is not, and `goccy/bigquery-emulator` 0.8.1 is that project's latest
+release, so there is no upgrade to take instead.
+
+**The stripper tracks quoting rather than ignoring it.** A `--` inside a string literal or a
+backtick identifier is data, and a regex that removes it changes the statement. Both forms
+are in the tests, and the naive `re.sub(r"--[^\n]*", "", s)` fails three of them -- which is
+the version that would have been written if the tests had been written after the code.
+
+**The regression test takes the probe's shape, not the hypothesis's.** W2.16's first
+hypothesis was the statement body, and it was wrong: every window shape materialises when
+sent without comments. So the test puts the trigger keywords inside a `--` comment and
+asserts the statement still declares its view, and it asserts against the real
+`002_spans_deduped.sql` rather than a fixture -- with the revert, the file's normal state
+*is* the regression case. Discrimination checked by mutation: a no-op stripper fails three
+of eleven, the greedy regex fails three.
+
+**Our own scanner read comments as code too, latently.** The seeder's existence check --
+the one added because a DDL reported `ok` while creating nothing -- ran its
+`CREATE ... VIEW` regex over the raw file while the POST sent something else. No comment in
+the repository currently names a view, so it never fired, but the check and the statement
+were reading two different texts, which is the whole failure mode it was built to catch.
+Both now read the stripped statement. **The reusable part is that the third-party parser's
+bug and ours were the same bug**, one function apart, and only the third-party one was
+visible because only it had a symptom.
+
+**What is not fixed, and is not ours to fix.** This is an emulator/production divergence,
+recorded in `local-dev.md` beside the unpartitioned-table one. Both known instances are
+*false-red*: the stand-in refuses SQL real BigQuery accepts, measured by dry-run in W2.17.
+**The direction that matters -- the stand-in accepting SQL production would reject -- stays
+unmeasured**, architecture §8 rests the local-first model on the fidelity it would break,
+and it is carried to F3 rather than chased here.
+**Exit review:** yes -- not for the fix, which is small, but for the finding that a guard
+and the thing it guards were reading different inputs.

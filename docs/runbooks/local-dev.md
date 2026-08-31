@@ -124,3 +124,24 @@ None of that makes the end-to-end run evidence about the cloud. It is evidence a
 normalization contract, the message contract, and the poison path. F2 is where the same
 pipeline meets real services, and the F2 entry gate still requires the kill-switch
 live-fire (#33) before anything is deployed.
+
+### Known divergences from real BigQuery
+
+Two, both in the stand-in and both worked around in `scripts/e2e/seed.py` rather than in
+the SQL, which is correct in both places.
+
+| Divergence | Worked around by | Recorded in |
+| --- | --- | --- |
+| `CREATE TABLE ... PARTITION BY` is refused outright, and a table carrying `timePartitioning` does not resolve on the Storage Write default stream | The local `spans` table is created through the REST API, unpartitioned and unclustered | W6.2 |
+| A `--` comment containing the keywords that open a partitioning clause makes the whole file answer HTTP 200 with a result set and **no view**, silently | Comments are stripped before the statement is POSTed (`strip_sql_comments`) | W2.16, W2.17, #91 |
+
+**The direction that is measured is the harmless one.** Both instances are *false-red*:
+the stand-in refuses SQL that real BigQuery accepts, and `bq query --dry_run` against the
+second one returns `Query successfully validated.` A false-red costs time and announces
+itself — the second cost four days and four probes.
+
+**The direction that matters is unmeasured: the stand-in accepting SQL that production
+would reject.** Nothing here has looked for it, architecture §8 rests the local-first model
+on the fidelity it would break, and finding it is F3's question rather than F2's. A green
+`make e2e` is evidence about the normalization, message and poison contracts. It is not
+evidence that the SQL is valid in BigQuery.

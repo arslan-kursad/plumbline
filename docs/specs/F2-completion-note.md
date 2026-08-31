@@ -87,8 +87,11 @@ than left to memory.
   a deployed one.
 - **#68 / ADR-0008** — left at `Proposed`. A status flip is a review output, not an
   authoring output.
-- **#91 / F2C-23** — the seeder hands SQL comments to a parser that misreads them.
-  Closes with F2C-23.
+- **#91 / F2C-23** — **fixed 2026-08-31.** The seeder strips SQL comments before POSTing
+  a statement, so the stand-in no longer reads prose as code, and the circumlocution in
+  `002_spans_deduped.sql` reverted to the plain wording F2C-02 asks for. The divergence it
+  worked around is not fixed and is not ours to fix — see the bullet above and
+  `local-dev.md`. Carried here only until #91 is closed at F2C-10.
 - **`/healthz` interception** — recorded as an unexplained known-unknown, **no date
   attached**. On the collector the exact path `/healthz` is intercepted at the Cloud
   Run layer and never reaches the container, while `/health`, `/healthz/`, `/` and
