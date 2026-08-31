@@ -1355,6 +1355,31 @@ depends on knowing the payload is safe has already read the payload.
 send-shaped and has not been done.
 **Exit review:** yes — it fills a stated gap in an accepted ADR's coverage.
 
+### W2.22 — Amendment 6: the harness comes before the runbook, and F2C-04's open half
+**Made:** 2026-08-31 · **Work item:** W-repo (F2 completion directive) · **Reversibility:** cheap
+**Decision:** directive v1.6 (Amendment 6) at **`442d08ee5bb56a751ffd8bf0c31adb5a0a0145e8`**. Chain: W2.17 `9d3b334` (v1.3),
+W2.18 `2d0ac7d` (v1.4), W2.19 `3cf6259` (v1.5), W2.22 this commit.
+**Ordering settled, and it invalidated work already written.** `make e2e-cloud` is written
+and merged first; F2C-09's runbook correction follows, written *from the harness as built*.
+The runbook amendment authored earlier in this session was written from intent and was
+**closed unmerged** (PR #96) rather than landed — documenting intent first is what lets a
+harness diverge from its own documentation silently, which is the class that produced
+F2C-01, the #61 claim and F2C-23's apply-path assertion.
+**F2C-04 was reported satisfied while half of it was open.** The `make e2e-cloud` clause
+sat in the task body while Amendment 2 corrected only the acceptance criterion, so nothing
+recorded the open half. It is Lane A work standing between here and arming, and §6's
+"two human actions" critical path was wrong for that reason.
+**The harness carries a one-shot hazard.** Its first cloud execution *is* DoD 7b's exam, so
+writing it creates a way to spend the exam by accident. Constraint: write it, merge it, do
+not run it against the cloud before F2C-11. Emulator runs are fine and are labelled
+emulator.
+**The send rule now tests the right thing.** "Publishing" was reading as "publishing a
+message"; it meant publishing outside the project. The test is whether the effect reaches a
+party outside the project — which means publishing OTLP into our own collector is not
+send-shaped, and is gated by Wave 4 arming instead.
+**Exit review:** yes — it changes the critical path and retires a task that was recorded
+as done.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
