@@ -1278,6 +1278,30 @@ Amendment 4 decides; the issue is filed with the measurement attached so the dec
 made against evidence rather than against the original reading.
 **Exit review:** yes — it changes a task's scope and retires a stated risk to the apply path.
 
+### W2.18 — Amendment 4 committed, and the hygiene rule applied to itself
+**Made:** 2026-08-31 · **Work item:** W-repo (F2 completion directive) · **Reversibility:** cheap
+**Decision:** directive v1.4 (Amendment 4) is committed at **`2d0ac7d`**, before any work is
+executed against it. W2.17 recorded v1.3 at `9d3b334`; the pair is the audit trail the
+header's canonical-copy rule exists to produce.
+**What Amendment 4 settles:** F2C-23's apply-path claim and its premise are both withdrawn
+on the measurement recorded in W2.17 — real BigQuery validates the pre-fix comment, and
+there is no scanner of ours to fix. The task is rewritten to strip `--` comments in
+`seed.py` before the POST, which is the same intent placed in our code rather than in a
+third-party parser. It also frees `002` to revert to plain wording, which is what F2C-02
+asked for and what the workaround currently prevents.
+**F2C-08 gained a second claim, and it is the right one.** An API read shows a channel is
+configured; it does not show a message arrives. The two are now separate artefacts.
+**The hygiene rule was applied to the amendment that introduced it.** After editing, every
+changed claim was grepped across the document: `three Cloud Run services` survives twice and
+`SQL scanner` once, all three inside amendment history — Amendment 2's record of F2C-23 as
+originally written, and Amendment 3's record of the `analytics-api` over-specification.
+Zero survive in normative text. `sits on the apply path` is gone entirely. Amendment 3
+introduced this class of defect by fixing F2C-04b and leaving criterion 2; checking rather
+than asserting is the whole content of the rule.
+**Carried forward, not closed:** #91 stays open. Amendment 4 answers the question the issue
+raised, but F2C-20 states the issue closes with F2C-23, and F2C-23 has not landed.
+**Exit review:** no — it is a directive amendment record.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
