@@ -1302,6 +1302,31 @@ than asserting is the whole content of the rule.
 raised, but F2C-20 states the issue closes with F2C-23, and F2C-23 has not landed.
 **Exit review:** no — it is a directive amendment record.
 
+### W2.19 — Amendment 5: the send boundary, and a deny-list left deliberately unfixed
+**Made:** 2026-08-31 · **Work item:** W-repo (F2 completion directive) · **Reversibility:** cheap
+**Decision:** directive v1.5 (Amendment 5) is committed at **`3cf6259da5942d622d32cdbdf8968ad7ffc08ff2`**, before work is
+executed against it. The chain is now W2.17 → `9d3b334` (v1.3), W2.18 → `2d0ac7d` (v1.4),
+W2.19 → this commit.
+**The send boundary is now a rule rather than an instinct.** An action whose effect leaves
+both the repo and this project's GCP state needs a per-instance go-ahead even when an
+approved directive names it: naming an action in a plan is not arming it, which is the
+shape Lane B already had for applies. F2 has exactly three such actions — F2C-06, F2C-08.2
+and F2C-14 — and F2C-14 was not previously marked as one, which would have been discovered
+mid-drill.
+**F2C-08's read is blocked and stays a read.** The Lane A permission layer denied
+`gcloud alpha monitoring policies list`. The provenance clause settles what happens next: a
+human runs the command and hands back raw output with the exact command line. Substituting
+`pubsub.tf` would be reading intent instead of state, which is the substitution the task
+exists to refuse. Retrying under a different `gcloud` spelling was refused on the same
+ground — a deny attaches to the intent, not to the string.
+**The deny-list defect is recorded and not fixed.** The same layer permits reading Cloud
+Run services from the API and denies reading monitoring policies: the list is enumerated
+rather than principled, and it will recur one command at a time. Fixing it during F2 would
+mean editing `.claude/settings.json` while DoD 12 asserts nothing was loosened during the
+phase; the artefacts differ, but clearing the tension on that technicality is worse than
+the one manual step it costs. The shaped rule goes to F3 entry.
+**Exit review:** yes — it changes the execution protocol, not just a task.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
