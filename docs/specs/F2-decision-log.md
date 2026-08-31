@@ -1251,6 +1251,33 @@ the one W2.15 built and this incident exercised.
 plausible and is outside #82's scope; recorded here rather than implemented.
 **Exit review:** no — it is a local-stand-in defect and a wording rule, not a design change.
 
+### W2.17 — The directive gets a canonical copy, and the apply-path claim in it is wrong
+**Made:** 2026-08-31 · **Work item:** W-repo (F2 completion directive) · **Reversibility:** cheap
+**Decision:** `docs/specs/F2-completion-directive.md` is the canonical copy of the F2
+completion directive. v1.3 (Amendment 3) is committed at **`9d3b334`**, verbatim as
+approved, before any further work is executed against it — the rule its own header states.
+Until this commit the directive existed only as a chat snapshot, which is how Amendment 2
+came to be read as missing.
+**Raised rather than edited.** F2C-23's priority argument says the comment trap "sits on
+the apply path, not only on CI", because `bigquery.tf` reads these SQL files. **Measured
+today: it does not.** `bq query --dry_run` against `plumbline-19458`, given the pre-fix
+comment line verbatim plus the three-column view body, answers
+`Query successfully validated`. Real BigQuery parses the comment correctly; the defect is
+confined to `goccy/bigquery-emulator` 0.8.1, which is the pinned local stand-in and the
+latest release there is. A dry run creates nothing, so this cost no mutation.
+**And there is no scanner of ours to fix.** F2C-23's action is "strip `--` line comments
+and `/* */` blocks before keyword scanning". Nothing in this repository scans these files
+for keywords: `seed.py` posts `path.read_text()` to the stand-in unmodified, and the only
+matches for the term under `scripts/` are prose inside comments. The scanner that misreads
+comments is third-party and not ours to patch. The nearest faithful reading of the intent
+is to strip comments in `seed.py` before handing the text to the defective parser, which
+would also let the reworded comment revert to the direct phrasing F2C-02 asks for.
+**Why this is recorded and not acted on:** an approved directive is not silently corrected
+by its executor, and the correction changes F2C-23's scope rather than a detail of it.
+Amendment 4 decides; the issue is filed with the measurement attached so the decision is
+made against evidence rather than against the original reading.
+**Exit review:** yes — it changes a task's scope and retires a stated risk to the apply path.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
