@@ -1327,6 +1327,34 @@ phase; the artefacts differ, but clearing the tension on that technicality is wo
 the one manual step it costs. The shaped rule goes to F3 entry.
 **Exit review:** yes — it changes the execution protocol, not just a task.
 
+### W2.20 — DLQ evidence is metadata only, and the rule is a list rather than a judgement
+**Made:** 2026-08-31 · **Work item:** F2C-07 · **Reversibility:** cheap
+**Decision:** a dead-letter archive never contains payload bytes — not raw, not base64, not
+decoded, not one interesting field. The permitted set is enumerated in
+`dead-letter.md` §1: `message_id`, `publish_time`, delivery attempt count, message
+attributes, payload size, and the SHA-256 of the payload.
+**Why an enumeration and not a principle.** The runbook already said content is "elided"
+when a triage transcript is archived. That is a principle with the decision left to whoever
+is archiving under time pressure, which is the condition under which the wrong call gets
+made. A list can be followed without judgement.
+**The digest is what makes it usable rather than merely safe.** Two archives can be
+compared and a replayed message matched to its original without either document holding the
+data — which is the question an archive is normally opened to answer.
+**The ADR-0006 gap, stated as coverage rather than defect.** ADR-0006 places redaction
+post-deserialize, pre-write. A dead-lettered message is defined by never reaching that
+stage, so the boundary does not cover it and never intended to. The boundary is drawn
+correctly for the path it describes; this path is the one that leaves it. The rule closes
+the gap at the only other point the bytes can escape, which is the archive.
+**Binds regardless of the payload.** A poison fixture this project constructs carries no
+personal data by construction, and is archived under the same rule anyway: a procedure that
+depends on knowing the payload is safe has already read the payload.
+**Also written, not executed:** the DoD 4 drill fixture and its procedure (`dead-letter.md`
+§5) — published directly to `traces` rather than through the collector, carrying
+`plumbline_drill=f2-dod4` so it is identifiable in the queue without opening it, and a
+`plumbline_drill_published_at` stamp so the alert is attributable. Publishing is
+send-shaped and has not been done.
+**Exit review:** yes — it fills a stated gap in an accepted ADR's coverage.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
