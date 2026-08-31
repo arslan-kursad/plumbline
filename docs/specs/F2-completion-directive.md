@@ -1,13 +1,14 @@
 # F2 — Completion Directive
 
-**Version:** 1.6 (Amendment 6) · **Status:** Approved · **Date:** 2026-08-30
+**Version:** 1.7 (Amendment 7) · **Status:** Approved · **Date:** 2026-08-31
 **Canonical copy:** `docs/specs/F2-completion-directive.md` in the repo. The chat-side copy
 is a snapshot and loses its tie to the repo the moment it is not re-committed (Project
 Brief, working model). Every amendment is committed before it is executed against, and the
 decision log records the commit SHA — otherwise "which version" is unanswerable, which is
 how Amendment 2 came to be read as missing.
-**Lane C sign-off:** 2026-08-30 — Decisions 1–4 of §9 approved
-**Baseline:** `main` @ `aac1097` · open PR #82 · measured F2 status snapshot 2026-08-30
+**Lane C sign-off:** 2026-08-30 — Decisions 1–4 of §9 approved · 2026-08-31 — Amendment 7,
+Decisions 5–17 and the §4 autonomy envelope approved
+**Baseline:** `main` @ `490beac` · #82 merged · live readings of 2026-08-31, project `plumbline-19458`
 **Executor:** Claude Code (Lane A), with explicit hand-backs to Lane B (armed apply) and Lane C (human-only)
 **Repo target:** `docs/specs/F2-completion-directive.md`
 
@@ -18,6 +19,52 @@ adds the checks the current plan does not yet contain.
 **Authority order on conflict:** `docs/specs/F2-minimal-gcp-footprint.md` §7 (DoD) →
 `F2-decision-log.md` (decisions) → `docs/architecture.md` §10 (ADR status) → this
 document. If any of those contradict a line here, they win and this line is stale.
+
+### Amendment 7 (2026-08-31, the executable chain and the autonomy envelope)
+
+Removes the two things that made the remaining chain need a confirmation round-trip per
+step: undecided shape inside `make e2e-cloud`, and a permission story that was wrong about
+itself. Four claims in the proposal did not survive being read against the repo. They are
+corrected here rather than committed, and every measurement below is dated.
+
+- **The deny-list does not refuse monitoring reads, and the class it was said to block was
+  never blocked.** The proposal's largest decision — move read-only verification into a new
+  CI workflow — rested on `.claude/settings.json` permitting Cloud Run reads and refusing
+  monitoring reads. It carries no monitoring rule at all. The entry that denied F2C-08.1 is
+  `Bash(gcloud alpha:*)`, and the command reached for was `gcloud alpha monitoring policies
+  list`, which is what [`f2-dod4-alert-configuration.md`](../evidence/f2-dod4-alert-configuration.md)
+  records. The GA surface is not denied. Measured 2026-08-31 from Lane A:
+  `gcloud monitoring policies list` returned the `traces-dlq` policy enabled, and IAM
+  policy, Pub/Sub subscription config, the Cloud Run service list, Artifact Registry tags
+  and the deployed view DDL all read the same day from the same lane. Decision 5 keeps the
+  artefact and drops the workflow.
+- **F4's uptime check is not decided to bind `/health`, and that decision is not homeless.**
+  The proposal asked the closure note to carry `/health` as a constraint F4 inherits.
+  [`F2-directive-w3c-consolidation.md`](F2-directive-w3c-consolidation.md) §5 measured
+  `/health` on 2026-08-26 returning Go's `404 page not found` — the collector registers
+  `/healthz` and `/v1/traces` and nothing else — and recorded the binding as **undecided
+  rather than written down wrong**; its §6 lists the path as Open. Writing the proposed
+  sentence would have committed the binding that document deliberately refused. What the
+  closure note carries is the open question and its three options, per §2 here and
+  [`collector-endpoints.md`](../runbooks/collector-endpoints.md).
+- **The closure note already schedules DoD 1 and 2, and its placeholder count was
+  overstated.** [`F2-completion-note.md`](F2-completion-note.md) carries *(placeholder)* on
+  DoD 1, 2, 5 and 12 — the four items the proposal wanted added to a re-derived-at-closing
+  bucket. The note holds **16** placeholders, not 18: the higher figure counts two prose
+  lines that describe placeholders rather than being ones. Nothing is added and the count
+  does not move. The bucket defect the proposal found is real, and it is in the ledger's
+  accounting rather than in the note.
+- **The Wave 4 image pin has decayed a second time.** F2C-05 asks for the `6a504b4` images.
+  Read 2026-08-31, neither image carries that tag: the `plumbline` repository holds
+  `0117848d`…`c9391033`, with current `main` (`490beac4`) present and `6a504b4`
+  (2026-08-26) already collected. This is A2.13 recurring in exactly the way A2.13 said a
+  blocked wave would produce it. Decision 17 stops carrying a SHA at all. The registry also
+  holds one repository and the second image is `worker`, not `ingestion-worker`; F2C-05 is
+  corrected below on both points.
+- **Autonomy envelope added to §4**, the ordered chain to §6, decisions to §9 as 5–17. The
+  envelope trades *ask before* for *audit after*. That trade holds only while the residual
+  uncertainty in each decision is written down rather than resolved quietly, which is why
+  the recording clause is normative and not advice.
 
 ### Amendment 6 (2026-08-30, sequencing `make e2e-cloud`)
 
@@ -247,6 +294,40 @@ and it is gated by Wave 4 arming instead. The no-mid-phase-interruptions propert
 all of it. In F2 the send-shaped actions are exactly three: F2C-06 (dispatch), F2C-08.2
 (channel test) and F2C-14 (the drill's alert).
 
+**Autonomy envelope (Amendment 7).** Inside this directive the executor's default is to
+decide and record. Asking is available only for Class 3.
+
+*Class 1 — decide, record, proceed.* Implementation shape inside an approved task: file
+layout, naming, language idiom, test structure, helper decomposition. Fixture design,
+naming and manifest entries under the W3C.2 provenance rule. Branch selection inside a
+documented runbook's error tree. A choice between Terraform expressions that produce an
+identical plan. Wording of non-normative documentation. Re-running a failed CI job when
+neither the rule nor the code changed. A choice between two measurement methods where both
+read from the API.
+
+*Class 2 — decide, record, proceed, and open an issue.* A finding that changes a task's
+method but not its acceptance criterion. A spec defect correctable without touching
+normative text elsewhere. Discovered work inside the phase's scope that no task names.
+Never chat-only: decided-but-uncommitted normative text belongs in an issue, and this
+project has already paid once for a directive that lived only as a chat snapshot.
+
+*Class 3 — stop, report, do not decide.* A plan diff outside the wave's declared resource
+set. Any finding that contradicts an Accepted ADR. Any ADR status flip. Any edit to
+`docs/eval-plan.md`. Any change to `.claude/settings.json` or to what a gate A–H asserts.
+Any send-shaped action, per the paragraph above. Any path that would produce evidence
+weaker than a DoD item specifies. Any circumstance in which the DoD 7b exam could be spent
+outside F2C-11. Spend > $0.00 on two consecutive days (Decision 16).
+
+Class 3 is a stop, not a request for permission to continue: the report names the trigger
+and the state at the stop, and does not propose a workaround in the same breath.
+
+**Recording is what makes the envelope safe.** For Classes 1 and 2 the decision-log entry
+names the decision, the alternative not taken, and the residual uncertainty. The last of
+those is the load-bearing one: the envelope substitutes *audit after* for *ask before*, and
+an entry that records only the outcome leaves nothing to audit. Amendment 7 is itself the
+worked example — four of its own proposed claims were wrong against the repo, and they were
+found by reading rather than by asking.
+
 ---
 
 ## 5. Task list
@@ -334,9 +415,14 @@ run (spec §7.2 CN4).
 **F2C-05 — Pre-arm flight check. Immediately before dispatch, not earlier.**
 Two failure modes have precedent in this phase and both are cheap to pre-empt:
 
-1. *Pin decay (A2.13):* confirm the `6a504b4` images for `collector` and
-   `ingestion-worker` are still in Artifact Registry. Cleanup keeps the last two tags and
-   deletes anything older than a day; a pending wave outlives its own pin.
+1. *Pin decay (A2.13, recurred — Decision 17):* re-derive the pin from current `main` at
+   dispatch, then confirm both images carry that tag in Artifact Registry. **Do not confirm
+   a SHA written in this directive.** `6a504b4` was named here and, read on 2026-08-31, had
+   already been collected from both images. There is one repository, `plumbline`, and the
+   images are `collector` and `worker` — not `ingestion-worker`. Cleanup keeps the last two
+   versions and deletes anything older than a day, so a pending wave outlives its own pin;
+   that has now happened twice, and the second time the pin was carried in the document
+   telling the executor to trust it.
 2. *IAM at apply:* enumerate every `setIamPolicy` call in the plan and, for each, verify
    the apply identity holds the required permission **by reading from the API**, not from
    the plan.
@@ -563,6 +649,56 @@ F2 completion has roughly five weeks of runway against that date; F3 entry, whic
 blocked on an unscheduled design question, does not. The snapshot's claim that F3 is the
 chain's only slack inverts this: F3 is not slack, it is the binding constraint.
 
+### The ordered chain (Amendment 7)
+
+Lane A steps need no approval and are not to be batched into a question. Ordering binds
+wherever a step's precondition names a prior step.
+
+**Stage 1 — Lane A, unblocked.**
+
+| # | Task | Precondition | Done when |
+|---|---|---|---|
+| 1 | Commit Amendment 7 as v1.7; decisions 5–17 into §9 | — | v1.7 in repo, its SHA recorded in the decision log as v1.3–v1.6 were |
+| 2 | `scripts/state-readout.sh` (Decision 5) + first run archived | 1 | Artefact carries every reading in Decision 5; command and raw output archived under `docs/evidence/` |
+| 3 | F2C-23: seeder fix, closing #91 | — | Emulator no longer parses comments as code; the W2.16 probe shape is the regression test |
+| 4 | F2C-04.2: harness, both entry points (Decisions 6–13) | 1 | Merged. **Not run against the cloud.** Emulator and dry runs labelled emulator per §8 |
+| 5 | F2C-09: runbook correction, derived from the harness as built | 4 | Names which view proves which claim; sequencing per Amendment 6 |
+| 6 | F2C-05: pre-arm flight check — pin re-derived from `main` (Decision 17), every `setIamPolicy` permission read from the API, apply-identity ledger closed | 2 | Ledger closed; any missing grant recorded as a finding, not routed around |
+
+**Stage 2 — Lane B gate.**
+
+| # | Task | Lane | Note |
+|---|---|---|---|
+| 7 | Wave 4 plan + dispatch | A | Empty-plan guard and fixture provenance apply as they stand |
+| 8 | `gcp-production` environment approval | **C — human** | Cannot be delegated; delegating it deletes Lane B |
+| 9 | Apply | A | Post-apply `No changes` plan retained as fixture |
+
+**Stage 3 — post-apply, Lane A.**
+
+| # | Task | Precondition | Done when |
+|---|---|---|---|
+| 10 | F2C-11: first delivery, `PLUMBLINE_E2E_TARGET=cloud` (Decision 10). **DoD 7b exam** | 9 | Google-signed token accepted, or the error-tree branch named. No blind retry |
+| 11 | F2C-12: DoD 3 evidence (Decision 13) and #61 closure — deployed view read from the API shows the three-column `PARTITION BY`, partition-filtered read succeeds | 10 | Both claims measured, not asserted |
+| 12 | Drain DLQ, record depth 0 | 11 | Depth read from the state readout |
+
+**Stage 4 — Lane C gate, then the drill.**
+
+| # | Task | Lane | Note |
+|---|---|---|---|
+| 13 | F2C-08.2: channel test | **C — human go-ahead** | Send-shaped. Send timestamp recorded (Decision 14) |
+| 14 | ≥ 30 min separation | — | Or a distinguishing marker, if the channel admits one (Decision 14) |
+| 15 | F2C-13/14: `make e2e-cloud-drill` — poison → DLQ → alarm → triage archive. **DoD 4** | A | Archive per F2C-07's enumeration: `message_id`, `publish_time`, attempt count, attributes, size, SHA-256. Nothing else |
+
+**Stage 5 — closure.**
+
+| # | Task | Done when |
+|---|---|---|
+| 16 | F2C-20: decision log closed. **DoD 11** | Every decision 5–17 present with its residual uncertainty |
+| 17 | Re-derive DoD 1, 2, 5 and 12 at closure | Four items measured at closure, none carried. The note already carries their placeholders |
+| 18 | F2C-10: fill the note's **16** placeholders by measurement | No placeholder filled by deciding that a measurement would have passed |
+| 19 | Close #63, #47, #91. Record carried obligations: #68, DoD 8/9/10/13, C1–C7, the F4 uptime-check path as **open** (§2), the Lane A deny-list shape defect, and the unmeasured direction of the emulator/production divergence | Every skipped mandatory CI job named in the closure note |
+| 20 | F2C-22, after F2 exit: break-glass runbook written **and dry-run**, then standing apply roles removed from human principals | Order binds. Removing access against an untested recovery path repeats F2C-08's error class |
+
 ## 7. Acceptance criteria — F2 exit
 
 1. DoD 3, 4, 7b, 8, 9, 10, 11 satisfied, each **measured at closure**, none carried from a
@@ -584,6 +720,19 @@ chain's only slack inverts this: F3 is not slack, it is the binding constraint.
    not role removal has executed by closure.
 7. Zero occurrences of any forbidden legacy-name pattern under the self-non-matching
    pattern form; no exclusion list required.
+8. Amendment 7 committed as v1.7, with decisions 5–17 carrying real numbers in §9 and each
+   carrying its residual uncertainty.
+9. `scripts/state-readout.sh` produces one artefact answering every reading in Decision 5.
+   No remaining F2 verification requires a human to paste command output; where one still
+   does, the blocking rule is named rather than worked around.
+10. `make e2e-cloud` and `make e2e-cloud-drill` merged, unrun against the cloud, with
+    Decisions 6–13 present **in code** rather than in the runbook that describes the code.
+11. DoD 3, 4 and 7b measured after Wave 4, each by a query or an API read, none by an apply
+    having succeeded.
+12. Closure note complete: 16 placeholders filled by measurement, C1 holding a date rather
+    than a ceiling, carried obligations enumerated.
+13. Period bill consistent with the phase's thesis, and the two-day escape hatch
+    (Decision 16) either unfired or fired with its incident note written.
 
 ## 8. Test expectations
 
@@ -602,6 +751,14 @@ chain's only slack inverts this: F3 is not slack, it is the binding constraint.
 - Emulator results are labelled as emulator wherever archived; they never satisfy a DoD
   item that names the cloud.
 - No test asserts a triviality to make a job look real (F0 §6 carries forward).
+- **Harness self-tests run in both directions (Amendment 7).** The stage-0 provenance check
+  must fail against a deliberately mismatched view definition and pass against the deployed
+  one. The cloud-target guard (Decision 10) must refuse without the arming variable. The
+  volatile-field allowlist (Decision 12) must fail when a non-allowlisted field differs. A
+  check that has never been shown to fail is not yet evidence.
+- **The unmeasured direction stays named.** CI green while production would reject is not
+  retired by a harness dry run, and the closure note says so rather than omitting it.
+- **No existing gate's assertion changes.** A newly red job is a finding, not a threshold.
 
 ## 9. Decisions of record
 
@@ -614,9 +771,157 @@ Approved by Lane C on 2026-08-30. These are decision-log entries, not proposals.
 | 3 | Account upgrade ≤ 2026-09-28 | Approved as ceiling | Concrete date still unpinned; C7 added (F2C-18, F2C-19) |
 | 4 | Remove standing human apply roles + break-glass runbook | Approved | After F2 exit; runbook written and dry-run first (F2C-22) |
 
+### Decisions 5–17 (Amendment 7, 2026-08-31)
+
+Recorded with the alternative not taken and the residual uncertainty, per §4. An entry
+carrying only its outcome does not satisfy the envelope.
+
+**Decision 5 — read-only state verification is a script in the repo, not a CI workflow and
+not a deny-list change.** `scripts/state-readout.sh` performs read-only API calls and emits
+one structured JSON artefact: Cloud Run service configs per service; IAM bindings for every
+principal named in the pending plan's `setIamPolicy` calls; deployed BigQuery view DDL;
+Pub/Sub subscription config including dead-letter policy and max delivery attempts; DLQ
+undelivered depth; Artifact Registry tags for `collector` and `worker`; BigQuery row counts
+by `synthetic` and by run id over an explicit partition window.
+*Alternative not taken:* a `workflow_dispatch` job authenticating via WIF, for the run
+number. Rejected because its premise was false — the deny-list carries no monitoring rule,
+and every reading above was performed from Lane A on 2026-08-31 — and because the CI
+identity's read grants are themselves unverified, so the workflow would add a new
+unmeasured dependency to the critical path in order to solve a problem that does not exist.
+Widening `.claude/settings.json` was also not taken, for the reason the proposal gave and
+which survives: DoD 12 asserts nothing was loosened across F2.
+*Residual uncertainty:* a local run carries a paste rather than a run number. F2C-08's
+provenance clause already holds that an API read stays an API read regardless of who runs
+it, so this weakens reproducibility rather than validity — the script is checked in so a
+third party can re-run it. If a run number is later wanted, the same script wires into CI
+unchanged.
+
+**Decision 6 — the corpus carries a run-scoped identity.** Every span carries resource
+attribute `synthetic=true` (Decision 2, unchanged) and `plumbline.e2e_run_id`, run-unique,
+emitted as a resource attribute so it lands in the lossless `attributes` column. All
+harness assertions scope to that value.
+*Alternative not taken:* deleting rows between runs. Rejected — deletion in a
+`require_partition_filter` table is awkward and is a mutation on the phase's only real data.
+*Residual uncertainty:* the corpus accumulates. Nothing prunes it inside F2, and the table's
+growth is bounded only by how often the harness runs.
+
+**Decision 7 — the partition predicate is structural.** Every harness query goes through one
+helper taking an explicit `(start_time_lower, start_time_upper)` window as a required
+argument; no code path can issue a query without one. The window derives from the run's own
+emission timestamps, never from `CURRENT_DATE()`.
+*Alternative not taken:* a convention plus review. Rejected because `require_partition_filter`
+rejecting a missing predicate is the weaker of the two invariants — a broad scan satisfies
+the filter and still burns the query budget. The helper enforces both.
+*Residual uncertainty:* the helper binds the harness only. Ad-hoc console queries remain
+outside it.
+
+**Decision 8 — stage 0 is view-definition provenance.** Before sending anything the harness
+reads deployed view DDL from the API and compares it to the repo SQL; a mismatch aborts with
+a message naming both.
+*Alternative not taken:* trusting the apply. Rejected because a stale view fails the golden
+diff with a normalization-shaped error that is really a deployment-shaped one, and this phase
+has already spent four days on one misread failure (W2.16). Measured 2026-08-31, the cloud
+view is still two-column — `PARTITION BY trace_id, span_id` — while the repo SQL is
+three-column, so the mismatch this check exists for is present right now.
+*Residual uncertainty:* the comparison is textual. A semantically equivalent reformatting by
+the API would abort a run that should have proceeded.
+
+**Decision 9 — two entry points, one tool.** `make e2e-cloud` runs the happy path;
+`make e2e-cloud-drill` publishes the poison fixture and verifies DLQ depth and alarm. Both
+ship in the same PR and both are merged before arming.
+*Alternative not taken:* a single entry point. Rejected because the drill requires DLQ
+drained to zero and a recorded separation from the F2C-08.2 channel test, neither of which
+holds at first delivery; one entry point would fire the DoD 7b exam and the DoD 4 drill
+together and weaken both.
+*Residual uncertainty:* two entry points share one code path, so a regression in the shared
+half shows up in whichever runs first.
+
+**Decision 10 — the cloud target requires explicit arming.** The default target is the
+emulator. Cloud execution requires `PLUMBLINE_E2E_TARGET=cloud` plus a run id on the command
+line; without both the target exits non-zero and prints why.
+*Alternative not taken:* relying on Amendment 6's written prohibition. Rejected because a
+forbidden action guarded by a remembered rule is this project's named anti-pattern, and the
+action here spends a once-only exam.
+*Residual uncertainty:* the guard stops accident, not intent.
+
+**Decision 11 — machine-readable stage output.** The harness writes a result JSON whose
+`stage` field is one of `view_provenance`, `publish`, `push_auth`, `normalize`, `write`,
+`query`, `complete`; on failure the field names the stage reached.
+*Alternative not taken:* human-readable logs plus interpretation. Rejected because the
+four-branch fault tree in `wave4-first-delivery.md` exists so that triage of the 7b exam is
+not improvised under pressure; aligning output to the tree's branches makes the runbook
+mechanically reachable.
+*Residual uncertainty:* the stages are the ones known today. A failure between two of them
+reports the earlier stage.
+
+**Decision 12 — golden diff with a checked-in volatile-field allowlist.** Cloud-normalized
+rows are diffed against the same corpus normalized locally. Excluded fields live in one
+checked-in constant — at minimum `ingest_time`, and `api_key_id` only if the two paths
+legitimately differ. Any field not on the list that differs is a failure.
+*Alternative not taken:* inline exclusions at the comparison site. Rejected because an inline
+exclusion is where a real difference gets waved through at 2am; a named list makes waving it
+through require a commit.
+*Residual uncertainty:* whether `api_key_id` legitimately differs is not yet measured. It is
+decided at first cloud run, and the reason goes in the constant.
+
+**Decision 13 — DoD 3's walling proof is a query.** Two assertions against `spans_deduped`
+scoped to the run id: emitted span count equals distinct `(trace_id, span_id)` count, and the
+count of rows with `synthetic` not true is zero.
+*Alternative not taken:* the harness reporting that it set the flag. Rejected — that proves
+what was sent, and DoD 3 is a claim about what landed.
+*Residual uncertainty:* the second assertion scopes to the run id, so it proves this run wrote
+no unflagged rows, not that the table contains none.
+
+**Decision 14 — channel test and drill are separated by recorded timestamps, and by a marker
+where one is available.** F2C-08.2's channel test executes first, its send timestamp recorded
+from the command's own output; the drill follows by at least 30 minutes. If the channel
+test's notification admits any distinguishing marker it carries one, and the marker rather
+than the timing is the attribution. The executor records which of the two applied.
+*Alternative not taken:* timing alone. Rejected because the drill's alert already carries
+`plumbline_drill=f2-dod4`, and whether the channel test can carry anything comparable is worth
+one check rather than one assumption.
+*Residual uncertainty:* if no marker is available, attribution rests on a 30-minute gap and two
+recorded timestamps. That is derivable, not identical.
+
+**Decision 15 — C1's pinning is a closure gate.** The closure note cannot be completed while
+C1 holds a ceiling instead of a date; the placeholder accepts a date, and `≤ 2026-09-28` is
+not a valid value. **Recommended: 2026-09-21.** C3 opens no earlier than 2026-10-05 (#74); C2
+is a live-fire immediately after the upgrade; a failed live-fire plus re-attach plus retry
+needs roughly two working days. Pinning at the ceiling leaves seven days including a weekend
+to absorb a failure; pinning a week inside leaves the same absorption budget plus a week of
+slack before the ceiling is breached.
+*Alternative not taken:* leaving the ceiling and reminding. Rejected because an unpinned
+ceiling drifts silently, and this converts drift into a blocked closure.
+*Residual uncertainty:* the date remains Lane C. This makes drift visible; it does not pick
+the date, and F2 closure is now coupled to a Lane C action that has no scheduled session.
+
+**Decision 16 — the two-day spend escape hatch is armed for the delivery window.** From
+arming until the closure note, the state readout includes gross cost for the period, and any
+spend > $0.00 on two consecutive days triggers the incident note `architecture.md` §7 already
+requires.
+*Alternative not taken:* relying on the kill-switch. Rejected because the kill-switch has been
+fire-tested but has never seen an actual bill; the escape hatch exists for exactly this moment
+and is currently a sentence in a document nobody is scheduled to read.
+*Residual uncertainty:* billing reads are Lane C — `Bash(gcloud billing:*)` is denied and that
+denial is correct. The daily figure therefore arrives by a human action, and the hatch is only
+as timely as that action.
+
+**Decision 17 — the Wave 4 pin is re-derived at dispatch, never carried.** F2C-05 re-derives
+the pin from current `main` and confirms both images carry that tag; no SHA written in a
+directive is confirmed as a pin.
+*Alternative not taken:* updating `6a504b4` to `490beac4`. Rejected because it repeats the
+defect one commit later — retention keeps the last two versions and deletes anything older
+than a day, and Wave 4's wait is measured in days. Widening retention was rejected in A2.13
+and is not reopened.
+*Residual uncertainty:* re-deriving at dispatch assumes an image exists for current `main`.
+If `deploy.yml` has not pushed one, F2C-05 fails on a missing image rather than a stale pin,
+which is a better failure but still a failure.
+
 ### Remaining Lane C items
 
-1. **Pin C1 to a date.** A ceiling is not a date.
+1. **Pin C1 to a date.** A ceiling is not a date. Amendment 7 Decision 15 makes this a
+   closure gate: F2 cannot close over an unpinned ceiling, and `≤ 2026-09-28` is not a
+   valid value for the placeholder. Recommended 2026-09-21, derived there.
 2. **Schedule the Adjudicator ground-truth-labelability session.** It gates Freeze A,
    which gates F3, which gates C7, which gates the single calendar block C4 requires. It
    is a separate conversation and it is on the critical path to 2026-10-05 — not F2's

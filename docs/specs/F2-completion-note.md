@@ -2,7 +2,8 @@
 
 **Phase:** F2, Minimal GCP Footprint · **Status:** *DRAFT SKELETON — not a closure claim*
 **Date:** *(placeholder — filled at closure)* · **Spec:** [`F2-minimal-gcp-footprint.md`](F2-minimal-gcp-footprint.md)
-**Directive:** [`F2-completion-directive.md`](F2-completion-directive.md) v1.5 (`3cf6259`)
+**Directive:** [`F2-completion-directive.md`](F2-completion-directive.md) v1.7 (SHA recorded
+in the decision log at commit)
 **Decisions:** [`F2-decision-log.md`](F2-decision-log.md) — D1–D6, W0.\*–W3.8, A2.1–A2.13, W2.14–W2.20
 
 > **This document is a skeleton authored ahead of the measurements it will carry**
@@ -92,6 +93,17 @@ than left to memory.
   attached**. On the collector the exact path `/healthz` is intercepted at the Cloud
   Run layer and never reaches the container, while `/health`, `/healthz/`, `/` and
   `/v1/traces` all do. Cause unknown; recorded rather than closed.
+- **F4's uptime-check path — open, and inherited by F4 as a question rather than a
+  binding.** W3C.7 asked that the check bind `/health`. Measured 2026-08-26, `/health`
+  reaches the container and returns Go's `404 page not found`: the collector registers
+  `/healthz` and `/v1/traces` and nothing else, so a check bound there would be green only
+  if configured to accept a 404, at which point it asserts that Google's edge is up rather
+  than that the collector is. `F2-directive-w3c-consolidation.md` §5 recorded the binding
+  as **undecided rather than written down wrong**, and its three options — bind
+  `/v1/traces` and accept the `405`, register a second health route at a path the edge does
+  not intercept, or establish why `/healthz` is intercepted — are in
+  [`collector-endpoints.md`](../runbooks/collector-endpoints.md). Each is a collector change
+  or an architecture decision. F4 inherits the open question; it does not inherit a path.
 
 ## 5. What is not true, stated plainly
 
@@ -108,11 +120,19 @@ complete list.)*
   **false-red**: CI fails on SQL production accepts. **The unobserved direction is the
   one that matters — CI green on SQL production would reject** — and it is unmeasured.
   Architecture §8 rests the local-first model on emulator fidelity. Carried to F3.
-- **The Lane A deny-list is enumerated, not principled.** It permits reading Cloud Run
-  services from the API and denies reading monitoring policies. Recorded in W2.19 and
-  deliberately not fixed during F2, because fixing it means editing
-  `.claude/settings.json` while DoD 12 asserts nothing was loosened. Shaped rule goes
-  to F3 entry.
+- **The Lane A deny-list is enumerated, not principled — and its previous description
+  here was wrong.** This note said it "denies reading monitoring policies". It does not:
+  `.claude/settings.json` carries no monitoring rule. What it denies is
+  `Bash(gcloud alpha:*)`, an entire command surface regardless of whether a call reads or
+  writes, and F2C-08.1 was blocked because the command reached for was
+  `gcloud alpha monitoring policies list`. Measured 2026-08-31 from Lane A, the GA surface
+  is permitted and returns the same reading: `gcloud monitoring policies list` returned the
+  `traces-dlq` policy enabled. The shape defect is real and is this — denial by command
+  surface rather than by effect — and it is deliberately not fixed during F2, because
+  fixing it means editing `.claude/settings.json` while DoD 12 asserts nothing was
+  loosened. Shaped rule goes to F3 entry. Corrected under Amendment 7; the earlier wording
+  was carried forward without being read against the file, which is the CN4 error class
+  this note exists to refuse.
 - **Skipped CI jobs, named.** *(placeholder — list every required check satisfied by a
   path-filter skip during #82 and Wave 4. A skipped job is not a passing job.)*
 
