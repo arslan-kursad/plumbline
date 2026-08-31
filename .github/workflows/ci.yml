@@ -156,6 +156,12 @@ jobs:
       - name: State readout self-test
         run: ./scripts/state-readout.sh --self-test
 
+      # The seeder's comment stripper needs no containers, so it is checked here
+      # rather than only inside the end-to-end job: a unit failure should not have
+      # to wait for a stack to come up to be seen.
+      - name: Seeder tests
+        run: python3 scripts/e2e/seed_test.py
+
       - name: Prove every gate can fail
         run: ./scripts/ci/prove-gates.sh
 

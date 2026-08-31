@@ -63,6 +63,83 @@ def pubsub(base: str, worker_push_url: str) -> int:
     return 0
 
 
+def strip_sql_comments(sql: str) -> str:
+    """Remove `--` line comments and `/* */` blocks, preserving everything else.
+
+    Comments are semantically inert in SQL, so this changes nothing under test. It
+    exists because the local stand-in is not inert about them: `goccy/bigquery-emulator`
+    0.8.1 scans the statement text for the keywords that open a partitioning clause,
+    finds them in a comment, and answers the whole file with HTTP 200, a result set and
+    no view -- silently (decision log W2.16, issue #91).
+
+    Real BigQuery parses the same text correctly; `bq query --dry_run` against the pre-fix
+    comment returns `Query successfully validated.` (W2.17). So this is not a fix to our
+    SQL, which was never wrong, but a translation for one third-party parser -- placed in
+    our code because 0.8.1 is that project's latest release and there is no upgrade to take.
+
+    Quoting is tracked rather than ignored, because a `--` inside a string literal is data
+    and removing it would change the statement. Newlines survive so that a parse error
+    still points at the line the author wrote.
+
+    The alternative -- a gate forbidding those keywords in `analytics/sql/*.sql` comments --
+    is rejected and stays rejected: F2C-02 requires an explanatory premise comment in
+    exactly these files, so a keyword ban makes them hostile to documentation the directive
+    itself mandates.
+    """
+    out = []
+    quote = None          # "'", '"' or "`" while inside a literal or quoted identifier
+    comment = None        # "line" or "block" while inside a comment
+    i = 0
+    while i < len(sql):
+        pair = sql[i:i + 2]
+        char = sql[i]
+
+        if comment == "line":
+            if char == "\n":
+                comment = None
+                out.append(char)
+            i += 1
+            continue
+
+        if comment == "block":
+            if pair == "*/":
+                comment = None
+                i += 2
+                continue
+            # Newlines are kept so line numbers do not shift under the stripper.
+            if char == "\n":
+                out.append(char)
+            i += 1
+            continue
+
+        if quote:
+            out.append(char)
+            if char == "\\" and i + 1 < len(sql):
+                out.append(sql[i + 1])
+                i += 2
+                continue
+            if char == quote:
+                quote = None
+            i += 1
+            continue
+
+        if pair == "--":
+            comment = "line"
+            i += 2
+            continue
+        if pair == "/*":
+            comment = "block"
+            i += 2
+            continue
+        if char in "'\"`":
+            quote = char
+
+        out.append(char)
+        i += 1
+
+    return "".join(out)
+
+
 SQL_TO_BIGQUERY = {
     "TIMESTAMP": "TIMESTAMP",
     "STRING": "STRING",
@@ -101,7 +178,7 @@ def bigquery(base: str, sql_dir: pathlib.Path) -> int:
     tables = f"{base}/bigquery/v2/projects/{PROJECT}/datasets/{DATASET}/tables"
     queries = f"{base}/bigquery/v2/projects/{PROJECT}/queries"
 
-    ddl = (sql_dir / "001_spans_table.sql").read_text()
+    ddl = strip_sql_comments((sql_dir / "001_spans_table.sql").read_text())
     fields = table_schema(ddl)
     if not fields:
         print("  FAILED  could not parse a schema out of 001_spans_table.sql", file=sys.stderr)
@@ -132,7 +209,11 @@ def bigquery(base: str, sql_dir: pathlib.Path) -> int:
     for path in sorted(sql_dir.glob("*.sql")):
         if path.name.startswith("001_"):
             continue  # created above, through the API the stand-in supports
-        status, body = request("POST", queries, {"query": path.read_text(), "useLegacySql": False})
+        # Read once and strip once. The statement that is POSTed and the statement the
+        # existence check below reads have to be the same text, or the check verifies a
+        # claim about a file rather than about what was sent.
+        statement = strip_sql_comments(path.read_text())
+        status, body = request("POST", queries, {"query": statement, "useLegacySql": False})
 
         # A 200 is not success. The stand-in answers some rejected statements with
         # HTTP 200 and the failure inside the payload, and answers others with a
@@ -150,7 +231,7 @@ def bigquery(base: str, sql_dir: pathlib.Path) -> int:
         # the *next* file fail with `Table not found`, naming a symptom one statement
         # away from its cause. Ask the stand-in what it actually holds.
         created = re.findall(r"CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+`?[\w-]*\.?(\w+)`?",
-                             path.read_text(), re.IGNORECASE)
+                             statement, re.IGNORECASE)
         for name in created:
             if name not in existing_tables(base):
                 print(f"  FAILED  sql {path.name}: reported ok but {DATASET}.{name} does not exist",
