@@ -19,6 +19,23 @@ not identify which one happened.
 Deciding what to look at while looking at it is how a silent failure gets recorded
 as a success.
 
+## 0. What is sent, and the one attribute that is not optional
+
+The payload is the constructed corpus (D2), and **every resource in it carries
+`synthetic=true`** (F2 completion directive, Decision 2). This is not a labelling
+nicety and it is not reversible after the fact.
+
+Without the flag the rows land in `spans_real`, which is the view F4's 14-day
+real-source window reads. F4 has no cheap way to remove them afterwards: they are
+indistinguishable from real spans by every other column, because being constructed is
+not a property the data carries anywhere else. The flag is free now and expensive
+later, and "later" is the point at which the contamination is discovered rather than
+the point at which it happened.
+
+The gain is that DoD 3 gets a stronger acceptance than it would otherwise have had.
+Because the rows are flagged, this delivery becomes the **first live test of the
+walled-off-synthetic invariant** — see §4.
+
 ## 1. Pre-flight — read the live configuration from the API
 
 Not from the plan, and not from `main`. The plan says what Terraform intended; the
@@ -197,10 +214,28 @@ reads the base table regardless: under the two-column dedup window the views are
 unqueryable against a partition-filtered table (#61), so verifying through them
 would confuse a view defect with a delivery that never landed.
 
-### The views come later
+### The views come later, and each one proves a different claim
 
 Exercise `spans_deduped` and `spans_real` as a **separate, later step**, after the
-premise check passes. Their own acceptance is DoD 3.
+premise check passes. Which view carries which claim is stated here rather than left
+to be worked out at the keyboard, because they are not interchangeable and reading
+the wrong one would look like a pass:
+
+| Claim | View | Query shape | What a failure means |
+| --- | --- | --- | --- |
+| **DoD 3** — the delivered spans are present and correct through the canonical view | `spans_deduped` | partition-filtered read; row count recorded **alongside the base-table count** | either the delivery or the dedup window; the base-table count separates them |
+| **The walled-off-synthetic invariant** — flagged rows are excluded from the real-source view | `spans_real` | the same partition filter; assert the delivered `trace_id`s are **absent** | the `synthetic` flag did not survive the write path, and F4's window is contaminated the moment it opens |
+
+The second row is an **exclusion** assertion, and that is the whole of its content: a
+`spans_real` query returning the delivered spans is a failure, not a success, and it
+is the one result in this runbook where rows arriving is the bad outcome. Anyone
+reading down the page looking for row counts will get this backwards unless it is
+written here.
+
+Neither claim is marked from the fact that the apply succeeded, and neither is marked
+from the other. `spans_deduped` returning rows says nothing about whether `spans_real`
+excludes them — the views are stacked, so a defect in the flag shows up only in the
+view that is supposed to filter on it.
 
 ## 5. Dead-letter triage
 

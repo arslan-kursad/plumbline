@@ -1355,6 +1355,30 @@ depends on knowing the payload is safe has already read the payload.
 send-shaped and has not been done.
 **Exit review:** yes — it fills a stated gap in an accepted ADR's coverage.
 
+### W2.21 — The runbook now sets the synthetic flag and says which view proves what
+**Made:** 2026-08-31 · **Work item:** F2C-09 · **Reversibility:** cheap
+**Checked before writing:** the runbook contained the word `synthetic` exactly once, as a
+column in the base-table `SELECT`. It did not state that the constructed payload carries
+the flag, and it did not name which view carries which claim. Decision 2 had been taken;
+the document the operator follows did not reflect it, which is the gap between a decision
+and an executable instruction.
+**Added, §0:** every resource in the constructed corpus carries `synthetic=true`. Stated
+before the procedure rather than beside a query, because it is a property of what is sent
+and cannot be repaired afterwards — the rows are indistinguishable from real spans by every
+other column, since being constructed is not a property the data carries anywhere else.
+**Added, §4:** a table binding each claim to its view. DoD 3 is proved by a
+partition-filtered read of `spans_deduped`, with the base-table count recorded alongside so
+a failure separates delivery from dedup. The walled-off-synthetic invariant is proved by
+`spans_real` **excluding** the delivered rows.
+**The exclusion assertion needed its own sentence.** It is the one result in this runbook
+where rows arriving is the bad outcome, and an operator scanning the page for row counts
+gets it backwards by default. The two claims are also independent: the views are stacked,
+so a flag that did not survive the write path shows up only in the view that filters on it.
+**What this buys:** DoD 3 gets a stronger acceptance than it would otherwise have had. The
+first delivery becomes the first live test of an invariant that would otherwise stay
+untested until F4 discovered it violated.
+**Exit review:** no — it renders an approved decision into the document that executes it.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
