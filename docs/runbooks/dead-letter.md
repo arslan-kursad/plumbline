@@ -49,6 +49,40 @@ message, or a chat transcript. When a transcript of a triage session is archived
 and F2's acceptance criteria require one — the content is elided and the shape is
 described instead.
 
+### The archive rule: metadata only, and it is a list rather than a judgement
+
+"Elided" above was a principle without an enumeration, which leaves the decision to
+whoever is archiving at the time. This is the list. **A DLQ archive never contains
+payload bytes** — not raw, not base64, not decoded, not "just the interesting field".
+What may be recorded is exactly:
+
+| Field | Where it comes from |
+| --- | --- |
+| `message_id` | Pub/Sub, assigned at publish |
+| `publish_time` | Pub/Sub |
+| delivery attempt count | `deliveryAttempt` on the pulled message |
+| message attributes | the §3.2 contract — `api_key_id`, `source_dialect`, `content_encoding`, `schema_url` |
+| payload size in bytes | measured, not quoted |
+| SHA-256 of the payload | computed locally, never the payload itself |
+
+The digest is what makes the rule usable rather than merely safe: two archives can be
+compared, and a replayed message can be matched to its original, without either
+document holding the data. Size and digest together answer "is this the same message"
+which is the question an archive is normally opened to answer.
+
+**Why this rule is here and not in ADR-0006.** ADR-0006 places redaction
+post-deserialize, pre-write. A dead-lettered message is *defined* by never having
+reached that stage — it is in the queue because deserialization failed — so the
+redaction boundary does not cover it and was never intended to. That is a gap in
+coverage, not a defect in the ADR: the boundary is drawn correctly for the path it
+describes, and this path is the one that leaves it. The rule above closes the gap at
+the only other point where the bytes can escape, which is the archive.
+
+The rule binds regardless of how harmless a specific message looks. A poison payload
+constructed by this project carries no personal data by construction — and it is
+archived under the same rule anyway, because an archive procedure that depends on
+knowing the payload is safe has already read the payload.
+
 ## 2. When the alert fires
 
 `traces-dlq has undelivered messages` fires when depth exceeds zero for a minute.
@@ -134,7 +168,73 @@ Topic-level retention is off on every topic. It is a paid feature, a separate
 mechanism, and the plan guard refuses any topic that declares it (architecture
 §2.2, §7.1).
 
-## 5. What this runbook does not cover
+## 5. The DoD 4 drill fixture
+
+Written before the drill, per the F2 completion directive F2C-07, so the procedure is
+reviewable before any message exists to triage. **Nothing in this section has been
+executed.** Publishing is irreversible and send-shaped: it needs its own go-ahead.
+
+### What the fixture is
+
+A message published **directly to `traces`**, not through the collector. That is the
+difference from the local end-to-end run, where the poison fixture travels through
+`/v1/traces` like everything else and is accepted there before failing downstream.
+Wave 4's drill targets the worker's deserialization failure specifically, so it skips
+the hop that would otherwise have to be innocent for the test to mean anything.
+
+The body is bytes the worker cannot deserialize. Either will do and the first is
+preferable because its failure is unambiguous:
+
+1. **Not gzip.** The contract says `content_encoding: gzip` (§3.2) and the worker
+   inflates before it parses; ASCII text fails at the first byte with a gunzip error
+   rather than somewhere inside a protobuf.
+2. **Truncated protobuf.** Valid gzip wrapping a prefix of a real OTLP request.
+
+Reuse `testdata/fixtures/claude-code/poison/request.pb` only if it is first confirmed
+to fail *at the worker* rather than at the collector; it was built for the local path
+and its guarantee is about that path.
+
+### Attributes, which are the whole point
+
+The message carries attributes that identify it in the DLQ **without opening the
+payload** — which is what makes §1's archive rule practical rather than a constraint
+to be worked around:
+
+| Attribute | Value | Why |
+| --- | --- | --- |
+| `content_encoding` | `gzip` | the contract value; the drill tests the worker, not attribute validation |
+| `source_dialect` | `claude-code` | hint only, and it keeps the message shaped like a real one |
+| `api_key_id` | `drill` | not a real issued key id; the drill does not travel the authenticated path |
+| `plumbline_drill` | `f2-dod4` | **the identifying attribute** — absent on every genuine message |
+| `plumbline_drill_published_at` | RFC 3339, set at publish | pairs with the alert timestamp so the two are attributable |
+
+`plumbline_drill` is what separates this exercise from an incident. A DLQ message
+without it during Wave 4 is a real failure and belongs in the §2 triage, not in the
+drill transcript.
+
+### The procedure
+
+1. Confirm the pre-drill depth is **0** and record it. If it is not, stop: the drill's
+   evidence is not separable from whatever is already in the queue (directive F2C-13).
+2. Record the time. Leave a clear gap after F2C-08's channel test so two notifications
+   into the same inbox stay attributable.
+3. Publish one message, with the attributes above.
+4. Expect five delivery attempts, then arrival in `traces-dlq`. The interval is
+   10s → 600s backoff, so this is not instant.
+5. Pull **without** acking, per §3, and archive under §1's rule — metadata only.
+6. Then the step most drills omit: send one **valid** delivery and confirm it succeeds.
+   A subscription that dead-lettered a poison message and then quietly stopped working
+   has not been shown to recover, and DoD 4 asks whether the path survived the failure,
+   not only whether it caught it.
+
+### What the drill does not prove
+
+That the alert is *deliverable*. The alert firing shows the policy evaluated its
+condition; that a human receives it is a separate claim, proven separately by the
+channel test in F2C-08.2. A drill run against an undeliverable channel would look
+identical from here.
+
+## 6. What this runbook does not cover
 
 - **Why** a message failed. That is the worker's logs and the poison-fixture tests,
   not this file.
