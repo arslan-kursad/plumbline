@@ -1380,6 +1380,30 @@ send-shaped, and is gated by Wave 4 arming instead.
 **Exit review:** yes — it changes the critical path and retires a task that was recorded
 as done.
 
+### W2.23 — The DLQ alert is configured and bound; delivery is still unproven
+**Made:** 2026-08-31 · **Work item:** F2C-08 claim 1 · **Reversibility:** n/a (a measurement)
+**Read from the API under the provenance clause:** the Lane A layer denied the command, the
+maintainer ran it, and the raw output was returned. Archived as
+`docs/evidence/f2-dod4-alert-configuration.md`. Reading `pubsub.tf` instead was refused —
+that is intent, and this task exists to refuse the substitution.
+**Result:** policy `14947663537432968254`, `traces-dlq has undelivered messages`, **enabled**,
+`COMPARISON_GT` over `num_undelivered_messages` on `traces-dlq-pull`, 60s duration, bound to
+channel `17645137777150770481` (`plumbline alerts`, email, enabled).
+**The binding was checked as an identity, not as coexistence.** The policy's
+`notificationChannels[0]` and the channel's `name` are the same string. A policy pointing at
+a channel that no longer exists is the failure this check is for, and two objects both
+existing does not rule it out.
+**`thresholdValue` is absent and is recorded as absent.** The API omits zero-valued fields,
+so absent with `COMPARISON_GT` means `> 0`. Recorded as *absent, read as zero* rather than
+as *`> 0` observed*: those are different observations and only one was made.
+**One field redacted, and only one.** `labels.email_address` is not in this repository —
+Terraform takes it as `var.alert_email` — and the repository is public. The redaction is
+named in the archive rather than done silently.
+**What is still unproven, and it is the half that matters:** `enabled: true` says the
+channel is configured, not that mail arrives. Delivery is F2C-08.2, it is send-shaped, and
+it has not been run. Until then the alert is a configured control rather than a proven one.
+**Exit review:** no — it is a measurement, and it closes half a task.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
