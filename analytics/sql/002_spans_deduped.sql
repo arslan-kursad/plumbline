@@ -14,12 +14,22 @@
 -- against it still has to constrain start_time — but that alone was not enough, and the
 -- earlier version of this comment stated it as if it were (#61).
 --
--- `start_time` is in the PARTITION BY, and that is load-bearing rather than cosmetic
--- (ADR-0007 D2). A predicate may only be pushed below a window function when it
--- references the window's PARTITION BY columns; with the two-column window a consumer's
--- `start_time` filter could not be pushed, the inner scan of `spans` had no partition
--- predicate, and the guardrail refused the query outright. The views could not be
--- queried at all.
+-- `start_time` is one of the window's partitioning columns, and that is load-bearing
+-- rather than cosmetic (ADR-0007 D2). A predicate may only be pushed below a window
+-- function when it references the columns the window partitions on; with the
+-- two-column window a consumer's `start_time` filter could not be pushed, the inner
+-- scan of `spans` had no partition predicate, and the guardrail refused the query
+-- outright. The views could not be queried at all.
+--
+-- The wording above is roundabout on purpose, and the reason is measured rather than
+-- stylistic. The local stand-in scans the statement text for the two keywords that
+-- open a partitioning clause, finds them in a comment, and then answers the whole
+-- file with HTTP 200, a result set, and no view — silently, which is the shape this
+-- project treats as worse than an error. Bisected one comment line at a time in CI
+-- (decision log W2.16). So the clause is named in prose everywhere except the window
+-- itself, where it has to be spelled. If someone tidies this back into the direct
+-- phrasing, `make e2e` fails naming the missing object: the seeder asks the dataset
+-- what it holds rather than trusting the status code.
 --
 -- Semantically this is the same dedup: two rows for one (trace_id, span_id) come from
 -- redelivery of identical OTLP bytes and carry the same start_time, so they already

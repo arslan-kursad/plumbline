@@ -1221,6 +1221,36 @@ Switching the conversion to round-half-up as a probe failed that test with
 fire; the probe was reverted.
 **Exit review:** yes — it changes a data-model decision and ADR-0002's dedup key.
 
+### W2.16 — The stand-in reads comments, and #82 was red for four days because of one
+**Made:** 2026-08-31 · **Work item:** W-repo (unblocks Wave 4) · **Reversibility:** cheap
+**Symptom:** with the three-column window in place, `002_spans_deduped.sql` was answered
+HTTP 200 with no error in the payload and created nothing, so `003_spans_real.sql` failed
+with `Table not found`. W2.15's detector — status, payload and existence are three claims —
+caught it and named the right object, which is the only reason the cause was reachable.
+**The obvious hypothesis was wrong, and measuring is what showed it.** The reading was
+that `start_time` in the window broke the stand-in. A probe applied every shape as a bare
+statement: two columns, three with a TIMESTAMP, three with a BOOL, four, and an expression.
+**Every one materialised.** The statement body was never the problem.
+**Bisecting the file, one comment line at a time, found a single line.** The trigger is the
+two keywords that open a partitioning clause appearing anywhere in the text the stand-in is
+handed — including inside a `--` comment. Case-insensitive; backticks and punctuation are
+irrelevant. One comment line carrying the same keywords survives only because a `;` follows
+soon after, which is too fine a coincidence to leave load-bearing, so it was reworded too.
+**Decision:** the clause is named in prose in `analytics/sql/*.sql` comments and spelled
+only where it is executable. `001_spans_table.sql` keeps its real clause and is unaffected:
+the seeder never sends it, because the stand-in cannot execute it and the table is created
+through the REST API instead (W6.2).
+**This is the self-matching class again**, in a new place: a comment describing a construct
+tripped a parser scanning for that construct. F1's rule was that a scanner must not match
+its own text; the same shape here is a document that must not describe its own syntax. The
+fix is the wording, never an exception in the check.
+**What catches a regression:** `make e2e` already does, loudly, by asking the dataset what
+it holds. Nothing new was added, because the control that was missing in the first place is
+the one W2.15 built and this incident exercised.
+**Not generalised into a gate.** A CI check forbidding the keywords in these comments is
+plausible and is outside #82's scope; recorded here rather than implemented.
+**Exit review:** no — it is a local-stand-in defect and a wording rule, not a design change.
+
 ### W3.1 — G2 is satisfied by a Wave 1 commit, and the ordering is a fact rather than a claim
 **Made:** 2026-08-26 · **Work item:** Wave 3 (#44) · **Reversibility:** cheap
 **Checked before anything was written, because the gate is on the apply and not on
