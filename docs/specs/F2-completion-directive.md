@@ -1,6 +1,6 @@
 # F2 — Completion Directive
 
-**Version:** 1.3 (Amendment 3) · **Status:** Approved · **Date:** 2026-08-30
+**Version:** 1.4 (Amendment 4) · **Status:** Approved · **Date:** 2026-08-30
 **Canonical copy:** `docs/specs/F2-completion-directive.md` in the repo. The chat-side copy
 is a snapshot and loses its tie to the repo the moment it is not re-committed (Project
 Brief, working model). Every amendment is committed before it is executed against, and the
@@ -18,6 +18,34 @@ adds the checks the current plan does not yet contain.
 **Authority order on conflict:** `docs/specs/F2-minimal-gcp-footprint.md` §7 (DoD) →
 `F2-decision-log.md` (decisions) → `docs/architecture.md` §10 (ADR status) → this
 document. If any of those contradict a line here, they win and this line is stale.
+
+### Amendment 4 (2026-08-30, post-measurement)
+
+Closes #91. Two corrections and one refinement, all against this directive rather than
+against the work.
+
+- **F2C-23's apply-path claim is withdrawn — it was an assumption, and it was wrong.**
+  A dry-run against real BigQuery with the pre-fix comment and a three-column body returns
+  `Query successfully validated.` Production parses the comment correctly. `bigquery.tf`
+  reaches BigQuery, not the emulator, so the trap never sat on the apply path. The claim was
+  derived from the architecture rather than measured, which is the failure this project
+  names first; the measurement cost nothing because a dry-run creates nothing.
+- **F2C-23's premise is also withdrawn: there is no scanner of ours to fix.** `seed.py`
+  POSTs the file verbatim via `read_text()`; every match under `scripts/` is plain text
+  inside a comment. The misparsing parser is `goccy/bigquery-emulator` 0.8.1, third-party
+  and already at its latest release. Rewritten below.
+- **§7 criterion 2** still said "three Cloud Run services" after Amendment 3 corrected
+  F2C-04b to two. One site fixed, the other left. Corrected below, and see the hygiene rule.
+- **F2C-08** refined: an API read proves configuration, not delivery. Split below.
+
+**Amendment hygiene rule, effective now.** After any amendment, grep the document for every
+other occurrence of the changed claim before shipping. Amendment 3 fixed F2C-04b and left
+criterion 2; that is the same one-site-of-two error twice over in this directive, and it is
+mechanically preventable.
+
+**Not silently corrected.** The executor raised #91 with the measurement attached rather
+than editing an approved directive. That is the required behaviour and the reason this
+amendment exists rather than a quiet diff.
 
 ### Amendment 3 (2026-08-30, post-merge review)
 
@@ -260,10 +288,20 @@ SHA-256 of the payload. Write this into the DLQ runbook with an explicit referen
 ADR-0006 and the gap it fills.
 *Acceptance:* the procedure is reviewable before any message is published.
 
-**F2C-08 — Verify the DLQ alert from the API, before the drill.**
-Confirm the `num_undelivered_messages > 0` policy exists, is enabled, and its notification
-channel is real and deliverable. A drill that discovers a misconfigured alert has proven
-nothing about the alert and has already spent the clean-DLQ precondition.
+**F2C-08 — Verify the DLQ alert before the drill. Split into two claims by Amendment 4.**
+
+1. *Configuration, from the API:* the `num_undelivered_messages > 0` policy exists, is
+   enabled, and is bound to a notification channel.
+2. *Delivery, proven not read:* send a test notification to that channel. An API read shows
+   a channel is configured; it does not show a message arrives. Counting a configuration
+   read as proof of delivery is the unproven-control error this directive spends four other
+   tasks avoiding. The channel test is independent of the policy, so it costs nothing and
+   does not touch the DLQ.
+3. *Out of scope here:* that the policy itself fires end-to-end. That is proven only by
+   F2C-14, and it is the drill's job, not this task's.
+
+*Acceptance:* both artefacts archived. A drill that discovers a misconfigured alert has
+proven nothing about the alert and has already spent the clean-DLQ precondition.
 
 **F2C-09 — Synthetic walling for the F2 constructed payload. DECIDED 2026-08-30
 (Decision 2).**
@@ -342,34 +380,38 @@ and the cost result degrades from "gross $0.00 under real load" to "gross $0.00 
 idle" — a materially weaker claim, and a month to redo. That trade is a Lane C decision if
 it arises; it is not taken by default through schedule slip.
 
-**F2C-23 — Fix the SQL scanner, do not fence the SQL. Lane A, follow-up issue, not in
-#82's scope.**
-Decision log W2.16 found that a `--` comment containing the two keywords that open the
-partitioning clause suppresses view creation, and that a second site survived only because a
-`;` happened to follow it. The comments were reworded and CI is green; the scanner is
-unchanged.
-*The proposed alternative — a gate forbidding those keywords in `analytics/sql/*.sql`
-comments — is rejected.* It encodes the wrong invariant. F2C-02 mandates an explanatory
-premise comment in exactly these files; a keyword ban makes the file hostile to the
-documentation this directive requires, and it makes the codebase accommodate a defective
-parser instead of fixing it. It is also the repo's existing lesson pointed the wrong way:
-the forbidden-string rule says a scanner must not match its own representation. The
-generalisation is that a scanner reading code must not read comments as code.
-*Action:* strip `--` line comments and `/* */` blocks before keyword scanning; add the
-regression test in §8; leave a short marker in the SQL file referencing W2.16 and this
-issue, so the current wording is not "tidied" back into the trap. Do not restate the
-trigger words in that marker.
-*Priority:* not a Wave 4 blocker — current state is green. But `bigquery.tf` reads these
-SQL files, so the trap sits on the apply path, not only on CI. File the issue now, carry it
-in the closure note as a dated obligation, and let execution land in F3 if it does not fit
-before closure. Losing it to "later" is the failure mode to avoid.
+**F2C-23 — Strip comments in the seeder; record the emulator divergence. Rewritten by
+Amendment 4 (#91). Lane A, off the critical path.**
+W2.16 found that a `--` comment containing the two keywords opening the partitioning clause
+suppresses view creation, and that a second site survived only because a `;` followed it.
+Measurement then relocated the defect: real BigQuery validates the pre-fix comment; only
+`goccy/bigquery-emulator` 0.8.1 misparses it, and that is its latest release.
+*Standing rejection, unchanged:* a gate forbidding those keywords in `analytics/sql/*.sql`
+comments encodes the wrong invariant. F2C-02 mandates an explanatory premise comment in
+exactly these files; a keyword ban makes the file hostile to the documentation this
+directive requires.
+*Action, per #91:* strip `--` line comments in `seed.py` before the file is POSTed. This is
+the faithful reading of the original intent and it is in our code, where the third-party
+parser is not. Once it lands, revert the circumlocution in `002` to plain wording — that
+plain comment is the artefact F2C-02 asked for, and the workaround currently prevents it.
+Keep the marker referencing W2.16 and #91 until the strip lands, so the awkward phrasing is
+not "tidied" back into the trap; drop the marker with the workaround.
+*Record, separately from the fix:* this is an emulator/production divergence, not a bug in
+our code. The observed direction is false-red — CI fails on SQL production accepts, which
+cost four probes. **The unobserved direction is the one that matters: CI green on SQL
+production would reject.** It is unmeasured and out of scope for F2. Architecture §8 rests
+the whole local-first model on emulator fidelity, so record the divergence with its named
+instance in the closure note and let F3 decide whether emulator fidelity needs a test of its
+own. Do not chase it here.
+*Priority:* not a Wave 4 blocker and not on the apply path. Land it before the closure note
+if it fits; carry it forward if it does not. No urgency is manufactured for it.
 
 ### Track G — Closure
 
 **F2C-20 — DoD 11.** Close the decision log: D1–D6, W0.\*–W3.8, A2.1–A2.13, plus entries
 created by this directive (F2C-02 premise, F2C-09 synthetic decision, F2C-07 redaction
-rule, F2C-05 permission ledger, W2.16 scanner finding, Decisions 1–4, and the Amendment 2
-and Amendment 3 corrections). Close #63 and #47.
+rule, F2C-05 permission ledger, W2.16 and W2.17, Decisions 1–4, and the Amendment 2
+through Amendment 4 corrections). Close #63 and #47; #91 closes with F2C-23.
 
 **F2C-21 — Closure note (CN1–CN4).** Carries forward as **dated open obligations**:
 DoD 13 / Verification C (gross $0.00 after credit exhaustion, post-upgrade live-fire,
@@ -430,7 +472,8 @@ chain's only slack inverts this: F3 is not slack, it is the binding constraint.
    prior summary (spec §7.2 CN4).
 2. DoD 5, 6, 12 **re-measured** at closure rather than inherited from the 2026-08-30
    snapshot: `terraform plan -detailed-exitcode` → 0; DoD 6 evidenced per F2C-04b (API read
-   of the three Cloud Run services **plus** a captured guard rejection), not from a plan
+   of the two deployed Cloud Run services, plus the dated `Cannot find service` record for
+   `analytics-api`, plus a captured guard rejection), not from a plan
    that happens to contain no Cloud Run resources; Gates A–H green with no rule, allowlist
    or protection loosened during #82 or Wave 4. Where a required check was satisfied by a
    path-filter skip, the skipped job is named in the closure note — a skipped job is not a
