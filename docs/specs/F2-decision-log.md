@@ -1956,3 +1956,36 @@ there at 2am.
 recorder that has never been reached is not implemented. The harness's guards were all
 exercised in tests; the one thing that had never run was the code that reports which guard
 stopped it.
+
+### W3.17 — DoD 7b failed at branch A, and it is the argument for 7a/7b in one measurement
+**Made:** 2026-09-01 · **Work item:** F2C-11 · **Reversibility:** the exam is spent; the fix is cheap
+**What happened:** the first push delivery was attempted and refused. The collector accepted
+five payloads and published them; Cloud Run refused every push with *"The access token could
+not be verified"*; all five dead-lettered after the policy's five attempts. Evidence:
+[`f2-dod7b-first-delivery.md`](../evidence/f2-dod7b-first-delivery.md).
+
+**Two audience checks exist and only the second was configured.** The subscription mints
+`aud=plumbline-ingestion-worker`. Cloud Run authenticates before the container and validates
+that against the service URL unless the service declares custom audiences — and the worker
+declares none, so the token is refused at the platform. The worker's own validator reads the
+same value from `PUSH_OIDC_AUDIENCE` and never ran.
+
+**Everything a review could read was correct.** The push identity, the `roles/run.invoker`
+binding, the endpoint path and the `internal` ingress all check out; the plan is not wrong.
+What is missing is a platform contract no plan expresses. Wave 3 applied cleanly, and W3.8
+recorded that as the first apply this phase where no permission announced itself — which is
+precisely what this defect looks like from the inside, because every artefact agrees with
+every other artefact.
+
+**So this is the 7a/7b split cashed out.** "Push transport established" was true.
+"Push transport exercised" was false. Nothing but a real delivery separates them, which is
+the whole reason DoD 7 was split and the reason the exam is worth taking once rather than
+being replaced by a stronger-looking review.
+
+**Recorded rather than tidied away:** the DLQ now holds five real messages that are not the
+poison fixture, so the DoD 4 drill is blocked on draining them and cannot attribute what it
+finds until they are gone. The dead-letter path is, incidentally, now proven — five attempts,
+W3.3's floor live for the first time, attributes intact. That is evidence nobody asked for
+and it is not a substitute for the drill.
+**Exit review:** yes — it is the phase's sixth permission-shaped defect and the first that a
+plan reading could not have found.

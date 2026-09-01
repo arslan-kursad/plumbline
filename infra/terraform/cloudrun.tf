@@ -178,6 +178,20 @@ resource "google_cloud_run_v2_service" "worker" {
   name     = "ingestion-worker"
   location = var.region
 
+  # Cloud Run's own authentication runs *before* the container, and it verifies the
+  # token's audience against this service's URL unless the service declares another.
+  # The Wave 3 subscription mints `plumbline-ingestion-worker`, so without this line the
+  # platform rejects every push with "The access token could not be verified" and the
+  # worker's own validator — which checks the same value from PUSH_OIDC_AUDIENCE below —
+  # is never reached.
+  #
+  # Measured, not reasoned: DoD 7b's first delivery on 2026-09-01 failed exactly here.
+  # The collector accepted five payloads, the subscription minted tokens, and all five
+  # dead-lettered after the policy's five attempts without the worker seeing one
+  # (decision log W3.17). Wave 3's apply was clean because nothing in the plan is wrong;
+  # what was missing is a platform contract no plan expresses.
+  custom_audiences = [local.push_oidc_audience]
+
   # Verified against current documentation at wave time, as the wave issue
   # requires, rather than assumed: Cloud Run counts a Pub/Sub push subscription as
   # an internal source when it is in the same project (or VPC-SC perimeter) and
