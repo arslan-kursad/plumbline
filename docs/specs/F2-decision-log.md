@@ -2269,3 +2269,38 @@ now written down rather than left for the next reader.
 **Exit review:** yes — for the closing method. An issue closed by ticking its own checklist
 asserts that someone checked; an issue closed against a table of measurements lets the next
 person check.
+
+### W3.27 — the kill-switch's tests never ran once across thirty-eight pull requests
+**Made:** 2026-09-01 · **Work item:** F2C-10, skipped-jobs placeholder · **Reversibility:** n/a — measurement
+**Measured** across the 38 pull requests merged from #82 onward, reading each PR's own run
+rather than the push run on `main` — the first attempt read the merge commit and reported
+one skip per job, which was the `main` push answering a question about the pull request.
+
+| Required check | Skipped | Ran |
+| --- | ---: | ---: |
+| `changed paths`, `invariant gates`, `ci complete` | 0 | 38 |
+| `local end-to-end` | 29 | 9 |
+| `terraform plan (wif)`, `terraform static checks` | 32 | 6 |
+| `images (distroless)` | 33 | 5 |
+| `worker and analytics (.net)` | 34 | 4 |
+| `collector (go)` | 37 | 1 |
+| **`kill-switch function (go)`** | **38** | **0** |
+
+**Thirty-eight green ticks that carried no information, on the component the zero-cost claim
+rests on.** The path filters are correct — nobody touched that code — and that is precisely
+why this is worth writing down rather than treating as a defect. Nothing in the pull-request
+view distinguishes *passed* from *did not run*; both render as a green check, and DoD 12's
+"gates green" reads as covering the kill-switch unless someone counts.
+
+**Closed by measurement rather than by argument.** Run `33477177883` — `workflow_dispatch` on
+`main` at `ec39569`, this note's own base — ran all ten jobs with zero skips, all ten green.
+Every check above has now passed against the closing tree, once, on the record.
+
+**The reusable form.** A path filter turns a required check into an advisory one, silently
+and per pull request. The cheap remedy is a dispatched full run before a phase closes; the
+expensive alternative is discovering at F3 that a suite has not executed since August. This
+is the same shape as the phase's other recurring finding — a check that reports success
+without having examined anything (W3.11, W3.18, W3.22) — one layer up, in CI rather than in
+a predicate.
+**Exit review:** yes — it is a property of the CI design rather than of this phase, and F3
+inherits it.

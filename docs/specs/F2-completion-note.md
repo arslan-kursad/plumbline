@@ -138,8 +138,38 @@ complete list.)*
   loosened. Shaped rule goes to F3 entry. Corrected under Amendment 7; the earlier wording
   was carried forward without being read against the file, which is the CN4 error class
   this note exists to refuse.
-- **Skipped CI jobs, named.** *(placeholder — list every required check satisfied by a
-  path-filter skip during #82 and Wave 4. A skipped job is not a passing job.)*
+- **Skipped CI jobs, named.** Measured 2026-09-01 across the **38 pull requests merged
+  from #82 onward**, reading each PR's own run rather than the push run on `main`:
+
+  | Required check | Skipped | Ran |
+  | --- | ---: | ---: |
+  | `changed paths` | 0 | 38 |
+  | `invariant gates` | 0 | 38 |
+  | `ci complete` | 0 | 38 |
+  | `local end-to-end` | 29 | 9 |
+  | `terraform plan (wif)` | 32 | 6 |
+  | `terraform static checks` | 32 | 6 |
+  | `images (distroless)` | 33 | 5 |
+  | `worker and analytics (.net)` | 34 | 4 |
+  | `collector (go)` | 37 | 1 |
+  | **`kill-switch function (go)`** | **38** | **0** |
+
+  **`kill-switch function (go)` never ran once.** Thirty-eight required-check green ticks,
+  every one of them a path-filter skip, on the test suite for the component the entire
+  zero-cost claim rests on. The filters are not wrong — nobody touched that code — but a
+  green tick that carried no information thirty-eight times is exactly what *"a skipped job
+  is not a passing job"* is about, and DoD 12's "gates green" would otherwise be read as
+  covering it.
+
+  **The gap is closed by measurement rather than by argument.** CI run
+  [`33477177883`](https://github.com/arslan-kursad/plumbline/actions/runs/33477177883) —
+  `workflow_dispatch` on `main` at `ec39569`, which is this note's own commit base — ran
+  **all ten jobs with zero skips and all ten succeeded.** Every check listed above has
+  therefore passed against the closing tree, once, on the record.
+
+  The habit worth keeping past F2: a path filter makes a required check advisory, and
+  nothing in the pull-request view distinguishes *passed* from *did not run*. A dispatched
+  full run before a phase closes costs one command.
 
 ## 6. CN3 — Wave 1 drift, root cause recorded
 
