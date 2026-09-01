@@ -2141,3 +2141,35 @@ table is empty* or *the table holds N rows outside this window, so the window is
 one, not the data*. That distinction is the one the previous three defects each erased.
 **Exit review:** yes — three of a kind is a design rule, not three bugs. Any reading that
 can come back empty needs to say why it is empty.
+
+### W3.23 — the channel test sent, and it cannot carry a marker
+**Made:** 2026-09-01 · **Work item:** F2C-08 claim 2 · **Reversibility:** none — it reached an inbox
+**Sent** between `04:48:36Z` and `04:48:39Z`, `HTTP 200`, empty body. Evidence:
+[`f2c-08-2-channel-test.md`](../evidence/f2c-08-2-channel-test.md).
+
+**Decision 14's question, answered by measurement before sending: no marker is available.**
+The channel resource carries `displayName`, `labels`, `enabled`, `type` and mutation records
+— no `description`, no `userLabels` — and the email body is Google's template. Of Decision
+14's two attribution options this is the second, and recording which applied was part of it.
+Earliest permissible drill: **`05:18:39Z`**.
+
+**The asymmetry is the useful part.** The drill's alert carries `plumbline_drill=f2-dod4`
+and is identifiable on its own content. The gap therefore protects the *reverse* direction:
+it stops this verification email being mistaken for the drill's alert, not the other way
+round. A rule written only as "separate them by 30 minutes" would not have said which
+direction it was buying.
+
+**Two limits recorded rather than glossed.** It is a *verification* email, not an alert
+notification — the only API-driven real send available, since v3 exposes no test-notification
+endpoint and `gcloud beta monitoring channels` offers only create/delete/describe/list. And
+a `200` with an empty body proves the API accepted a send; **it does not prove an email
+arrived**, which is precisely the distinction claim 2 exists to enforce. Arrival is
+confirmed by the person holding the inbox, and until that is recorded the artefact proves a
+send and nothing more.
+
+**Timestamp provenance is a bracket, not a reported instant.** Decision 14 asks for the
+timestamp "from the command's own output"; the body is empty and the call does not reach the
+audit log, so the record is the bracket around the call taken from the issuing shell — under
+three seconds wide, and labelled as a bracket.
+**Exit review:** no — but the asymmetry point is worth carrying into any rule that separates
+two events by time rather than by identity.
