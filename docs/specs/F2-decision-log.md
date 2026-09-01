@@ -1754,3 +1754,56 @@ unmeasured**, architecture §8 rests the local-first model on the fidelity it wo
 and it is carried to F3 rather than chased here.
 **Exit review:** yes -- not for the fix, which is small, but for the finding that a guard
 and the thing it guards were reading different inputs.
+
+### W3.11 — F2C-04.2: the harness, and three defects that only running it could find
+**Made:** 2026-09-01 · **Work item:** F2C-04.2 (Decisions 6-13) · **Reversibility:** cheap
+**Decision:** `make e2e-cloud` and `make e2e-cloud-drill` are written, merged, and
+**unrun against the cloud**. Their first cloud execution is the DoD 7b exam (F2C-11) and
+the arming guard exists so an accidental invocation cannot spend it.
+
+**Three defects surfaced by building it, none of which a reading would have caught.**
+
+*The run id is not where the obvious path looks for it.* Decision 6 puts
+`plumbline.e2e_run_id` in the lossless `attributes` column and scopes every assertion to
+it. Resource attributes nest under `resource` in that column, so
+`JSON_VALUE(attributes, '$."plumbline.e2e_run_id"')` returns NULL for every row: the
+predicate matches nothing and **both of DoD 3's assertions pass over an empty set**. A
+count of zero equalling a distinct count of zero is true. This was written, and it was
+wrong, and it was found by normalizing a corpus and looking at the output rather than by
+re-reading the query. `state_readout.py` carried the same path and is corrected. Pinned by
+a test against a committed golden file — a test restating the constant would have
+re-encoded the bug.
+
+*`bq query --format=json` drops microseconds.* Measured: a TIMESTAMP renders as
+`2026-08-31 12:00:00`. The golden files carry six digits, so the diff would have failed on
+every row and said *normalization* while meaning *wire format*. The projection now formats
+timestamps in SQL. The general form of this is that a tool's default rendering is not a
+contract; ask for the shape you intend to compare.
+
+*Decision 6 did not make the harness re-runnable, which was its stated purpose.* Issue
+#102, raised rather than silently implemented. The run-id attribute is not in the dedup
+window and cannot be, so a second send of a static corpus collapses into the first and a
+query scoped to run 1 returns zero rows through the views while the base table still holds
+both. Identity is now derived from the run id, deterministically, preserving lengths and
+parent references. `start_time` is untouched: shifting it would move rows between
+partitions and make Decision 7's window a function of the run rather than of the data.
+
+**The drill stops before it fires.** `make e2e-cloud-drill` checks the drained-queue
+precondition and then prints what remains and exits. The alert reaches an inbox outside the
+project, so it is send-shaped under §4 and needs a per-instance go-ahead; a script that
+completed the drill would be the thing that fired it.
+
+**A test tightened a guard rather than being relaxed to fit it.** The run-id pattern
+accepted a trailing hyphen. The id is written into every span, queried back verbatim, and
+used in file names and evidence archives, where a trailing hyphen reads as a truncation —
+and an ambiguous identifier in an archive is one that has to be re-derived later to be
+trusted. The regex was corrected.
+
+**One list, two languages.** The volatile-field allowlist (Decision 12) is a single
+constant with a test binding the Python and C# sides. `api_key_id` is deliberately absent:
+the harness hands the cloud run's key id to the local normalization, so the two paths agree
+by construction rather than by exclusion — which is what Decision 12's *if and only if*
+asks for.
+**Exit review:** yes — the first defect is the reusable one. A predicate that matches
+nothing makes an assertion vacuously true, and every guard in this harness is written to
+fail loudly rather than to pass emptily because of it.
