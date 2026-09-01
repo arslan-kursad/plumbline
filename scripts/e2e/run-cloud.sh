@@ -81,12 +81,30 @@ if [ "$drill" = "1" ]; then
     fail publish
   fi
 
-  printf '\n  The remaining drill steps publish a poison payload and wait for the alert.\n'
-  printf '  That alert reaches an inbox outside the project, so it is send-shaped and needs\n'
-  printf '  a per-instance go-ahead (directive §4). It is also separated from the F2C-08.2\n'
-  printf '  channel test by at least 30 minutes or by a marker (Decision 14).\n'
-  printf '\n  Not automated past this point on purpose: this script must not be the thing\n'
-  printf '  that fires it.\n'
+  # Both gates are mechanisms, not reminders: PLUMBLINE_E2E_DRILL_ARMED=yes on top of the
+  # cloud target, and Decision 14's 30-minute separation from the channel test enforced
+  # against a recorded timestamp. The script may fire the alert; it may not do so by
+  # accident, and it may not do so early.
+  step "drill precondition: armed, separated, queue drained"
+  "${harness[@]}" --emit drill-check || fail publish
+
+  step "stage publish — the poison fixture, straight to traces"
+  "${harness[@]}" --emit drill-publish --result "${state}/drill-publish.json" \
+    | tee "${state}/drill-publish.json" || fail publish
+
+  step "stage write — waiting for the dead-letter"
+  for attempt in $(seq 1 40); do
+    depth="$("${harness[@]}" --emit depth 2>/dev/null || echo 0)"
+    [ "$depth" != "0" ] && { printf '  depth reached %s after ~%ss\n' "$depth" "$((attempt * 15))"; break; }
+    [ "$attempt" = "40" ] && { printf '  depth still 0 after ~600s\n' >&2; fail write; }
+    sleep 15
+  done
+
+  printf '\n  The alert fires from this depth and reaches an inbox this script cannot read.\n'
+  printf '  Arrival is confirmed by the person holding it; depth and the published marker\n'
+  printf '  are what is measurable here.\n'
+  record complete
+  printf '\ne2e-cloud-drill: poison published and dead-lettered (stage complete)\n'
   exit 0
 fi
 

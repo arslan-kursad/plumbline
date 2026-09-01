@@ -41,6 +41,23 @@ RUN_ID_JSON_PATH = '$.resource."plumbline.e2e_run_id"'
 RUN_ID_ATTRIBUTE = "plumbline.e2e_run_id"
 
 
+# F2C-08.2's channel test, recorded so Decision 14's separation is a mechanism rather than
+# a remembered rule. Evidence: docs/evidence/f2c-08-2-channel-test.md.
+#
+# Neither notification is self-identifying: the alert policy carries `userLabels: None`, and
+# W2.20's `plumbline_drill=f2-dod4` marks the Pub/Sub *message* so it can be found in the
+# queue without being opened. So this gap is the only attribution available between the two
+# emails, and it protects both directions (W3.24).
+CHANNEL_TEST_SENT = dt.datetime(2026, 9, 1, 4, 48, 39, tzinfo=dt.timezone.utc)
+DRILL_SEPARATION = dt.timedelta(minutes=30)
+
+# Attributes the drill's message carries. The payload is deliberately unparseable, so it
+# cannot carry them itself -- which is why the drill publishes straight to `traces` rather
+# than through the collector (W2.20).
+DRILL_MARKER = "plumbline_drill"
+DRILL_MARKER_VALUE = "f2-dod4"
+
+
 class Refused(Exception):
     """A guard refused. Carries the reason the operator needs, not a stack trace."""
 
@@ -486,12 +503,96 @@ def exclusion_query(window: PartitionWindow, run_id: str) -> str:
     return scoped_query(window, run_id, "COUNT(*) AS leaked", "spans_real")
 
 
+def drill_arming(env, now=None):
+    """Refuse the drill unless it was asked for, and unless the clock permits it.
+
+    Two independent gates, both mechanisms rather than reminders. The drill fires a real
+    alert into a real inbox, so §4 requires a per-instance go-ahead -- and an approved
+    directive naming the action is not that go-ahead.
+    """
+    if env.get("PLUMBLINE_E2E_DRILL_ARMED") != "yes":
+        raise Refused(
+            "the drill publishes a poison message and fires a real alert into an inbox "
+            "outside the project.\n"
+            "It needs PLUMBLINE_E2E_DRILL_ARMED=yes as well as the cloud target: a "
+            "send-shaped action guarded only by a remembered rule is this project's named "
+            "anti-pattern."
+        )
+
+    now = now or dt.datetime.now(dt.timezone.utc)
+    earliest = CHANNEL_TEST_SENT + DRILL_SEPARATION
+    if now < earliest:
+        raise Refused(
+            f"Decision 14 separates this from the F2C-08.2 channel test by "
+            f"{int(DRILL_SEPARATION.total_seconds() // 60)} minutes.\n"
+            f"  channel test sent: {CHANNEL_TEST_SENT:%Y-%m-%dT%H:%M:%SZ}\n"
+            f"  earliest drill:    {earliest:%Y-%m-%dT%H:%M:%SZ}\n"
+            f"  now:               {now:%Y-%m-%dT%H:%M:%SZ}\n"
+            "Neither email identifies itself, so the gap is the whole attribution."
+        )
+    return earliest
+
+
+def publish_poison(fixture: pathlib.Path, runner=subprocess.run) -> dict:
+    """Publish one poison fixture straight to `traces`, carrying the drill's markers.
+
+    Straight to the topic rather than through the collector, because the payload is
+    truncated past parsing and so cannot carry anything itself; the attributes have to come
+    from the publisher (W2.20). The collector path is exercised by the happy run.
+    """
+    import base64 as _b64
+
+    payload = fixture.read_bytes()
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # REST with base64 rather than `gcloud pubsub topics publish --message=`. The fixture is
+    # a protobuf truncated mid-field: passing it as a shell argument would send it through
+    # UTF-8 encoding and change the bytes, and a drill that dead-letters a *differently*
+    # corrupted message proves something adjacent to what it claims. Same lesson as W3.20,
+    # where gcloud's rendering of a payload was not the payload.
+    token = runner(["gcloud", "auth", "print-access-token"], capture_output=True, text=True)
+    if token.returncode != 0:
+        raise Refused(f"could not mint a token: {token.stderr.strip()}")
+
+    body = json.dumps({"messages": [{
+        "data": _b64.b64encode(payload).decode(),
+        "attributes": {
+            DRILL_MARKER: DRILL_MARKER_VALUE,
+            f"{DRILL_MARKER}_published_at": stamp,
+            "api_key_id": "drill",
+            "source_dialect": "claude-code",
+            "content_encoding": "identity",
+        },
+    }]})
+    proc = runner(
+        ["curl", "-sS", "-X", "POST",
+         "-H", f"Authorization: Bearer {token.stdout.strip()}",
+         "-H", "Content-Type: application/json", "-d", body,
+         f"https://pubsub.googleapis.com/v1/projects/{PROJECT}/topics/traces:publish"],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        raise Refused(f"publishing the drill fixture failed: {proc.stderr.strip()}")
+    result = json.loads(proc.stdout or "{}")
+    if "messageIds" not in result:
+        raise Refused(f"publish returned no message id: {proc.stdout[:300]}")
+
+    return {
+        "published_at": stamp,
+        "fixture": str(fixture.relative_to(REPO)),
+        "payload_size_bytes": len(payload),
+        "payload_sha256": hashlib.sha256(payload).hexdigest(),
+        "message_id": result["messageIds"][0],
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--run-id")
     parser.add_argument("--corpus-out", default=".e2e-cloud/corpus")
     parser.add_argument("--emit",
-                        choices=("corpus", "queries", "provenance", "diff", "depth", "result"),
+                        choices=("corpus", "queries", "provenance", "diff", "depth", "result",
+                                 "drill-check", "drill-publish"),
                         default="corpus")
     parser.add_argument("--stage", choices=STAGES)
     parser.add_argument("--failure")
@@ -535,6 +636,20 @@ def main(argv=None) -> int:
             queries = dict(walling_queries(window, args.run_id))
             queries["spans_real_exclusion"] = exclusion_query(window, args.run_id)
             print(json.dumps(queries, indent=2))
+        elif args.emit == "drill-check":
+            earliest = drill_arming(os.environ)
+            depth = dlq_depth()
+            if depth != 0:
+                raise Refused(
+                    f"traces-dlq-pull holds {depth} message(s). The drill needs a drained "
+                    "queue: a drill that starts from a non-empty queue cannot attribute "
+                    "what it finds there to itself."
+                )
+            print(f"  armed; separation satisfied (earliest was {earliest:%H:%M:%SZ}); depth 0")
+        elif args.emit == "drill-publish":
+            drill_arming(os.environ)
+            fixture = REPO / "testdata" / "fixtures" / "claude-code" / "poison" / "request.pb"
+            print(json.dumps(publish_poison(fixture), indent=2))
         elif args.emit == "depth":
             print(dlq_depth())
         elif args.emit == "diff":

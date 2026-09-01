@@ -883,9 +883,15 @@ where one is available.** F2C-08.2's channel test executes first, its send times
 from the command's own output; the drill follows by at least 30 minutes. If the channel
 test's notification admits any distinguishing marker it carries one, and the marker rather
 than the timing is the attribution. The executor records which of the two applied.
-*Alternative not taken:* timing alone. Rejected because the drill's alert already carries
-`plumbline_drill=f2-dod4`, and whether the channel test can carry anything comparable is worth
-one check rather than one assumption.
+*Alternative not taken:* timing alone. Rejected because a marker, where one exists, is
+identity rather than inference, and whether the channel test can carry one is worth one check
+rather than one assumption.
+*Premise corrected 2026-09-01, before the drill.* This entry first said "the drill's alert
+already carries `plumbline_drill=f2-dod4`". It does not: read from the API the alert policy
+carries `userLabels: None`, and W2.20 puts that marker on the **Pub/Sub message**, so it
+identifies the message in the queue and not the notification. Neither email is
+self-identifying, so the gap is the only attribution available between them and protects
+both directions. The decision stands; its stated reason was wrong (W3.24).
 *Residual uncertainty:* if no marker is available, attribution rests on a 30-minute gap and two
 recorded timestamps. That is derivable, not identical.
 

@@ -49,11 +49,19 @@ the second, and recording which applied is part of the decision.
 | --- | --- |
 | channel test sent | `2026-09-01T04:48:36Z` … `04:48:39Z` |
 | earliest permissible drill | **`2026-09-01T05:18:39Z`** |
-| drill's own marker | `plumbline_drill=f2-dod4` — the drill *does* carry one |
+| drill's own marker | `plumbline_drill=f2-dod4` — on the **message**, not on the alert |
 
-The asymmetry is worth naming: the drill's alert is identifiable on its own content, so the
-gap protects the reverse direction — it stops this verification email being mistaken for the
-drill's alert, not the other way round.
+**Correction, 2026-09-01, before the drill.** This section first claimed the drill's alert
+carries `plumbline_drill=f2-dod4` and is therefore identifiable on its own content, making
+the gap protect only one direction. That is wrong, and it was inherited rather than checked:
+Amendment 7's Decision 14 says the same thing. Read from the API, the alert policy carries
+`userLabels: None`. W2.20 puts the marker on the **Pub/Sub message** — *"identifiable in the
+queue without opening it"* — alongside a `plumbline_drill_published_at` stamp.
+
+So the marker distinguishes the two *messages*, and **neither email is self-identifying.**
+The gap is therefore the only attribution available between the two notifications, and it
+protects both directions rather than one. The rule is unchanged; what was wrong was the
+reason given for it, which made it look weaker than it is.
 
 ## Timestamp provenance
 

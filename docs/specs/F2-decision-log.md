@@ -2173,3 +2173,38 @@ audit log, so the record is the bracket around the call taken from the issuing s
 three seconds wide, and labelled as a bracket.
 **Exit review:** no — but the asymmetry point is worth carrying into any rule that separates
 two events by time rather than by identity.
+
+### W3.24 — the drill's marker is on the message, not on the alert, and Decision 14 is now a clock
+**Made:** 2026-09-01 · **Work item:** F2C-13/14 preparation · **Reversibility:** cheap
+**Correction first.** Amendment 7's Decision 14 says *"the drill's alert already carries
+`plumbline_drill=f2-dod4`"*, and the channel-test evidence repeated it an hour ago. Read from
+the API, the alert policy carries `userLabels: None`. W2.20 puts that marker on the **Pub/Sub
+message** — *"identifiable in the queue without opening it"* — with a
+`plumbline_drill_published_at` stamp beside it.
+
+So **neither email identifies itself.** The marker distinguishes the two messages, not the
+two notifications. Decision 14's rule is unchanged and its stated reason was wrong: the gap
+is not a fallback protecting one direction, it is the only attribution available between the
+two emails and it protects both. Corrected in the directive and in the evidence, in place and
+dated, rather than quietly.
+
+**Decision 14 is now enforced by the clock rather than by memory.** `drill_arming` refuses
+without `PLUMBLINE_E2E_DRILL_ARMED=yes` on top of the cloud target, and refuses again inside
+the thirty minutes, printing all three instants so the operator never re-derives them. The
+channel test's recorded send time is a constant with a test binding it to the archived
+evidence — a gap computed from a time nothing happened at would be worse than no gap.
+
+**A payload defect caught before it fired.** The first publisher passed the fixture through
+`gcloud pubsub topics publish` as a command argument. The fixture is a protobuf truncated
+mid-field and is not valid UTF-8, so the shell path would have changed the bytes, and the
+drill would have dead-lettered a *differently* corrupted message — proving something adjacent
+to DoD 4 while reading as DoD 4. It publishes over REST with base64 now. Same shape as W3.20:
+a convenience surface silently disagreeing with the wire.
+
+**And the test for that defect matched its own rationale.** It grepped `cloud.py` for the
+flag it wanted absent, and the comment explaining why the flag is avoided contains it. The
+repository's rule is that such a check is rewritten so it cannot match itself and never
+narrowed by an exclusion, so it now drives the publisher with a fake runner and asserts on
+the commands issued — behaviour instead of text, which is the better test regardless.
+**Exit review:** yes — for the correction. A claim about which of two artefacts carries a
+marker travelled through three documents unchecked, and the artefact was one API read away.
