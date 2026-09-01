@@ -2238,3 +2238,34 @@ gauge lagging (W3.22), not the pipeline.
 **Exit review:** yes — for the digest argument. An archive that records what happened is
 weaker than one that records that *this* is the thing that happened, and the difference is
 one comparison.
+
+### W3.26 — F2C-20: the decision log closed, and four issues closed against evidence rather than ticked
+**Made:** 2026-09-01 · **Work item:** F2C-20, DoD 11 · **Reversibility:** cheap
+**Closed.** 73 entries across five series — `W0.*`, `W1.*`, `W2.*`, `W3.1`–`W3.26`,
+`A2.1`–`A2.13` — plus D1–D6 and the directive's §9. Decisions 5–17 were checked
+**mechanically** rather than by reading: each carries an alternative not taken and a
+residual uncertainty, and the check found none missing. That was worth automating because
+the envelope's safety rests on the residual clause specifically, and a reader skims it.
+
+**#47 and #63 were closed against evidence, not by ticking boxes.** Between them they
+carried twenty-two unchecked items describing work that had in fact been done and never
+recorded. Ticking twenty-two boxes at once would have been the cheapest available lie, so
+each claim was mapped to a measurement instead — the environment's protection rules read
+today, Gate G green, the Firestore registry exercised by a real key, ingress read from the
+API, the guard's captured rejection, 26 rows written.
+
+**Two of those maps produced corrections rather than confirmations**, which is the argument
+for doing it that way. #47 records that `billing-killswitch` predates the gate it is gated
+by, because Wave 0 is the kill-switch's own remediation and a timestamp table read carelessly
+says the opposite. #63 records that its "DoD 7 satisfied" line was true about the transport
+existing and false about it working — the split into 7a and 7b became visible only when a
+real delivery was refused for a platform contract no plan expresses.
+
+**#102 closed on the measurement it made possible.** The issue asked for run-derived span
+identity; the proof is that a replay of one run id collapsed 39 base rows to 13 through the
+view while two different run ids collapsed nothing. It also outlived itself: deriving
+identity per run quietly changed what the spec's "run it twice" means, and that reading is
+now written down rather than left for the next reader.
+**Exit review:** yes — for the closing method. An issue closed by ticking its own checklist
+asserts that someone checked; an issue closed against a table of measurements lets the next
+person check.
