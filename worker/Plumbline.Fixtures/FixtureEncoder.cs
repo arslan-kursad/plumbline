@@ -26,7 +26,15 @@ public static class FixtureEncoder
     /// Unknown fields are rejected, so a mistyped key fails the fixture instead of
     /// vanishing from the payload.
     /// </remarks>
-    public static byte[] Encode(string twinJson)
+    public static byte[] Encode(string twinJson) => Parse(twinJson).ToByteArray();
+
+    /// <summary>The same parse, stopping at the request rather than its bytes.</summary>
+    /// <remarks>
+    /// Split out so the cloud harness can normalize a corpus locally
+    /// (<see cref="CorpusNormalizer"/>, directive v1.7 Decision 12) without a second copy
+    /// of the id-rewriting rule above. One parse, two callers.
+    /// </remarks>
+    public static ExportTraceServiceRequest Parse(string twinJson)
     {
         var node = JsonNode.Parse(twinJson, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip })
                    ?? throw new InvalidDataException("twin is empty");
@@ -34,8 +42,7 @@ public static class FixtureEncoder
 
         return ExportTraceServiceRequest.Parser
             .WithDiscardUnknownFields(false)
-            .ParseJson(node.ToJsonString())
-            .ToByteArray();
+            .ParseJson(node.ToJsonString());
     }
 
     private static void RewriteIds(JsonNode node)

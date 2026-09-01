@@ -162,6 +162,12 @@ jobs:
       - name: Seeder tests
         run: python3 scripts/e2e/seed_test.py
 
+      # The cloud harness's guards, none of which touch the cloud. The arming guard in
+      # particular is what stands between an accidental invocation and the DoD 7b exam,
+      # so it is checked on every commit rather than only when someone runs the harness.
+      - name: Cloud harness guard tests
+        run: python3 scripts/e2e/cloud_test.py
+
       - name: Prove every gate can fail
         run: ./scripts/ci/prove-gates.sh
 

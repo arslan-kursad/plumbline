@@ -29,6 +29,17 @@ FIXTURES = REPO / "testdata" / "fixtures"
 # of the runbook that triages it instead of leaving that mapping to whoever is on call.
 STAGES = ("view_provenance", "publish", "push_auth", "normalize", "write", "query", "complete")
 
+# Where the run id actually lands in the `attributes` column.
+#
+# Resource attributes are nested under `resource` by the normalizer -- the column holds
+# {"resource": {...}, "scope": {...}, "span": {...}} -- so the obvious top-level path
+# returns NULL for every row. A run-scoped query written that way matches nothing and its
+# assertions pass over an empty set, which is the failure mode that would have surfaced
+# during the DoD 7b exam rather than before it. Pinned by a test against a committed
+# golden file (cloud_test.py), not by this comment.
+RUN_ID_JSON_PATH = '$.resource."plumbline.e2e_run_id"'
+RUN_ID_ATTRIBUTE = "plumbline.e2e_run_id"
+
 
 class Refused(Exception):
     """A guard refused. Carries the reason the operator needs, not a stack trace."""
@@ -110,7 +121,7 @@ def scoped_query(window: PartitionWindow, run_id: str, select: str, view: str) -
     return (
         f"SELECT {select} FROM `{PROJECT}.{DATASET}.{view}` "
         f"WHERE {window.predicate()} "
-        f"AND JSON_VALUE(attributes, '$.\"plumbline.e2e_run_id\"') = '{run_id}'"
+        f"AND JSON_VALUE(attributes, '{RUN_ID_JSON_PATH}') = '{run_id}'"
     )
 
 
@@ -286,11 +297,154 @@ def walling_queries(window: PartitionWindow, run_id: str) -> dict[str, str]:
     }
 
 
+# --- Decision 12: the cloud half of the golden diff ------------------------------------
+
+
+def projection() -> list[tuple[str, str]]:
+    """Every column and its type, from the one file that defines the table.
+
+    Reuses the parse `seed.py` already performs against `001_spans_table.sql`, so the
+    harness cannot acquire a private idea of the schema that drifts from the seeder's.
+    """
+    from seed import table_schema, strip_sql_comments
+
+    ddl = strip_sql_comments((SQL_DIR / "001_spans_table.sql").read_text())
+    fields = table_schema(ddl)
+    if not fields:
+        raise Refused("could not parse a schema out of 001_spans_table.sql")
+    return [(f["name"], f["type"]) for f in fields]
+
+
+def select_list() -> str:
+    """Ask SQL for the exact wire shape rather than trusting the tool's rendering.
+
+    `bq query --format=json` renders a TIMESTAMP as `2026-08-31 12:00:00` -- measured, and
+    it silently drops the microseconds. The golden files carry microsecond precision, so a
+    diff over that rendering fails on every row for a formatting reason and says
+    "normalization" while meaning "wire format". Timestamps are therefore formatted in the
+    query, to the same shape `Timestamps.Format` produces.
+    """
+    parts = []
+    for name, kind in projection():
+        if kind == "TIMESTAMP":
+            parts.append(f"FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E6SZ', {name}) AS {name}")
+        elif kind == "JSON":
+            parts.append(f"TO_JSON_STRING({name}) AS {name}")
+        else:
+            parts.append(name)
+    return ", ".join(parts)
+
+
+def convert(value, kind: str):
+    """bq tags every scalar as a string; put the types back, once, in one place."""
+    if value is None:
+        return None
+    if kind == "INTEGER":
+        return int(value)
+    if kind == "FLOAT":
+        return float(value)
+    if kind == "BOOLEAN":
+        return value in (True, "true")
+    if kind == "JSON":
+        return json.loads(value) if isinstance(value, str) else value
+    return value
+
+
+def fetch_rows(window: PartitionWindow, run_id: str, view: str = "spans_deduped",
+               runner=subprocess.run) -> list[dict]:
+    """The run's rows, as the same JSON objects the local normalization writes."""
+    sql = scoped_query(window, run_id, select_list(), view) + " ORDER BY trace_id, span_id"
+    proc = runner(
+        ["bq", f"--project_id={PROJECT}", "query", "--nouse_legacy_sql", "--format=json", sql],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        raise Refused(f"query against {view} failed:\n{proc.stdout or proc.stderr}")
+
+    kinds = dict(projection())
+    rows = []
+    for raw in json.loads(proc.stdout or "[]"):
+        row = {name: convert(raw.get(name), kind) for name, kind in kinds.items()}
+        for column in VOLATILE:
+            row.pop(column, None)
+        rows.append(row)
+    return rows
+
+
+# Kept in step with worker/Plumbline.Fixtures/VolatileFields.cs by a test, not by hope.
+VOLATILE = ("ingest_time",)
+
+
+def load_ndjson(path: pathlib.Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def diff_rows(local: list[dict], cloud_rows: list[dict]) -> list[str]:
+    """Every difference between the two normalizations, by span and by field.
+
+    Fails closed. A field that is not on the volatile allowlist and differs is a failure,
+    including one nobody thought about when this was written -- which is the difference
+    between an allowlist and a denylist, and the reason Decision 12 asks for the former.
+    """
+    def key(row):
+        return (row.get("trace_id"), row.get("span_id"))
+
+    local_by, cloud_by = {key(r): r for r in local}, {key(r): r for r in cloud_rows}
+    findings = []
+
+    for missing in sorted(set(local_by) - set(cloud_by)):
+        findings.append(f"{missing[0]}/{missing[1]}: normalized locally, absent from the cloud view")
+    for extra in sorted(set(cloud_by) - set(local_by)):
+        findings.append(f"{extra[0]}/{extra[1]}: in the cloud view, not in the corpus")
+
+    for identity in sorted(set(local_by) & set(cloud_by)):
+        here, there = local_by[identity], cloud_by[identity]
+        for column in sorted(set(here) | set(there)):
+            if column in VOLATILE:
+                continue
+            if here.get(column) != there.get(column):
+                findings.append(
+                    f"{identity[0]}/{identity[1]}.{column}: "
+                    f"local={here.get(column)!r} cloud={there.get(column)!r}"
+                )
+    return findings
+
+
+def dlq_depth(subscription: str = "traces-dlq-pull", runner=subprocess.run) -> int:
+    """Undelivered messages, from Monitoring v3 -- the same read the state readout takes."""
+    token = runner(["gcloud", "auth", "print-access-token"], capture_output=True, text=True)
+    if token.returncode != 0:
+        raise Refused(f"could not mint a read token: {token.stderr.strip()}")
+
+    now = dt.datetime.now(dt.timezone.utc)
+    metric = "pubsub.googleapis.com/subscription/num_undelivered_messages"
+    url = (
+        f"https://monitoring.googleapis.com/v3/projects/{PROJECT}/timeSeries"
+        f'?filter=metric.type="{metric}"'
+        f"&interval.startTime={now - dt.timedelta(minutes=30):%Y-%m-%dT%H:%M:%SZ}"
+        f"&interval.endTime={now:%Y-%m-%dT%H:%M:%SZ}"
+    )
+    proc = runner(
+        ["curl", "-sS", "-G", "-H", f"Authorization: Bearer {token.stdout.strip()}", url],
+        capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        raise Refused(f"depth read failed: {proc.stderr.strip()}")
+
+    for series in json.loads(proc.stdout or "{}").get("timeSeries", []):
+        if series["resource"]["labels"].get("subscription_id") == subscription and series.get("points"):
+            return int(series["points"][0]["value"]["int64Value"])
+    raise Refused(f"no depth series for {subscription}; the drill cannot assert against a missing metric")
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--run-id")
     parser.add_argument("--corpus-out", default=".e2e-cloud/corpus")
-    parser.add_argument("--emit", choices=("corpus", "queries", "provenance"), default="corpus")
+    parser.add_argument("--emit", choices=("corpus", "queries", "provenance", "diff", "depth"),
+                        default="corpus")
+    parser.add_argument("--local-rows")
+    parser.add_argument("--result")
     args = parser.parse_args(argv)
 
     import os
@@ -311,6 +465,19 @@ def main(argv=None) -> int:
         elif args.emit == "queries":
             window = PartitionWindow.around(dt.datetime.now(dt.timezone.utc))
             print(json.dumps(walling_queries(window, args.run_id), indent=2))
+        elif args.emit == "depth":
+            print(dlq_depth())
+        elif args.emit == "diff":
+            if not args.local_rows:
+                raise Refused("--emit diff needs --local-rows, the locally normalized corpus")
+            window = PartitionWindow.around(dt.datetime.now(dt.timezone.utc))
+            findings = diff_rows(load_ndjson(pathlib.Path(args.local_rows)),
+                                 fetch_rows(window, args.run_id))
+            for line in findings:
+                print(f"  diff  {line}")
+            if findings:
+                raise Refused(f"{len(findings)} difference(s) between the two normalizations")
+            print("cloud rows match the corpus normalized locally")
         else:
             written = build_corpus(args.run_id, pathlib.Path(args.corpus_out))
             print(f"corpus: {len(written)} payload(s) for run {args.run_id}")

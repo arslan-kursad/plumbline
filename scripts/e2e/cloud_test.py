@@ -10,6 +10,7 @@ Run directly: python3 scripts/e2e/cloud_test.py
 import datetime as dt
 import json
 import pathlib
+import re
 import sys
 import tempfile
 import unittest
@@ -173,6 +174,48 @@ class Provenance(unittest.TestCase):
         )
 
 
+class RunIdPath(unittest.TestCase):
+    """Where the run id lands in the `attributes` column, pinned against real output.
+
+    The obvious path -- `$."plumbline.e2e_run_id"` -- is wrong, and wrong in the quiet
+    direction: JSON_VALUE returns NULL for every row, the run-scoped predicate matches
+    nothing, and DoD 3's two assertions both pass over an empty set. It would have
+    surfaced during the exam.
+
+    So this asserts against a committed golden file, which is normalizer output, rather
+    than against the string in the module -- a test that restated the constant would
+    re-encode the bug rather than catch it.
+    """
+
+    def golden(self):
+        path = cloud.FIXTURES / "claude-code" / "happy-path" / "expected-rows.json"
+        return json.loads(path.read_text())[0]["attributes"]
+
+    def test_resource_attributes_nest_under_resource(self):
+        attributes = self.golden()
+        self.assertIn("resource", attributes)
+        self.assertIn("service.name", attributes["resource"])
+
+    def test_a_resource_attribute_is_not_reachable_at_the_top_level(self):
+        # The precise reason the obvious path fails.
+        self.assertNotIn("service.name", self.golden())
+
+    def test_the_run_id_path_addresses_the_resource_object(self):
+        self.assertTrue(
+            cloud.RUN_ID_JSON_PATH.startswith("$.resource."),
+            f"{cloud.RUN_ID_JSON_PATH} does not address the object resource attributes land in",
+        )
+        self.assertIn(cloud.RUN_ID_ATTRIBUTE, cloud.RUN_ID_JSON_PATH)
+
+    def test_the_corpus_writes_the_attribute_the_path_reads(self):
+        # The two halves have to name the same key, or the corpus is scoped by one name
+        # and queried by another.
+        with tempfile.TemporaryDirectory() as tmp:
+            payload = json.loads(cloud.build_corpus("run-alpha", pathlib.Path(tmp))[0].read_text())
+            keys = [a["key"] for a in payload["resourceSpans"][0]["resource"]["attributes"]]
+        self.assertIn(cloud.RUN_ID_ATTRIBUTE, keys)
+
+
 class StageResult(unittest.TestCase):
     """Decision 11. The stage names a branch of the runbook's fault tree."""
 
@@ -192,6 +235,111 @@ class StageResult(unittest.TestCase):
     def test_the_stages_match_the_runbook_fault_tree_order(self):
         self.assertEqual(cloud.STAGES[0], "view_provenance")
         self.assertEqual(cloud.STAGES[-1], "complete")
+
+
+class VolatileAllowlist(unittest.TestCase):
+    """Decision 12. One list, in two languages, kept in step by this test.
+
+    The harness excludes columns on the Python side and the local normalization excludes
+    them on the C# side. Decision 12 asks for *one* checked-in constant; two constants
+    that agree today are one constant only while something checks.
+    """
+
+    CSHARP = cloud.REPO / "worker" / "Plumbline.Fixtures" / "VolatileFields.cs"
+
+    def csharp_keys(self):
+        # The dictionary initialiser entries, e.g. ["ingest_time"] = "...".
+        return set(re.findall(r'\["([a-z_]+)"\]\s*=', self.CSHARP.read_text()))
+
+    def test_both_sides_exclude_the_same_columns(self):
+        self.assertEqual(self.csharp_keys(), set(cloud.VOLATILE))
+
+    def test_ingest_time_is_excluded_because_it_is_a_clock(self):
+        self.assertIn("ingest_time", cloud.VOLATILE)
+
+    def test_api_key_id_is_not_excluded(self):
+        # Decision 12 admits it only if the two paths legitimately differ. The harness
+        # hands the cloud run's key id to the local normalization, so they do not.
+        self.assertNotIn("api_key_id", cloud.VOLATILE)
+        self.assertNotIn("api_key_id", self.csharp_keys())
+
+    def test_every_excluded_column_is_a_real_column(self):
+        columns = {name for name, _ in cloud.projection()}
+        for column in cloud.VOLATILE:
+            with self.subTest(column):
+                self.assertIn(column, columns)
+
+
+class Projection(unittest.TestCase):
+    """The wire shape is asked for, not inherited from the tool's defaults."""
+
+    def test_timestamps_are_formatted_in_sql(self):
+        # bq renders a TIMESTAMP as '2026-08-31 12:00:00' and drops the microseconds --
+        # measured. The golden files carry six digits, so the diff would fail on every
+        # row and blame normalization for a formatting difference.
+        self.assertIn("FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E6SZ', start_time)", cloud.select_list())
+
+    def test_json_columns_are_stringified_then_parsed_back(self):
+        self.assertIn("TO_JSON_STRING(attributes)", cloud.select_list())
+        self.assertEqual(cloud.convert('{"a":1}', "JSON"), {"a": 1})
+
+    def test_scalars_come_back_typed(self):
+        self.assertIs(cloud.convert("true", "BOOLEAN"), True)
+        self.assertIs(cloud.convert("false", "BOOLEAN"), False)
+        self.assertEqual(cloud.convert("42", "INTEGER"), 42)
+        self.assertEqual(cloud.convert("1.5", "FLOAT"), 1.5)
+        self.assertIsNone(cloud.convert(None, "INTEGER"))
+
+    def test_the_schema_comes_from_the_table_definition(self):
+        columns = {name for name, _ in cloud.projection()}
+        self.assertIn("synthetic", columns)
+        self.assertIn("attributes", columns)
+        self.assertGreater(len(columns), 20)
+
+
+class GoldenDiff(unittest.TestCase):
+    """Decision 12. It fails closed, and §8 requires that be demonstrated."""
+
+    def row(self, **overrides):
+        base = {"trace_id": "t1", "span_id": "s1", "name": "call", "synthetic": True,
+                "ingest_time": "2026-08-31T00:00:00.000000Z"}
+        base.update(overrides)
+        return base
+
+    def test_identical_rows_produce_no_findings(self):
+        self.assertEqual(cloud.diff_rows([self.row()], [self.row()]), [])
+
+    def test_a_volatile_field_may_differ(self):
+        findings = cloud.diff_rows(
+            [self.row()], [self.row(ingest_time="2027-01-01T00:00:00.000000Z")])
+        self.assertEqual(findings, [])
+
+    def test_a_non_allowlisted_field_that_differs_is_a_failure(self):
+        findings = cloud.diff_rows([self.row()], [self.row(name="different")])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("name", findings[0])
+
+    def test_a_field_nobody_thought_about_is_still_caught(self):
+        # The property that makes this an allowlist rather than a denylist.
+        findings = cloud.diff_rows([self.row()], [self.row(some_future_column="x")])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("some_future_column", findings[0])
+
+    def test_a_span_missing_from_the_cloud_is_a_failure(self):
+        findings = cloud.diff_rows([self.row()], [])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("absent from the cloud view", findings[0])
+
+    def test_an_unexpected_span_in_the_cloud_is_a_failure(self):
+        # Scoped by run id, so this means the run wrote something the corpus did not.
+        findings = cloud.diff_rows([], [self.row()])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("not in the corpus", findings[0])
+
+    def test_the_finding_names_both_sides(self):
+        findings = cloud.diff_rows([self.row()], [self.row(name="other")])
+        self.assertIn("local='call'", findings[0])
+        self.assertIn("cloud='other'", findings[0])
 
 
 class WallingProof(unittest.TestCase):

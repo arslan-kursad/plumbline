@@ -341,7 +341,9 @@ def row_counts(lower, upper):
     """
     sql = (
         "SELECT synthetic, "
-        "JSON_VALUE(attributes, '$.\"plumbline.e2e_run_id\"') AS e2e_run_id, "
+        # Resource attributes nest under `resource` in this column; the top-level path
+        # returns NULL for every row and the grouping would silently collapse to one bucket.
+        "JSON_VALUE(attributes, '$.resource.\"plumbline.e2e_run_id\"') AS e2e_run_id, "
         "COUNT(*) AS row_count "
         f"FROM `{PROJECT}.{DATASET}.spans_deduped` "
         f"WHERE DATE(start_time) BETWEEN '{lower}' AND '{upper}' "
