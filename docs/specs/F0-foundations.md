@@ -16,8 +16,11 @@ follow from it and are fixed here:
 - Repository: `arslan-kursad/plumbline`
 - Go module: `github.com/arslan-kursad/plumbline/collector`
 - .NET solutions: `Plumbline.Worker`, `Plumbline.Analytics`
-- Container images: `collector`, `ingestion-worker`, `analytics-api` under the
+- Container images: `collector`, `worker`, `analytics-api` under the
   `plumbline` Artifact Registry repo
+  *(corrected 2026-09-01: this line said `ingestion-worker`, which is the Cloud Run
+  service name rather than the image name. Measured against the registry during F2C-05,
+  which the same confusion had already sent looking for an image that does not exist.)*
 - BigQuery dataset: `plumbline` (replaces the pre-decision working name; underscores
   unnecessary, single word is a valid dataset ID)
 

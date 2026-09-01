@@ -78,3 +78,24 @@ not a substitute for it.
 - No row is edited to match a narrowing that has not been applied. A ledger that
   describes the intended state rather than the live one is the failure mode
   architecture §6.1 has already had corrected twice (W2.5, W3.7).
+
+## Wave 4 — closed 2026-09-01, and it requested nothing
+
+F2C-05's pre-arm check ([`f2c-05-pre-arm-flight-check.md`](../evidence/f2c-05-pre-arm-flight-check.md),
+CI run `33460053493`) found **zero `setIamPolicy` calls in the plan**. Wave 4 changes one
+resource: `google_bigquery_table.spans_deduped`, #61's corrected view definition.
+
+The one permission it needs, `bigquery.tables.update`, is carried by
+`roles/bigquery.dataOwner`, which `ci-deploy@` already holds — read from the IAM API, not
+from the plan.
+
+**This is the ledger's own argument at its cleanest, and it cuts the way the ledger says.**
+Wave 3 requested four IAM operations and none failed, which this file records as an argument
+for narrowing rather than against it. Wave 4 requests none, and that is a weaker statement
+still: a wave that touches one view proves nothing about whether the grants above are wider
+than the waves that motivated them.
+
+So the ledger is **complete for F2** in the sense F2C-05 asks — every wave's requests are
+recorded and no grant is missing — and it is **not** evidence that the grants are
+right-sized. The "Narrow at F2 exit?" column is still a proposal for the exit review, and
+Wave 4 gave the review no new information.
