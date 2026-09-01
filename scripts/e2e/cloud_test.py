@@ -430,6 +430,103 @@ class ResultIsWritten(unittest.TestCase):
         self.assertTrue(called <= set(cloud.STAGES), f"undeclared stages: {called - set(cloud.STAGES)}")
 
 
+class DrillGates(unittest.TestCase):
+    """Decision 14 and §4's send rule, as mechanisms rather than remembered rules."""
+
+    ARMED = {"PLUMBLINE_E2E_DRILL_ARMED": "yes"}
+
+    def after_separation(self):
+        return cloud.CHANNEL_TEST_SENT + cloud.DRILL_SEPARATION + dt.timedelta(seconds=1)
+
+    def test_an_unarmed_drill_is_refused(self):
+        with self.assertRaises(cloud.Refused):
+            cloud.drill_arming({}, now=self.after_separation())
+
+    def test_an_armed_drill_after_the_gap_is_allowed(self):
+        # The other direction. A gate that refused everything would pass the test above.
+        self.assertEqual(
+            cloud.drill_arming(self.ARMED, now=self.after_separation()),
+            cloud.CHANNEL_TEST_SENT + cloud.DRILL_SEPARATION,
+        )
+
+    def test_an_armed_drill_inside_the_gap_is_refused(self):
+        with self.assertRaises(cloud.Refused) as caught:
+            cloud.drill_arming(self.ARMED, now=cloud.CHANNEL_TEST_SENT + dt.timedelta(minutes=29))
+        message = str(caught.exception)
+        # The refusal must name all three instants, or the operator re-derives them.
+        self.assertIn("channel test sent", message)
+        self.assertIn("earliest drill", message)
+        self.assertIn("now", message)
+
+    def test_the_separation_is_the_thirty_minutes_decision_14_names(self):
+        self.assertEqual(cloud.DRILL_SEPARATION, dt.timedelta(minutes=30))
+
+    def test_the_recorded_channel_test_matches_its_evidence(self):
+        # The constant is the mechanism's input; if it drifts from the archived send, the
+        # gap is computed from a time nothing happened at.
+        evidence = (cloud.REPO / "docs" / "evidence" / "f2c-08-2-channel-test.md").read_text()
+        self.assertIn(cloud.CHANNEL_TEST_SENT.strftime("%H:%M:%S"), evidence)
+
+
+class DrillPayload(unittest.TestCase):
+    """The fixture has to arrive corrupted the way it was corrupted, not another way."""
+
+    FIXTURE = cloud.REPO / "testdata" / "fixtures" / "claude-code" / "poison" / "request.pb"
+
+    def test_the_poison_fixture_exists_and_is_truncated(self):
+        self.assertTrue(self.FIXTURE.exists())
+        self.assertEqual(len(self.FIXTURE.read_bytes()), 96)
+
+    def test_the_payload_would_not_survive_a_shell_argument(self):
+        # Why the publisher uses REST with base64 rather than `gcloud ... --message=`:
+        # the bytes are not valid UTF-8, so passing them as text changes them, and a drill
+        # that dead-letters a differently corrupted message proves something adjacent.
+        raw = self.FIXTURE.read_bytes()
+        self.assertNotEqual(raw.decode("latin-1").encode("utf-8"), raw)
+
+    def test_the_publisher_sends_the_bytes_base64_and_not_as_an_argument(self):
+        """Asserted against the commands issued, not against the source text.
+
+        The first version of this grepped `cloud.py` for the flag it wanted absent, and the
+        comment explaining why that flag is avoided contains it — a scanner matching its own
+        rationale. The repository's rule is that such a check is rewritten so it cannot match
+        itself, never narrowed by an exclusion, so this drives the function with a fake
+        runner and inspects what it actually tried to run.
+        """
+        import base64
+        issued = []
+
+        class FakeProc:
+            returncode = 0
+            stderr = ""
+            def __init__(self, out): self.stdout = out
+
+        def runner(cmd, **_kw):
+            issued.append(cmd)
+            if cmd[:2] == ["gcloud", "auth"]:
+                return FakeProc("token-value")
+            return FakeProc(json.dumps({"messageIds": ["1"]}))
+
+        result = cloud.publish_poison(self.FIXTURE, runner=runner)
+
+        publish = [c for c in issued if any("topics/traces:publish" in str(a) for a in c)]
+        self.assertEqual(len(publish), 1, "the payload did not go through the REST publish")
+
+        body = json.loads(publish[0][publish[0].index("-d") + 1])
+        message = body["messages"][0]
+        self.assertEqual(base64.b64decode(message["data"]), self.FIXTURE.read_bytes(),
+                         "the bytes on the wire differ from the fixture")
+        self.assertEqual(message["attributes"][cloud.DRILL_MARKER], cloud.DRILL_MARKER_VALUE)
+        self.assertIn(f"{cloud.DRILL_MARKER}_published_at", message["attributes"])
+        self.assertEqual(result["payload_size_bytes"], 96)
+
+        # No command may carry the raw payload as an argument, whatever the flag is called.
+        raw = self.FIXTURE.read_bytes().decode("latin-1")
+        for cmd in issued:
+            for arg in cmd:
+                self.assertNotIn(raw, str(arg), "the payload was passed as a command argument")
+
+
 class WallingProof(unittest.TestCase):
     """Decision 13. DoD 3 is a claim about rows, so the evidence is a query over rows."""
 
