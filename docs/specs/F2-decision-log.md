@@ -2114,3 +2114,30 @@ to the number the spec names. The extra one strengthens the result; rounding it 
 match the sentence would have been the small dishonesty this phase keeps refusing.
 **Exit review:** no — it confirms a documented property. Worth carrying only as the pattern
 of checking the tie-break as well as the counts.
+
+### W3.22 — the DLQ is drained, and draining exposed two defects in the tool that reports it
+**Made:** 2026-09-01 · **Work item:** Stage 3 step 12 · **Reversibility:** the drain is not reversible; the fixes are
+**Drained:** seven messages acknowledged, reconciled against the archive before and after —
+seven drained, seven archived, nothing in either set the other lacked. A pull immediately
+afterwards returns nothing. Depth 0 is recorded from the readout artefact as step 12 asks.
+
+**The artefact was wrong at the moment it was asked.** Immediately after the drain it
+reported `traces-dlq-pull: 7` while a pull returned nothing: `num_undelivered_messages` is a
+sampled gauge that lags by minutes, and the directive's step 12 says to read depth *from the
+readout*. So the tool now records each sample's own timestamp beside the value, and carries
+the caveat. The lag is a minute or two; the failure it enables is asserting "drained" about
+the wrong instant, and it would have been recorded as evidence.
+
+**The row-count reading was silently empty for the third time in this class.** Its default
+window was the last seven days; the corpus sits at 2026-08-19, because the fixtures are
+static and Decision 6 deliberately leaves `start_time` alone. It returned `[]` while
+`spans_deduped` held 26 rows. W3.11 was the JSON path, W3.18 was the harness window, this is
+the same shape in the readout — **three instances of a predicate that matches nothing and
+reads exactly like a clean result.**
+
+So the fix is not only a wider default. An empty result now cross-checks the table's own
+`numRows`, which is metadata and costs no scan, and states which of the two it is: *the
+table is empty* or *the table holds N rows outside this window, so the window is the wrong
+one, not the data*. That distinction is the one the previous three defects each erased.
+**Exit review:** yes — three of a kind is a design rule, not three bugs. Any reading that
+can come back empty needs to say why it is empty.

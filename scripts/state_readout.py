@@ -311,13 +311,24 @@ def undelivered_depth():
     )
 
     if entry.get("status") == "ok":
-        entry["depth"] = {
-            series["resource"]["labels"]["subscription_id"]: int(
-                series["points"][0]["value"]["int64Value"]
-            )
-            for series in (entry["value"] or {}).get("timeSeries", [])
-            if series.get("points")
-        }
+        depth, sampled = {}, {}
+        for series in (entry["value"] or {}).get("timeSeries", []):
+            if not series.get("points"):
+                continue
+            name = series["resource"]["labels"]["subscription_id"]
+            point = series["points"][0]
+            depth[name] = int(point["value"]["int64Value"])
+            sampled[name] = point.get("interval", {}).get("endTime")
+        entry["depth"] = depth
+        entry["depth_sampled_at"] = sampled
+        # This is a sampled gauge, not a live count, and it lags by minutes. Measured
+        # 2026-09-01: a drained subscription still read 7 while a pull returned nothing.
+        # A depth from here is evidence about a few minutes ago; asserting "drained" on it
+        # asserts the wrong instant.
+        entry["caveat"] = (
+            "sampled gauge, lags by minutes; compare depth_sampled_at against read_at "
+            "before treating a value as current"
+        )
     return entry
 
 
@@ -354,6 +365,30 @@ def row_counts(lower, upper):
         ["bq", f"--project_id={PROJECT}", "query", "--nouse_legacy_sql", "--format=json", sql],
     )
     entry["partition_window"] = {"lower": lower, "upper": upper}
+
+    # An empty result and "the window missed the data" look identical, and this tool
+    # produced the second while reading like the first: the default window was the last
+    # seven days and the corpus sits at 2026-08-19, because the fixtures are static and
+    # the harness deliberately does not shift `start_time`. Same class as W3.11 and W3.18.
+    #
+    # The table's own row count is metadata, so cross-checking costs no scan.
+    if entry.get("status") == "ok" and not entry.get("value"):
+        meta = read(
+            "bigquery_table_rows",
+            ["bq", f"--project_id={PROJECT}", "show", "--format=prettyjson", f"{DATASET}.spans"],
+        )
+        total = None
+        if meta.get("status") == "ok" and isinstance(meta.get("value"), dict):
+            total = int(meta["value"].get("numRows", 0))
+        entry["empty_result_check"] = {
+            "rows_in_table": total,
+            "verdict": (
+                "the table is empty, so an empty window result is the whole truth"
+                if total == 0 else
+                f"the table holds {total} row(s) outside this window -- the window is the "
+                "wrong one, not the data"
+            ),
+        }
     return entry
 
 
@@ -412,7 +447,9 @@ def self_test():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     today = dt.date.today()
-    parser.add_argument("--window-lower", default=str(today - dt.timedelta(days=7)))
+    # Wide enough to cover a static corpus, because the fixtures carry fixed timestamps
+    # and a calendar-shaped default silently returns nothing (see row_counts).
+    parser.add_argument("--window-lower", default=str(today - dt.timedelta(days=30)))
     parser.add_argument("--window-upper", default=str(today))
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
