@@ -1,7 +1,7 @@
 # F2 — Minimal GCP Footprint: Work Package Spec
 
 **Version:** 0.2 · **Status:** Approved on handoff (2026-08-21), Amendment 1 proposed
-2026-08-30, Amendment 2 proposed 2026-09-01 · **Date:** 2026-08-21
+2026-08-30, Amendments 2 and 3 proposed 2026-09-01 · **Date:** 2026-08-21
 **Phase budget:** ~15 h · **Executor:** Claude Code (graduated mode, §2) + maintainer (§9)
 **Predecessor:** F1 complete ([`F1-completion-note.md`](F1-completion-note.md)); the
 claude-code capture (#10) is still open and stays non-blocking — it gates F4's
@@ -488,6 +488,28 @@ Content requirements on the F2 completion note, not suggested wording.
   into a directive and then into a second directive, after W1.8 had explained and fixed
   it. The rule extends W3C.2's fixture-provenance principle to prose: **a hand-authored
   status table is a hand-authored fixture, and it fails the same way.**
+- **CN5 — the full run is anchored, and the anchor is part of the claim.** Path filters
+  make required checks advisory: a job that did not run and a job that passed render as
+  the same green tick. So the closing note must cite a **dispatched** run in which all ten
+  jobs ran with zero skips, and must cite it as **run id plus the SHA it ran against**. A
+  bare run id is not the evidence — it goes on pointing at a tree the repository has since
+  moved past, which is the completion note's §5 identifier rule — *an identifier is not an
+  identity* — reaching the sentence that carries the evidence.
+
+  *(§5 of **this** spec is Out of scope (hard). The rule lives in
+  [`F2-completion-note.md`](F2-completion-note.md) §5, and is named that way here because
+  writing a bare "§5" into a document whose own §5 is something else is the defect CN5
+  exists to catch.)*
+
+  The consequence is a sequence, not a fact to be checked once. **Tag the closing SHA,
+  dispatch against the tag, then record the run.** The record lands one commit later and
+  that is correct — the claim is anchored to the tagged SHA, not to the tip, and a tip is
+  unquotable by construction because quoting it is a commit. Chasing the tip with more
+  runs does not converge.
+
+  Already exercised twice, for two different reasons: run `33477177883` closed the
+  original gap at `ec39569`, and run `33503481240` re-established it at `216fee2` after
+  six merges had moved the tree out from under the first one.
 
 ## 8. Decision authority
 
@@ -550,6 +572,33 @@ detection-fidelity claim, not anything in F2.
 | #36 | Freeze A alignment in `eval-plan.md` | No — context only; F2 does not touch that file |
 
 ## 12. Changelog
+
+**Amendment 3 — 2026-09-01** — §7.2 gains CN5, the full-run anchoring requirement
+(source: runs `33477177883` and `33503481240`; the §5 skipped-jobs measurement).
+
+**Numbering:** §12 held Amendment 1, Amendment 2 and a v0.1 entry when this was written,
+so this is Amendment 3. ADR-0004's amendment sequence is separate and unaffected.
+
+**A cross-document section reference was caught in the draft of this amendment.** CN5's
+text read "§5's identifier rule". §5 of *this* spec is Out of scope (hard); the rule is in
+the completion note's §5. Amendment 1 recorded the same class of error against its own
+header, and CN5 is the requirement written to stop identifiers pointing at the wrong
+thing. Corrected before filing, and recorded here rather than fixed silently, because an
+amendment that commits the defect it defines is the more useful record.
+
+1. **§7.2 gains CN5.** Existing CN1–CN4 are unchanged and not renumbered. It states two
+   things the note had been doing by habit rather than by requirement: cite a dispatched
+   zero-skip run, and cite it with the SHA it ran against.
+2. **It is written from a failure, not from a principle.** The closing note carried
+   *"`ec39569`, which is this note's own commit base"* as its full-run evidence. Six
+   merges on 2026-09-01 moved the tree; the sentence stayed. The run id had not stopped
+   being valid — it had stopped being current, while continuing to look current. That is
+   the completion note's §5 identifier rule appearing in the paragraph that cites evidence
+   rather than in the paragraphs it governs.
+3. **The sequence is the operative part.** Tag, dispatch against the tag, then record.
+   A tip cannot cite a zero-skip run against itself, because recording the run is a commit
+   and that commit takes the path filter. Recognising this closes the loop instead of
+   running it again.
 
 **Amendment 2 — 2026-09-01** — §7 item 1 re-expressed as five checkable facts
 (source: [`f2-dod1-five-facts.md`](../evidence/f2-dod1-five-facts.md); ADR-0004
