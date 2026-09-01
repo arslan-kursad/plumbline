@@ -2057,3 +2057,35 @@ replay**, and only a replay tests what ADR-0002 rests on.
 **Exit review:** yes — for the last paragraph. A design decision quietly changed what an
 older acceptance sentence means, and nothing in either document noticed until the numbers
 were on the table.
+
+### W3.20 — the DLQ archive, and `gcloud` renders a payload that is not the payload
+**Made:** 2026-09-01 · **Work item:** F2C-07 applied to the failed delivery · **Reversibility:** the archive is cheap; the drain it precedes is not
+**Decision:** the seven messages the failed first delivery left in `traces-dlq-pull` are
+archived before draining, under W2.20's enumeration and nothing more. Draining is
+irreversible and they are the only physical evidence the dead-letter path carried a real
+failure. Archive: [`f2-dlq-archive-2026-09-01.md`](../evidence/f2-dlq-archive-2026-09-01.md).
+
+**The count was wrong twice before it was right.** Five, then six, then seven — each figure
+came from a pull that returned what was not leased at that moment. A single pull is not a
+census, and the archive now polls until the ids stop being new. Both earlier figures were
+stated in this session as fact.
+
+**`gcloud`'s JSON rendering of `message.data` is not the wire payload.** Built from
+`--format=json`, the archive disagreed with the REST `:pull` response about the same
+messages: 792 bytes against 821, 878 against 907, 422 against 436. One `data` field came back
+557 characters, and base64 length is always a multiple of four, so that field cannot be the
+encoded payload under any reading. The delta is systematic.
+**It fails in the worst available direction for this table.** The archive exists so a
+replayed message can be matched to its original; a digest of the wrong bytes fails that
+comparison silently and looks exactly like a genuine mismatch — a wrong answer to the only
+question an archive is opened to ask. `dead-letter.md` now names the REST pull for size and
+digest, and leaves attributes on `gcloud` where they are unaffected.
+
+**What the archive proves in passing.** All seven show five delivery attempts —
+`maxDeliveryAttempts` on `traces-push`, the floor W3.3 settled. The policy was configured on
+2026-08-21 and read back from the API on 2026-08-31; this is the first time it has been
+observed *executing*. Not a substitute for the DoD 4 drill, which needs its own poison
+fixture and its own alert.
+**Exit review:** yes — a tool's convenience rendering silently disagreeing with the wire is
+worth carrying past this project, and the shape is the same as W3.18's: the wrong answer and
+the right one are indistinguishable without a second source.
