@@ -93,6 +93,28 @@ hatch, because a leaked credential is an incident whether or not it cost money.
 
 ### Revocations performed
 
+**2026-09-01 — `wave4-e2e`, `wave4-e2e-2`, `wave4-e2e-3`, orphaned by the F2 first-delivery
+sequence.** None was exposed; all three were issued during Wave 4 and outlived their use.
+
+| Key | Issued | Why it was orphaned |
+| --- | --- | --- |
+| `wave4-e2e` | `02:31:03Z` | plaintext written to a relative path and deleted before the harness read it |
+| `wave4-e2e-2` | `02:34:23Z` | shredded immediately after a *failed* run, so the retry could not reuse it |
+| `wave4-e2e-3` | `03:33:49Z` | carried the successful deliveries and the drill; no longer needed |
+
+Revoked by `PATCH` with `updateMask.fieldPaths=status`, so only that field moved. Read back
+rather than assumed: all three `revoked`, seven fields each, `key_sha256` intact.
+
+**The second one is a procedure lesson, not an accident.** The instruction to shred the key
+file was given for the success case and followed after a failure, and a failed run needs a
+retry with the same key. Cost: one key. `#112` carries it forward.
+
+**Effective immediately in practice, and the reasoning is dated rather than asserted.** The
+collector last served a request at `04:19:43Z` and revocation happened at `06:38Z` — two
+hours and nineteen minutes of idle against `min-instances = 0`, so no instance holds the
+pre-revocation registry and the next cold start reads the revoked documents.
+
+
 **2026-08-26 — `adjudicator-prod`, twice, plaintext exposed in a screenshot.**
 The key issued 2026-08-21 was displayed in a terminal capture shared into a chat,
 reissued under the same id, and the reissue was displayed the same way. Both
