@@ -2208,3 +2208,33 @@ narrowed by an exclusion, so it now drives the publisher with a fake runner and 
 the commands issued — behaviour instead of text, which is the better test regardless.
 **Exit review:** yes — for the correction. A claim about which of two artefacts carries a
 marker travelled through three documents unchecked, and the artefact was one API read away.
+
+### W3.25 — the drill fired, and the digest is the part that makes it evidence
+**Made:** 2026-09-01 · **Work item:** F2C-13/14, DoD 4 · **Reversibility:** none — it reached an inbox
+**Fired** under the go-ahead §4 requires, with all three preconditions checked by the tool
+rather than remembered: armed, thirty minutes past the channel test, queue drained. Poison
+published straight to `traces` at `05:23:14Z`; dead-lettered at `05:25:02Z` after five
+attempts; depth observed 0 → 1. Archive:
+[`f2-dod4-drill.md`](../evidence/f2-dod4-drill.md).
+
+**The digest matching is what turns the archive into evidence.** The message in the queue
+hashes to exactly what was published — 96 bytes, `7597adc7…`. Without that comparison the
+archive would say a poison message was dead-lettered, which was already believable; with it,
+the archive says *this* message, unchanged, and that is the claim F2C-07's enumeration was
+built to support. It also retires the near-miss recorded in W3.24: had the fixture gone
+through a shell argument it would have been re-encoded, and the drill would have
+dead-lettered a differently corrupted message while producing a document that read the same.
+
+**Five attempts, observed on a message published for the purpose.** The floor W3.3 settled
+has now been seen executing twice — once by accident on the failed first delivery, once
+deliberately. The accidental case is archived beside this one, and the pair is worth keeping
+together: it is the difference between a control that fired and a control that was aimed.
+
+**What the drill did not prove, recorded because the document reads like it might.** Not
+replay, which is manual in v0.1 and outside DoD 4. Not that a real poison message looks like
+this one — this one carries markers a genuine failure would not. And not that the alert is
+timely: the three minutes between the dead-letter and the metric moving are the sampled
+gauge lagging (W3.22), not the pipeline.
+**Exit review:** yes — for the digest argument. An archive that records what happened is
+weaker than one that records that *this* is the thing that happened, and the difference is
+one comparison.
