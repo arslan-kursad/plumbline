@@ -75,15 +75,27 @@ one (§4). Reusing the id would be the silent-revocation case above.
 
 ## 4. Revoking
 
-Set `status` to `revoked` on the document. The collector reads the registry at
-startup, not per request (a data-plane component re-reading a file or a collection
-on the hot path buys hot reload nobody asked for and pays in latency), so a
-revocation takes effect on the next start. With `min-instances = 0` a redeploy
-costs nothing and no downtime:
+Set `status` to `revoked` on the document. `keyctl` issues only — it has no revoke
+flag — so this is a direct one-field write against the Firestore REST API:
 
 ```bash
-gcloud run services update collector --region us-central1 --project "$PROJECT_ID" --no-traffic --tag revoke-refresh
+curl -X PATCH -H "Authorization: Bearer $(gcloud auth print-access-token)" -H "Content-Type: application/json" "https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents/api_keys/$KEY_ID?updateMask.fieldPaths=status" -d '{"fields":{"status":{"stringValue":"revoked"}}}'
 ```
+
+**`updateMask.fieldPaths=status` is not decoration.** A `PATCH` without it replaces
+the document with the request body, which would drop `key_sha256` and the other
+five fields and leave a document that authenticates nothing and explains nothing.
+Read the document back afterwards and confirm seven fields with `key_sha256`
+intact — the three revocations on 2026-09-01 were checked that way, and the check
+costs one request.
+
+The collector reads the registry at startup, not per request (a data-plane
+component re-reading a file or a collection on the hot path buys hot reload nobody
+asked for and pays in latency), so a revocation takes effect on the next start.
+With `min-instances = 0` that happens without an operator: the serving revision
+scales to zero when idle, and the next request cold-starts against the current
+registry. Nothing needs to be redeployed, and the wait is bounded by traffic
+rather than by a command.
 
 **Revocation is not instant, and pretending otherwise would be the dangerous
 version.** If a key is known leaked and the exposure matters more than the
