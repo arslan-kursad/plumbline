@@ -107,10 +107,16 @@ per-task.
   which is the substitution this whole task exists to refuse.
 - **Deny-list shape defect recorded, deliberately not fixed during F2.** See below.
 
-**Deny-list shape defect.** The Lane A permission layer allows reading Cloud Run services
-from the API (F2C-04b did exactly that) and denies reading monitoring policies from the
-API. Same class, opposite verdicts: the list is enumerated, not principled. It will recur
-one command at a time — Scheduler reads in F3, uptime-check reads in F4.
+**Deny-list shape defect.** *(Diagnosis corrected by Amendment 7's hygiene pass,
+2026-09-01. The defect is real; this paragraph had the mechanism wrong, and the wrong
+version was the one Amendment 7 inherited.)* The Lane A permission layer denies
+`Bash(gcloud alpha:*)` — an entire command surface, regardless of whether a call reads or
+writes — while allowing the same reads on the GA surface. It carries **no monitoring rule
+at all**; F2C-08.1 was blocked because the command reached for was `gcloud alpha monitoring
+policies list`, and `gcloud monitoring policies list` returns the same policy from Lane A
+(measured 2026-08-31). Same class, opposite verdicts, but the axis is the command surface
+rather than the resource: the list is enumerated, not principled. It will recur one command
+at a time wherever the only documented spelling is an `alpha` one.
 *Not fixed here, on purpose.* DoD 12 requires that no gate, allowlist or protection rule was
 loosened during the phase. The `.claude/settings.json` deny-list is a different artefact
 from the Terraform resource-type allowlist DoD 12 names, and resolving the tension by that

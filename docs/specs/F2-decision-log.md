@@ -1839,3 +1839,25 @@ returns nothing -- path, window, run id, then the fault tree -- because three of
 are indistinguishable from a transport failure at a glance.
 **Exit review:** yes -- it is the concrete case for Amendment 6's ordering rule. The
 runbook is materially different for having been written after the thing it documents.
+
+### W3.13 — Amendment 7's hygiene pass found the site it had itself inherited from
+**Made:** 2026-09-01 · **Work item:** amendment hygiene rule · **Reversibility:** cheap
+**Decision:** the directive's Amendment 5 block carried the deny-list diagnosis Amendment 7
+corrected everywhere else, and it is corrected in place with a dated marker rather than
+rewritten silently. W2.19 above is **not** edited: it is dated and superseded by W3.9, and
+this log's convention is that a later entry corrects an earlier one (W2.17 over W2.16).
+Editing dated history to agree with a later finding would cost more than the stale sentence.
+
+**The rule caught the case it was written for.** Amendment 4 added it after Amendment 3
+fixed F2C-04b and left §7 criterion 2 saying "three Cloud Run services" — one site of two.
+This is the same shape: Amendment 7 corrected the closure note, §2 and its own text, and
+left the paragraph in Amendment 5 that every later reader would reach first.
+
+**And that paragraph is where Amendment 7 got the wrong claim.** The proposal's central
+decision rested on "permits Cloud Run reads, refuses monitoring reads", which is this
+paragraph's wording almost verbatim. So the defect propagated: directive → closure note →
+proposal, three documents, none of which had opened `.claude/settings.json`. The correction
+now sits at the source as well as at the copies.
+**Exit review:** yes — a mechanical rule found a defect that three careful readings did not,
+and the reusable form is that a claim's *origin* is the site worth grepping for, not only
+its restatements.
