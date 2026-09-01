@@ -1921,3 +1921,38 @@ and answered an easier question. Today the same tool exits 0 with no failed read
 probe that was deliberately allowed to fail is what makes today's pass mean something.
 **Exit review:** yes — for the ordering. Merge, apply and query are three claims, and this
 phase has now been caught by the gap between each adjacent pair.
+
+### W3.16 — the first cloud run stopped before publishing, and Decision 11 was not on the path
+**Made:** 2026-09-01 · **Work item:** F2C-11, first attempt · **Reversibility:** cheap
+**What happened:** the harness was run against the cloud, stopped at `publish` on an unset
+`PLUMBLINE_E2E_API_KEY`, and wrote nothing about where it stopped. **The DoD 7b exam was
+not spent.** Measured rather than assumed: the collector's Cloud Run request log carries no
+entry for 2026-09-01, no message was published to `traces`, and `plumbline.spans` holds
+zero rows. Push authentication has still never seen a real Google-signed token.
+
+**Decision 11 existed in the module and not on the path.** `Result` and `STAGES` were
+written, tested, and never called by `run-cloud.sh` — so the stage had to be reconstructed
+afterwards from which files happened to exist in the working directory. That
+reconstruction is precisely the improvisation the fault tree exists to prevent, and the
+acceptance criterion it fails is §7.10: the decisions must be present *in code*, not in the
+runbook that describes the code. Claiming a decision is implemented because its class
+exists is the same substitution this phase keeps finding elsewhere.
+**Fixed by putting the recorder ahead of the thing it records.** `--emit result` now runs
+before the arming gate, because a run that stops *at* arming also has a stage worth
+recording, and gating the recorder behind the guard is how it fell off the path.
+
+**Two defects of mine, found by the same run.**
+*`.e2e-cloud/` was not ignored, and `git add -A` committed it.* Eight files — a run corpus
+and the locally normalized rows — entered a public repository in `a3dac89`. Nothing
+sensitive: the content derives from public fixtures, and the only identifier is an
+`api_key_id`, which the design puts on every span as provenance. Untracked and ignored now.
+The cause is not the missing ignore rule, it is `git add -A` in a directory a tool writes
+into, and the ignore rule is the cheap half of the fix.
+*The failing message did not name its likely cause.* `keyctl` lives inside the collector
+module, so a redirect run from the repository root produces an empty file and an empty
+variable. The check now says that where it fires rather than in a chat message that is not
+there at 2am.
+**Exit review:** yes — for the shape. A guard that has never fired is unproven, and a
+recorder that has never been reached is not implemented. The harness's guards were all
+exercised in tests; the one thing that had never run was the code that reports which guard
+stopped it.

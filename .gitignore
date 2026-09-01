@@ -38,3 +38,9 @@ crash.log
 
 # Local end-to-end run state: a generated API key and query output, never committed.
 .e2e/
+# The cloud harness's working directory. It holds the run corpus, the locally
+# normalized rows and the result document -- none of which is an artefact of the
+# repository, and the corpus carries a per-run identity that means nothing after
+# its run. Added after the first real run wrote it into an untracked directory
+# nothing was ignoring.
+.e2e-cloud/

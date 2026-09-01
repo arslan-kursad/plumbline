@@ -34,7 +34,19 @@ run_id="${E2E_RUN_ID:-}"
 harness=(python3 scripts/e2e/cloud.py --run-id "$run_id")
 
 step() { printf '\n=== %s\n' "$1"; }
-fail() { printf '\ne2e-cloud: FAILED at stage %s\n' "$1" >&2; exit 1; }
+
+# Decision 11. Every exit writes the stage it reached, including the ones that leave
+# before any cloud call -- a run that stopped on a missing variable and a run that
+# stopped on a rejected token are different facts, and reconstructing which from the
+# files left on disk is the improvisation the fault tree exists to prevent.
+record() { "${harness[@]}" --emit result --stage "$1" --failure "${2:-}" >/dev/null 2>&1 || true; }
+fail() {
+  record "$1" "${2:-stopped at ${1}}"
+  printf '\ne2e-cloud: FAILED at stage %s\n' "$1" >&2
+  printf 'result: .e2e-cloud/result.json\n' >&2
+  printf 'triage: docs/runbooks/wave4-first-delivery.md section 2\n' >&2
+  exit 1
+}
 
 # Arming, first and always. Delegated to the harness so the rule lives in one place and
 # is unit-tested there rather than restated here in shell.
@@ -82,13 +94,22 @@ fi
 # The happy path.
 # ---------------------------------------------------------------------------
 step "normalizing the same corpus locally"
-: "${PLUMBLINE_E2E_API_KEY_ID:?set PLUMBLINE_E2E_API_KEY_ID to the key id the cloud run uses}"
+if [ -z "${PLUMBLINE_E2E_API_KEY_ID:-}" ]; then
+  printf '  PLUMBLINE_E2E_API_KEY_ID is unset. It is the key id the cloud run uses.\n' >&2
+  fail normalize "PLUMBLINE_E2E_API_KEY_ID unset"
+fi
 dotnet run --project worker/Plumbline.Fixtures -- \
   --normalize "${state}/corpus" --out "${state}/local-rows.ndjson" \
   --api-key-id "$PLUMBLINE_E2E_API_KEY_ID" || fail normalize
 
 step "stage publish"
-: "${PLUMBLINE_E2E_API_KEY:?set PLUMBLINE_E2E_API_KEY; key plaintext is Lane C custody and is never stored here}"
+if [ -z "${PLUMBLINE_E2E_API_KEY:-}" ]; then
+  printf '  PLUMBLINE_E2E_API_KEY is unset or empty.\n' >&2
+  printf '  Key plaintext is Lane C custody and is never stored here (directive section 4).\n' >&2
+  printf '  If it came from a file, check the file is not empty: keyctl runs inside the\n' >&2
+  printf '  collector module, so it needs -C collector or a cd.\n' >&2
+  fail publish "PLUMBLINE_E2E_API_KEY unset or empty"
+fi
 collector="$(gcloud run services describe collector --region us-central1 \
   --project plumbline-19458 --format='value(status.url)')"
 printf '  collector: %s\n' "$collector"
@@ -121,4 +142,5 @@ step "stage query — the golden diff"
 step "stage query — DoD 3's walling proof"
 "${harness[@]}" --emit queries
 
+record complete
 printf '\ne2e-cloud: PASS (stage complete)\n'
