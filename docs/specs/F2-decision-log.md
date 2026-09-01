@@ -2328,3 +2328,37 @@ five places is the defect this phase has now paid for three times: the closure n
 A grep afterwards found no surviving "not pinned".
 **Exit review:** no — but the hygiene pass finding five sites for one sentence is worth
 noting as ordinary rather than exceptional.
+
+### W3.29 — F2C-22 stopped: there are no apply roles to remove, only owner, and nothing above it
+**Made:** 2026-09-01 · **Work item:** F2C-22 · **Reversibility:** the stop is free; the action would not have been
+**Stopped under Class 3** and reported without a workaround, per the envelope. Issue #129.
+
+**F2C-22 assumes a shape the project does not have.** It says *"remove standing apply roles
+from human principals"* and *"this removes human principals only"*, which implies granular
+apply-capable roles beside a retained baseline. Read from the API: the project carries
+**exactly one human binding, `roles/owner`**, and has **no organization parent**. There is
+nothing granular to remove, and no higher-level admin to grant anything back.
+
+So executing the task as written means removing all human administrative access from an
+org-less project, after which the entire recovery capability is **GitHub → WIF →
+`ci-deploy@` → `setIamPolicy`** — four links, each a single point of failure, with nothing
+behind them. That is a different trade from the one Decision 4 approved. Its premise holds —
+standing roles past F2 are standing exposure — but the remedy is not a narrowing.
+
+**One measurement decides how bad the failure mode is.** The human's `roles/owner` binding
+is **not Terraform-managed**; it predates the configuration. No plan shows it missing and no
+apply restores it, so the usual reflex — re-apply and move on — is not available.
+
+**The runbook was written anyway**, because constraint 2 requires it before removal whichever
+way #129 resolves, and because a project with one human owner and no org wants a documented
+recovery path regardless. `break-glass.md` carries a §3 *"What this cannot recover from"* and
+a **deliberately empty** dry-run record: absent would read as an oversight, empty reads as a
+fact.
+
+**The dry run needs its own decision.** To be worth anything it must run *as* `ci-deploy@`
+through a workflow dispatch, not from a laptop holding owner — a dry run performed with the
+credentials the emergency assumes missing is the F2C-08 error class wearing a different hat.
+The workflow that would do it does not exist, and writing it is part of the dry run rather
+than part of the emergency.
+**Exit review:** yes — the task's premise was wrong about the project's own IAM shape, and
+the shape was one API read away for the whole phase.
