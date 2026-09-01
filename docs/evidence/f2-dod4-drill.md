@@ -86,3 +86,25 @@ unavailable rather than assumed so.
 - **Not that the alert is timely.** The depth metric is a sampled gauge and lags by minutes
   (W3.22); the gap between the dead-letter at `05:25:02Z` and the metric moving at
   `05:28:00Z` is the sampler, not the pipeline.
+
+## 6. Drained, 2026-09-01
+
+The drill's message was acknowledged after this archive reached `main` — one message, and it
+reconciles exactly: `21642212302575522` drained, `21642212302575522` archived, nothing in
+either set the other lacks. An immediate pull returns nothing.
+
+`traces-dlq-pull` is empty, which is the state the next drill would need and the state the
+closure note should record.
+
+**The depth gauge illustrated its own caveat while doing it.** Immediately after the drain
+the readout showed:
+
+```
+depth         : traces-dlq-pull 1
+depth_sampled : 2026-09-01T05:47:00Z
+read_at       : 2026-09-01T05:48:47Z
+```
+
+A stale `1` beside the timestamp that makes it obviously stale — which is the whole point of
+W3.22's change. Before it, the same reading would have said `1` and nothing else, and a
+closure note could have recorded a drained queue as holding a message.
