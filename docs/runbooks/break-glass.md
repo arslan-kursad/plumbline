@@ -65,17 +65,34 @@ emergency: a recovery step first performed under pressure is not a recovery step
 *(No dry run has been performed. This section is deliberately empty rather than absent, so
 that its emptiness is visible to anyone who reaches for this document.)*
 
-The dry run must exercise the real chain without touching the owner binding:
+**The workflow exists:** [`.github/workflows/break-glass-drill.yml`](../../.github/workflows/break-glass-drill.yml).
+`workflow_dispatch` only, and it refuses without `confirm: dry-run` typed in — it writes IAM
+on purpose, so it does not run by accident.
 
-1. Grant a harmless role — `roles/browser` — to a throwaway principal, **as `ci-deploy@`,
-   through a workflow dispatch**, not from a laptop with owner credentials. Running it as
-   the human proves nothing: the human's access is the thing assumed absent.
-2. Read the binding back from the API.
-3. Remove it the same way.
-4. Record the run number, the timestamps and the raw output here.
+What it does, in the order it does it:
 
-Step 1 is the whole test. A dry run performed with the credentials the emergency assumes
-missing is the F2C-08 error class wearing a different hat.
+1. Authenticates **as `ci-deploy@` through WIF**, the same identity and path a real recovery
+   would use. Running it as the human proves nothing: the human's access is the thing the
+   emergency assumes absent, so a laptop with owner credentials answers a different question.
+2. Records the owner-binding count and refuses if `roles/browser` is already bound to the
+   test member — a drill that cannot tell its own write from a pre-existing one is not
+   measuring anything.
+3. Grants `roles/browser` to `ci-readonly@`, reads it back, and asserts it landed.
+4. Revokes it, under `if: always()`. A drill that leaves its own binding behind has changed
+   the thing it was measuring.
+5. Asserts the test role is gone **and the owner-binding count is unchanged**, then prints a
+   summary block for §5 below.
+
+**The role is deliberately inert.** `ci-readonly@` already holds `roles/viewer`, which
+subsumes `roles/browser`, so the grant moves no effective permission while still being a real
+`setIamPolicy` write. The test is the write, not the role.
+
+**It cannot grant owner.** Both the member and the role are literals in the workflow rather
+than inputs — a drill that can be pointed at an arbitrary principal is not a drill, it is a
+grant tool. Rehearsing the owner grant would mean performing it.
+
+*Pre-flight, run against the live policy 2026-09-01:* one owner binding present,
+`roles/browser` bound to nobody, test member present in the policy. Both guards would pass.
 
 ## 6. Removal is withdrawn; this runbook is not
 
