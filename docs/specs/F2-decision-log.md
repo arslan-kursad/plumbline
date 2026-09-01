@@ -1861,3 +1861,39 @@ now sits at the source as well as at the copies.
 **Exit review:** yes — a mechanical rule found a defect that three careful readings did not,
 and the reusable form is that a claim's *origin* is the site worth grepping for, not only
 its restatements.
+
+### W3.14 — the pin was checked from outside the repository, and the guard caught it
+**Made:** 2026-09-01 · **Work item:** F2C-05 / Wave 4 arming · **Reversibility:** cheap
+**What happened:** F2C-05's flight check verified that images exist for current `main` and
+declared the wave clear to dispatch. The plan job refused: `no image tagged 6a504b41... in
+Artifact Registry for: collector worker`. Nothing was applied, the apply job was skipped,
+and the `gcp-production` approval was never requested.
+
+**The check read the wrong object.** The pin is `var.image_tag` in
+`infra/terraform/variables.tf`, and it still held `6a504b4` — the value A2.13's successor
+had already been collected. Confirming from outside that *some other commit* has images is
+not the same claim, and it is the weaker one: it says the registry contains something, not
+that the configuration names it.
+
+**The variable's own documentation had already settled this**, which is the uncomfortable
+part. It says the value lives in the repository on purpose, because the approval gate binds
+the reviewer to a fingerprint of addresses and actions that cannot see an attribute value —
+so a tag chosen at dispatch time would be invisible to the one control that makes a deploy
+deliberate — and that **bumping it is part of arming a wave, not an afterthought**. The
+check was designed without reading the contract of the thing being checked.
+
+**Decision 17's wording carried the ambiguity in.** "Re-derive the pin from current `main`
+at dispatch, then confirm both images carry that tag" admits both readings, and the wrong
+one is the easier one. The variable's comment now states the distinction where the value
+is, not only where the decision is: re-checking means bumping this line in a pull request.
+
+**The guard caught it, again, and for a different reason than it was built for.** A2.13
+already recorded that the plan job's Artifact Registry check exists because Cloud Run
+resolves a tag at revision start, so a missing image would otherwise fail *after* approval.
+It has now refused two distinct arming defects: a pin that aged out while a wave was
+blocked, and a pin that was never bumped because the check for it looked elsewhere.
+**The reusable form:** a verification is only as good as its object, and "I checked the pin"
+and "I checked something the pin could have been" fail identically at a glance. Both produce
+a passing check and a green paragraph.
+**Exit review:** yes — it is the phase's sixth arming-time defect and the first one produced
+by the verification rather than found by it.

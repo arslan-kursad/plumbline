@@ -8,6 +8,15 @@
 Run immediately before dispatch, which is the only time it means anything: two of its three
 checks read state that decays.
 
+> **Correction, 2026-09-01, after the dispatch this document cleared.** Section 1 checked
+> the wrong object and section 4's verdict was wrong because of it. The pin is
+> `var.image_tag`, a value **in the repository** (`infra/terraform/variables.tf`); it was
+> still `6a504b4` and bumping it is a reviewed pull request, by design. What section 1
+> verified is that images exist for current `main` — necessary, and not the check.
+> Wave 4's first dispatch (run `33460547748`) was refused by the plan job's Artifact
+> Registry guard. Nothing was applied and no approval was requested. Recorded here rather
+> than rewritten: W3.14.
+
 ## 1. Pin — re-derived, not confirmed
 
 Decision 17 stops the directive from naming a SHA, because naming one is how the check
@@ -69,5 +78,9 @@ evidenced until this applies.
 
 ## 4. Verdict
 
-**Clear to dispatch.** The `gcp-production` approval remains Lane C and is not affected by
-anything here.
+~~**Clear to dispatch.**~~ **Withdrawn** — see the correction at the top. The check was
+clear on IAM and on image *availability*, and silent on the pin that is actually applied.
+Section 2's finding stands unchanged: the plan carries no `setIamPolicy` call and
+`ci-deploy@` holds the one permission the single change needs.
+
+The `gcp-production` approval remains Lane C and was never reached.

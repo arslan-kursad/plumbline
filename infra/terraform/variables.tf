@@ -148,22 +148,27 @@ variable "image_tag" {
   EOT
   type        = string
 
-  # Current `main`. It carries Wave 2's two code prerequisites — the real OIDC push
-  # validator (#64) and the Firestore key registry (#65) — which landed well before
-  # it, and its images are in Artifact Registry.
+  # Current `main` at Wave 4's arming, 2026-09-01. Its images are in Artifact
+  # Registry (verified against the registry the same day), and the collector and
+  # worker code it carries is what serves the first push delivery — DoD 7b's exam.
+  # Wave 4's own change is the corrected view definition, which is Terraform and SQL
+  # rather than image content; the pin still matters because an apply resolves both
+  # service images and would otherwise redeploy a stale pair.
   #
   # **This pin ages out, and that is a property of the design rather than an
-  # accident.** The previous value (#65's merge, `ac7b5af`) was verified present on
-  # 2026-08-22 and was gone by 2026-08-26: the repository's own cleanup policy keeps
-  # the last two versions and deletes anything older than a day, so once two newer
-  # images existed the pinned one was collected — while the wave sat blocked behind
-  # the kill-switch incident.
+  # accident.** It has now done so twice. `ac7b5af` (#65's merge) was verified present
+  # on 2026-08-22 and gone by 2026-08-26. Its replacement, `6a504b4`, was verified
+  # present on 2026-08-26 and gone by 2026-08-31 — the cleanup policy keeps the last
+  # two versions and deletes anything older than a day, so a wave that waits outlives
+  # its own pin. Decision log A2.13, then W3.14.
   #
-  # So a pin that has waited days needs re-checking before the wave is armed. The
-  # plan job's Artifact Registry check is what makes that safe rather than
-  # surprising: it refused this exact case before the reviewer was asked to approve
-  # anything. Decision log A2.13.
-  default = "6a504b417a5740a9138a2a483f4c3f16f6536b28"
+  # So a pin that has waited days needs re-checking before the wave is armed, and
+  # **re-checking means bumping this line in a pull request** — not confirming from
+  # outside that some other commit has images. That distinction is the whole reason
+  # the value lives here: the approval fingerprint cannot see an attribute value, so a
+  # tag chosen at dispatch time would be invisible to the reviewer. Wave 4's first
+  # dispatch was refused by the plan job for exactly that misreading.
+  default = "9f70a875dd0da7fa5e601313f6d2daa10e7a4c83"
 
   validation {
     # A full commit SHA, not a moving tag: `latest` or a branch name would make
