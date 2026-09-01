@@ -181,13 +181,26 @@ complete list.)*
 
   **The gap is closed by measurement rather than by argument.** CI run
   [`33477177883`](https://github.com/arslan-kursad/plumbline/actions/runs/33477177883) —
-  `workflow_dispatch` on `main` at `ec39569`, which is this note's own commit base — ran
-  **all ten jobs with zero skips and all ten succeeded.** Every check listed above has
-  therefore passed against the closing tree, once, on the record.
+  `workflow_dispatch` on `main` at `ec39569` — ran **all ten jobs with zero skips and all
+  ten succeeded.**
+
+  **And then the tree moved, which is the part worth recording.** That run's sentence
+  originally read "`ec39569`, which is this note's own commit base". Six pull requests
+  merged on 2026-09-01 after it — #137, #141, #139, #140, #142, #143 — and every one of
+  them skipped seven jobs on the path filter, this note's own edits included. The claim
+  did not become wrong because the code changed; it became wrong because the tree it named
+  stopped being the current one, while the run id went on pointing at it. Re-established
+  by a second dispatched run,
+  [`33503481240`](https://github.com/arslan-kursad/plumbline/actions/runs/33503481240) on
+  `main` at `216fee2`: **ten jobs, zero skips, ten succeeded**, `kill-switch function (go)`
+  among them, plus `prove-gates.sh` showing each of the nine assertions failing when its
+  own invariant is violated.
 
   The habit worth keeping past F2: a path filter makes a required check advisory, and
   nothing in the pull-request view distinguishes *passed* from *did not run*. A dispatched
-  full run before a phase closes costs one command.
+  full run before a phase closes costs one command — and it is anchored to a tree, so it
+  expires the moment the next merge lands. The run id is not the evidence; the run id
+  **plus the SHA it ran against** is.
 - **An identifier is not an identity — it proves neither sameness nor difference, and it
   does not stop pointing when its referent is replaced.** Three instances in this phase,
   one shape:
@@ -258,7 +271,7 @@ then would be the substitution this note exists to refuse.
 | Evidence documents | 16 |
 | Runbooks | 12 |
 | Pull requests merged from #82 | 43 |
-| Invariant gates | 9, all green with none skipped on run `33477177883` |
+| Invariant gates | 9, all green with none skipped on run [`33503481240`](https://github.com/arslan-kursad/plumbline/actions/runs/33503481240), `main` @ `216fee2` |
 | Harness guard tests | 63 |
 | Seeder tests | 11 |
 | Normalization / worker tests | 114 |
