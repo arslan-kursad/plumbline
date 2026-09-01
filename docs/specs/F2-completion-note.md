@@ -115,10 +115,23 @@ than left to memory.
 *(placeholder — filled at closure. The items below are already known and are not the
 complete list.)*
 
-- **Emulator results are not cloud results.** `dataset now holds: ['spans',
-  'spans_deduped', 'spans_real']` with 13 rows per view is a **local emulator** result.
-  Cloud `plumbline.spans` stands at 0 rows. No emulator result satisfies a DoD item
-  that names the cloud.
+- **Emulator results are not cloud results, and now both have data.** `dataset now holds:
+  ['spans', 'spans_deduped', 'spans_real']` with 13 rows per view is a **local emulator**
+  result. Cloud `plumbline.spans` held 0 rows when this line was written; measured
+  2026-09-01 it holds **52**, with 26 through `spans_deduped` and 0 through `spans_real`.
+  The two agreeing is not the two being equivalent: no emulator result satisfies a DoD item
+  that names the cloud, and the divergence below is why.
+- **A narrowing predicate that matches nothing reads exactly like a healthy system, and
+  this phase produced three.** The run-scoped JSON path addressed the top level while the
+  normalizer nests resource attributes under `resource` (W3.11). The harness derived its
+  partition window from the clock while the corpus is static at 2026-08-19 (W3.18). The
+  state readout's default window did the same (W3.22). **In each case every assertion
+  passed over an empty set** — rows equal distinct spans equal zero, unflagged zero, leaked
+  zero. A perfect result and no data. Two were caught by querying by hand; none was caught
+  by the tool reporting anything. The guards now assert that their predicates *select*
+  something, and an empty reading cross-checks the table's own row count and says which case
+  it is. **Carried to F3 as a design rule rather than three fixes:** any reading that can
+  come back empty must say why it is empty.
 - **The emulator/production divergence is real and only half-measured.** W2.16 found
   that a comment suppresses view creation in `goccy/bigquery-emulator` 0.8.1 while real
   BigQuery validates the same text (W2.17, dry-run). The observed direction is
@@ -182,11 +195,34 @@ and the configuration insists on writing it back:
    `older_than = "86400s"`.
 
 Both named, both fixed, verified by `terraform plan -detailed-exitcode` returning 0
-with no changes on 2026-08-30. *(Re-measure at closure per §7 criterion 2.)*
+with no changes on 2026-08-30. **Re-measured 2026-09-01** per §7 criterion 2: CI run
+[`33475352691`](https://github.com/arslan-kursad/plumbline/actions/runs/33475352691) reports
+`No changes. Your infrastructure matches the configuration.` The drift has not returned
+across Wave 4's apply, the `custom_audiences` apply, or the image-pin bump.
 
 ## 7. Numbers
 
-*(placeholder — filled at closure.)*
+Measured 2026-09-01. **The billing row is deliberately absent, not forgotten** — DoD 8, 9
+and 10 are evaluated against a period that has not closed, and a number written here before
+then would be the substitution this note exists to refuse.
+
+| | |
+| --- | --- |
+| Rows in cloud `plumbline.spans` | 52 |
+| Through `spans_deduped` | 26 |
+| Through `spans_real` | **0** — the walling holds |
+| Deliveries | 5 runs: one refused at branch A, three of `w4-third-delivery`, one of `w4-second-delivery` |
+| Dead-lettered messages | 8 — 7 from the failed first delivery, 1 from the drill |
+| Decision-log entries | 78, across five series |
+| Evidence documents | 15 |
+| Runbooks | 12 |
+| Pull requests merged from #82 | 43 |
+| Invariant gates | 9, all green with none skipped on run `33477177883` |
+| Harness guard tests | 63 |
+| Seeder tests | 11 |
+| Normalization / worker tests | 114 |
+| API keys issued during Wave 4 | 4 — 3 revoked, 1 pre-existing and untouched |
+| Period cost | *(not measurable until the period closes — see the note above)* |
 
 ## 8. Exit review
 
