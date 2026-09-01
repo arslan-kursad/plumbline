@@ -627,6 +627,40 @@ converts a recorded defect into standing exposure.
 *Acceptance:* roles removed, verified by reading the IAM policy from the API; break-glass
 runbook committed with a dated dry-run record.
 
+**RE-SCOPED 2026-09-01 (Lane C, Decision 18). The removal is withdrawn; the exposure is
+addressed differently.** #129 measured the premise wrong: the task assumes granular
+apply-capable roles beside a retained baseline of human access, and the project carries
+**exactly one human binding — `roles/owner` — on a project with no organization parent.**
+
+Removing it is not a narrowing. It would remove all human administrative access and leave
+the entire recovery capability as GitHub → WIF → `ci-deploy@` → `setIamPolicy`: four links,
+each a single point of failure, with nothing behind them. The human's owner binding is also
+not Terraform-managed, so no plan shows it missing and no apply restores it.
+
+**And it buys close to nothing here.** Decision 4's premise — standing apply roles are
+standing exposure — is sound where several humans hold them and the gated path is the
+control. This project has one human, and that person also owns the repository, the WIF
+configuration and `ci-deploy@`. Removing owner relocates their access rather than reducing
+it, while converting a recoverable state into an unrecoverable one.
+
+*Revised acceptance:*
+
+1. A **second owner** is added as an independent recovery path, defeating each failure mode
+   `break-glass.md` §3 names — repository unavailable, WIF broken, `ci-deploy@` role lost.
+2. The break-glass runbook stays, and its **dry run remains owed**. It is the control for
+   the recovery path whether or not any role is ever removed.
+3. **Role removal is deferred out of F2**, to a phase in which the project has either an
+   organization parent or more than one maintainer — the conditions under which Decision 4's
+   reasoning actually applies.
+
+*Rejected, and by the project's own rule:* a keyed break-glass service account. Gate C
+forbids exported service account keys across the whole repository with no exclusions.
+
+*Also considered:* an organization parent via Cloud Identity. Structurally the correct
+answer and how GCP intends recovery to work, but disproportionate for a phase named
+*minimal GCP footprint* — it introduces an admin surface that itself needs securing, to
+solve a problem a second owner solves in one call. Recorded so the choice is visible.
+
 ---
 
 ## 6. Where the chain is serial, and where it is not
@@ -777,7 +811,8 @@ Approved by Lane C on 2026-08-30. These are decision-log entries, not proposals.
 | 1 | Merge #82 | Approved in advance | Void if F2C-01 shows rounding → STOP, hand back (F2C-03) |
 | 2 | `synthetic=true` on the F2 constructed payload | Decided | DoD 3 proves via `spans_deduped`; `spans_real` exclusion asserted (F2C-09) |
 | 3 | Account upgrade ≤ 2026-09-28 | Approved as ceiling; **pinned to 2026-09-21 on 2026-09-01** | C7 added (F2C-18, F2C-19). Decision 15's closure gate is satisfied |
-| 4 | Remove standing human apply roles + break-glass runbook | Approved | After F2 exit; runbook written and dry-run first (F2C-22) |
+| 4 | Remove standing human apply roles + break-glass runbook | Approved 2026-08-30; **removal withdrawn 2026-09-01 by Decision 18** | Runbook written; dry run still owed. Removal deferred out of F2 (#129) |
+| 18 | Second owner instead of removing the sole owner | Lane C, 2026-09-01 | F2C-22 re-scoped. Gate C forbids a keyed break-glass account; an organization is deferred as disproportionate |
 
 ### Decisions 5–17 (Amendment 7, 2026-08-31)
 

@@ -2362,3 +2362,36 @@ The workflow that would do it does not exist, and writing it is part of the dry 
 than part of the emergency.
 **Exit review:** yes — the task's premise was wrong about the project's own IAM shape, and
 the shape was one API read away for the whole phase.
+
+### W3.30 — F2C-22 re-scoped: a second owner instead of removing the only one
+**Made:** 2026-09-01 · **Work item:** F2C-22, #129 · **Reversibility:** the decision is cheap; what it avoided was not
+**Decision (Lane C, recorded as Decision 18):** the removal is withdrawn. A second owner is
+added as an independent recovery path; the break-glass runbook stays and its dry run remains
+owed; role removal is deferred out of F2 to a phase with an organization parent or more than
+one maintainer.
+
+**Decision 4's premise was sound and its remedy was not, and the difference is the project's
+shape.** Standing apply roles are standing exposure where several humans hold them and the
+gated path is the control. Here one human holds one binding — `roles/owner` — and that same
+person owns the repository, the WIF configuration and `ci-deploy@`. Removing owner relocates
+their access rather than reducing it, and converts a recoverable state into one whose only
+route back is four single points of failure with no organization behind them.
+
+**Two alternatives rejected, both on stated grounds rather than taste.** A keyed break-glass
+service account is forbidden by Gate C — the project's own rule, whole repository, no
+exclusions — which settles it without argument. An organization parent is the structurally
+correct answer and how GCP intends recovery to work, and it is disproportionate for a phase
+named *minimal GCP footprint*: it introduces an admin surface that itself needs securing, to
+solve what a second owner solves in one call. Recorded so the choice is visible rather than
+absent.
+
+**What the second owner does not fix, said plainly.** Both accounts belong to one person. It
+defeats every failure mode `break-glass.md` §3 names — repository unavailable, WIF broken,
+`ci-deploy@` role lost — and it does not defeat that person losing access to both. An
+organization would. That trade is now written down instead of being discovered later.
+
+**The dry run survives the task that required it.** F2C-22 asked for it as a precondition of
+removal; with removal withdrawn the precondition is moot and the dry run is not. A recovery
+path that has never been exercised is not a control, and there are now two of them.
+**Exit review:** yes — a task can be right about a risk and wrong about the remedy, and the
+thing that separated them was one API read of the project's own IAM.

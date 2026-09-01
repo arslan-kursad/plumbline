@@ -77,8 +77,17 @@ The dry run must exercise the real chain without touching the owner binding:
 Step 1 is the whole test. A dry run performed with the credentials the emergency assumes
 missing is the F2C-08 error class wearing a different hat.
 
-## 6. Until this is dry-run
+## 6. Removal is withdrawn; this runbook is not
 
-**No standing role is removed from a human principal.** F2C-22's ordering constraint is
-binding and is not a formality: the sequence *runbook → dry run → removal* is what separates
-a documented recovery from a hoped-for one.
+**F2C-22 was re-scoped on 2026-09-01 (Decision 18).** No standing role is removed from a
+human principal, and none is scheduled to be — the removal is deferred out of F2 to a phase
+in which the project has an organization parent or more than one maintainer, which are the
+conditions under which its reasoning applies (#129).
+
+**The dry run at §5 is still owed.** That is the part worth insisting on. This document is
+the control for the recovery path whether or not a role is ever removed, and a control that
+has never been exercised is not one — which is the same argument F2C-22's own ordering
+constraint made, surviving the task that made it.
+
+The second owner added under Decision 18 changes the arithmetic of §1 but not this section:
+two recovery paths that have both never been tested are two untested paths.
