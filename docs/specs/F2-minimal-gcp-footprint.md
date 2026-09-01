@@ -1,7 +1,7 @@
 # F2 — Minimal GCP Footprint: Work Package Spec
 
 **Version:** 0.2 · **Status:** Approved on handoff (2026-08-21), Amendment 1 proposed
-2026-08-30 · **Date:** 2026-08-21
+2026-08-30, Amendment 2 proposed 2026-09-01 · **Date:** 2026-08-21
 **Phase budget:** ~15 h · **Executor:** Claude Code (graduated mode, §2) + maintainer (§9)
 **Predecessor:** F1 complete ([`F1-completion-note.md`](F1-completion-note.md)); the
 claude-code capture (#10) is still open and stays non-blocking — it gates F4's
@@ -384,8 +384,18 @@ Terraform in the wave:
 
 ## 7. Definition of Done
 
-1. **G1**: #33 closed — post-fix live-fire succeeded, evidence archived, billing
-   re-attached, the corrected credit filter live.
+1. **G1** (#33). Five facts, each checkable on its own. The gate's ordering clause is
+   §3's and is not restated here; anything measuring this item measures the five below.
+
+   1. `#33` is closed.
+   2. The post-fix kill-switch live fire succeeded — confirmed at the billing API and not
+      only in the function logs, with idempotence under redelivery shown.
+   3. Its evidence is archived in [`kill-switch.md`](../runbooks/kill-switch.md) §4 with
+      operator, date, and every attempt including the failed ones.
+   4. Billing is attached **when the item is read**, not merely at some past instant.
+   5. **ADR-0004 Amendment 4's** credit filter is live — `credit_types_treatment =
+      "INCLUDE_ALL_CREDITS"` on `google_billing_budget.zero_spend` — confirmed at the API
+      rather than from Terraform state.
 2. **G2**: #44 closed with ordering evidence — runbook and retention merged before the
    push subscription existed.
 3. Constructed-fixture OTLP sent from a local machine lands in cloud BigQuery; rows are
@@ -540,6 +550,48 @@ detection-fidelity claim, not anything in F2.
 | #36 | Freeze A alignment in `eval-plan.md` | No — context only; F2 does not touch that file |
 
 ## 12. Changelog
+
+**Amendment 2 — 2026-09-01** — §7 item 1 re-expressed as five checkable facts
+(source: [`f2-dod1-five-facts.md`](../evidence/f2-dod1-five-facts.md); ADR-0004
+Amendments 1 and 4; CI Gate H).
+
+**Numbering, checked rather than assumed.** §12 held one amendment entry and a v0.1
+entry. Every other occurrence of "Amendment" in this spec refers to ADR-0004's sequence,
+which runs 1–4 and is separate from this one. So this is Amendment 2 because the
+sequence has one entry, not because nothing suggested otherwise.
+
+**Written after the measurement, and that is the disclosure.** The five facts were read
+individually on 2026-09-01, before this amendment was drafted, and the reading is what
+prompted it. Three hold, one does not close on the text as written, and one could not
+close on it at all. An amendment authored with the results in hand is a post-hoc edit and
+is recorded as one; what limits it is that **no verdict is stated here.** The verdicts
+live in the evidence file and the closure note, and this amendment does not make any fact
+easier to satisfy.
+
+1. **Item 1 becomes five numbered sub-facts, in the original order and with no fact
+   added or dropped.** The prose form ran them together in one sentence, which is how a
+   closure re-derivation came to measure §3's ordering clause and record item 1 as met.
+   Items 2–13 are not renumbered.
+2. **Fact 4 now demands the present tense.** "Billing re-attached" was a state claim
+   written in the grammar of an event. The event is true and stayed true for nothing: the
+   project's billing was detached five more times after the item was recorded — twice on
+   2026-08-22 as false positives, three times on 2026-08-25 during the Amendment 4
+   remediation — and the last unbroken re-attach is 2026-08-25 ~12:11. DoD items are read
+   in the present tense at closure, so the fact now says so.
+3. **Fact 5's referent moves, and this is a change in substance rather than in wording.**
+   The phrase "the corrected credit filter" was authored `2026-08-21 19:19:43 +0300`,
+   when its only possible referent was **ADR-0004 Amendment 1**'s enumerated `FREE_TIER`
+   filter. That filter was falsified in production on 2026-08-22 and superseded by
+   Amendment 4 on 2026-08-25. Read with its authoring referent, the fact demanded the
+   exact configuration CI **Gate H fails the build for containing**, so it was not
+   satisfiable. Naming Amendment 4 changes what is demanded. It is not a clarification and
+   is not filed as one.
+4. **Every referent is named by version or by location.** This is the F2 §5 rule — an
+   identifier is not an identity — applied to the item that produced it.
+
+**What this amendment deliberately does not do.** It does not restate §3's ordering
+clause inside §7. The two texts are different claims and collapsing them is the error
+being corrected, not the fix for it.
 
 **Amendment 1 — 2026-08-30** — Verification C, the credit qualification, and the shared
 calendar block (source decision D-74; #17, #18, #74, ADR-0004 Amendment 4).

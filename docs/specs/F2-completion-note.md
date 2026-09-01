@@ -30,7 +30,7 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 
 | # | Item | Status | Measured where, and when |
 | --- | --- | --- | --- |
-| 1 | G1 — #33 closed, post-fix live-fire | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — #33 closed `2026-08-21T20:35:09Z`; both application services created `2026-08-26`, five days after the gate |
+| 1 | G1 — five facts, spec §7 item 1 as amended (Amendment 2) | **3 of 5; not closed** | [`f2-dod1-five-facts.md`](../evidence/f2-dod1-five-facts.md), 2026-09-01, fact by fact. **1.1** #33 closed `2026-08-21T20:35:09Z`. **1.2** live fire passed on Attempt 3, `billingEnabled: false` at the API, idempotent under redelivery. **1.3** archived in `kill-switch.md` §4, all three attempts; the console screenshot #33 asked for is a recorded deliberate omission. **1.4 open** — billing attached is a present-tense claim and went false five times after the item was recorded; current state unread by Lane A (`.claude/settings.json` denies `Bash(gcloud billing:*)`). **1.5 open** — repository side measured (`killswitch.tf:284` `INCLUDE_ALL_CREDITS`, Gate H green on run `33475352691`), live side unread, same denial. The earlier [re-derivation](../evidence/f2-dod-1-2-5-12-rederived.md) measured §3's ordering clause, which is not this item |
 | 2 | G2 — #44 closed with ordering evidence | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — `f7d6ca3` at `2026-08-21T19:37Z`, five days before the subscription that binds it; both obligations verified in current form |
 | 3 | Constructed OTLP lands in cloud BigQuery through the views, every row `synthetic = true` | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md), 2026-09-01 — `spans_deduped` scoped to two runs: 13 rows each, `rows_seen = distinct_spans`, `unflagged = 0` |
 | 4 | Poison reaches the cloud DLQ, alert fired, triage archived | **satisfied** | [`f2-dod4-drill.md`](../evidence/f2-dod4-drill.md), 2026-09-01 — poison published `05:23:14Z`, dead-lettered `05:25:02Z` after 5 attempts, depth 0→1, alert delivered. Archive digest matches the published payload byte for byte |
@@ -255,7 +255,7 @@ then would be the substitution this note exists to refuse.
 | Deliveries | 5 runs: one refused at branch A, three of `w4-third-delivery`, one of `w4-second-delivery` |
 | Dead-lettered messages | 8 — 7 from the failed first delivery, 1 from the drill |
 | Decision-log entries | 78, across five series |
-| Evidence documents | 15 |
+| Evidence documents | 16 |
 | Runbooks | 12 |
 | Pull requests merged from #82 | 43 |
 | Invariant gates | 9, all green with none skipped on run `33477177883` |

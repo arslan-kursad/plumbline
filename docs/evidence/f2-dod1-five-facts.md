@@ -188,3 +188,22 @@ evidence. Either re-word §7 item 1 so its five facts are individually checkable
 name their referents by version (`ADR-0004 Amendment 4's credit filter`, not "the
 corrected credit filter"), or state in the closure note which of the five were measured
 at closure and which were inherited. The `10/13` figure rests on this item.
+
+---
+
+## Postscript — 2026-09-01, what was done with this
+
+The measurement above is unchanged and is not re-opened. Recorded here so the trail is
+readable in one place:
+
+The first option was taken. **Spec §12 Amendment 2** re-expresses §7 item 1 as five
+numbered facts, each naming its referent by version or location; fact 4 now demands the
+present tense, and fact 5 names ADR-0004 Amendment 4 rather than "the corrected credit
+filter". The amendment records that it was authored with these results in hand, and that
+naming Amendment 4 changes what is demanded rather than clarifying it.
+
+The closure note's §1 row 1 now carries all five facts with their individual state —
+**3 of 5, not closed** — instead of the two-fact abbreviation, and the phase tally moves
+from ten satisfied to nine.
+
+Facts 4 and 5 stay open on the same missing read, which is one API call Lane A is denied.
