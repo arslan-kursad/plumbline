@@ -28,11 +28,11 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 
 | # | Item | Status | Measured where, and when |
 | --- | --- | --- | --- |
-| 1 | G1 — #33 closed, post-fix live-fire | *(placeholder)* | |
-| 2 | G2 — #44 closed with ordering evidence | *(placeholder)* | |
+| 1 | G1 — #33 closed, post-fix live-fire | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — #33 closed `2026-08-21T20:35:09Z`; both application services created `2026-08-26`, five days after the gate |
+| 2 | G2 — #44 closed with ordering evidence | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — `f7d6ca3` at `2026-08-21T19:37Z`, five days before the subscription that binds it; both obligations verified in current form |
 | 3 | Constructed OTLP lands in cloud BigQuery through the views, every row `synthetic = true` | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md), 2026-09-01 — `spans_deduped` scoped to two runs: 13 rows each, `rows_seen = distinct_spans`, `unflagged = 0` |
 | 4 | Poison reaches the cloud DLQ, alert fired, triage archived | **satisfied** | [`f2-dod4-drill.md`](../evidence/f2-dod4-drill.md), 2026-09-01 — poison published `05:23:14Z`, dead-lettered `05:25:02Z` after 5 attempts, depth 0→1, alert delivered. Archive digest matches the published payload byte for byte |
-| 5 | Every resource Terraform-owned, final plan clean, zero out-of-path creations | *(placeholder — re-measure)* | |
+| 5 | Every resource Terraform-owned, final plan clean, zero out-of-path creations | **satisfied, with one stated exception** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — `No changes` on run `33475352691`; every resource enumerated from the API. The Eventarc-created subscription is not Terraform-declared and is named as such |
 | 6 | Cloud Run inside guardrails, guard shown to evaluate them | **satisfied** | [`f2-dod6-cloud-run-guardrails.md`](../evidence/f2-dod6-cloud-run-guardrails.md), 2026-08-31 — API read plus captured guard rejection, run `33390722393` |
 | 7a | Push transport established | **satisfied** | Wave 3, run `32969025343` |
 | 7b | Push transport exercised — a real Google-signed token accepted | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md) §1, 2026-09-01 — worker `POST /push - 204` after the `custom_audiences` fix. The first attempt failed at branch A ([`f2-dod7b-first-delivery.md`](../evidence/f2-dod7b-first-delivery.md)) |
@@ -40,7 +40,7 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 | 9 | Credit-lag procedure live with one data point | *(placeholder)* | |
 | 10 | Period invoice fully credit-offset | *(placeholder)* | |
 | 11 | Decision log complete | *(placeholder)* | |
-| 12 | Gates A–H green, nothing loosened | *(placeholder — re-measure at closure)* | |
+| 12 | Gates A–H green, nothing loosened | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — nine gate assertions green on run `33475352691`, all ten jobs run and none skipped; `invariant-gates.sh` unchanged since before #82, `.claude/settings.json` untouched all phase |
 | 13 | **Verification C** | **open by design** | see §4; not a phase-exit item |
 
 ## 2. CN1 — the credit sentence
