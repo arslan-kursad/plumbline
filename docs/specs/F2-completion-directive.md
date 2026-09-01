@@ -985,7 +985,7 @@ which is a better failure but still a failure.
    it, seven days still remain to the ceiling and fourteen to the window. Decision 15's
    closure gate is satisfied.
 2. ~~**Schedule the Adjudicator ground-truth-labelability session.**~~ **Scheduled
-   2026-09-01 for 2026-09-02, 10:00–12:00 Europe/Istanbul.** It gates Freeze A, which gates
+   2026-09-01 for 2026-09-02, 10:00–13:00 Europe/Istanbul.** It gates Freeze A, which gates
    F3, which gates C7, which gates the single calendar block C4 requires. It is a separate
    conversation and it is on the critical path to 2026-10-05 — not F2's critical path, the
    project's. The session owns three outputs: the ground-truth question answered, Freeze A
