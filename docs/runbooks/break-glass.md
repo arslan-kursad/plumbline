@@ -1,8 +1,11 @@
 # Runbook — break-glass: regaining project access
 
-**Status:** written 2026-09-01 for F2C-22, **not yet dry-run**. Until the dry-run record at
-§5 carries a date, this document is a plan and not a control — which is the distinction
-F2C-22's own ordering constraint exists to enforce.
+**Status:** written and **dry-run 2026-09-01** (§5). It is a control rather than a plan, and
+the distinction is the one F2C-22's ordering constraint exists to enforce.
+
+What the dry run establishes is narrow and worth stating exactly: `ci-deploy@` can write IAM
+on this project without the human principal. It does **not** establish that a real recovery
+would succeed — that grants owner, and rehearsing it would mean performing it.
 
 Scope: what to do when a human principal can no longer administer `plumbline-19458`, and
 what the recovery depends on. It is written before any role is removed, because removing
@@ -62,8 +65,63 @@ emergency: a recovery step first performed under pressure is not a recovery step
 
 ## 5. Dry-run record
 
-*(No dry run has been performed. This section is deliberately empty rather than absent, so
-that its emptiness is visible to anyone who reaches for this document.)*
+**Performed 2026-09-01. The recovery path works.** It ran twice — see the note below — and
+both runs passed every assertion.
+
+| | run `33486264765` | run `33486305767` |
+| --- | --- | --- |
+| started | `08:17:33Z` | `08:18:00Z` |
+| granted | — | `08:18:02Z` |
+| revoked | `08:17:40Z` | `08:18:07Z` |
+| grant visible in the policy | yes | yes |
+| test role still bound afterwards | no | no |
+| owner bindings before → after | 1 → 1 | 1 → 1 |
+
+**The identity is proven from the audit log, not from the job's own claim.** The workflow's
+`gcloud config get-value account` step returned **empty** — that probe does not report a
+WIF-federated identity, so it proved nothing and is a defect in the workflow rather than in
+the result. What proves it is Cloud Logging:
+
+```
+2026-09-01T08:18:06Z  ci-deploy@plumbline-19458.iam.gserviceaccount.com  SetIamPolicy
+2026-09-01T08:18:03Z  ci-deploy@plumbline-19458.iam.gserviceaccount.com  SetIamPolicy
+2026-09-01T08:17:39Z  ci-deploy@plumbline-19458.iam.gserviceaccount.com  SetIamPolicy
+2026-09-01T08:17:36Z  ci-deploy@plumbline-19458.iam.gserviceaccount.com  SetIamPolicy
+```
+
+Four writes for two runs, because `add-iam-policy-binding` and its removal are each a
+read-modify-write of the whole policy. **`ci-deploy@` made all four**, which is the claim
+this drill exists to establish: the recovery path is reachable without the human principal.
+
+**Verified independently afterwards**, rather than taking the job's word for it:
+
+```
+owner bindings      : 1
+roles/browser bound : False
+ci-readonly roles   : cloudquotas.viewer, iam.securityReviewer,
+                      serviceusage.serviceUsageConsumer, viewer
+```
+
+`ci-readonly@` is back to the four roles it started with. Nothing of the drill survives.
+
+### It ran twice, and that is recorded rather than tidied
+
+One dispatch was issued and two runs occurred, 28 seconds apart, identical inputs. The
+mechanism was not established and is not claimed here.
+
+**The duplication exercised a guard that would otherwise have gone untested.** The second
+run's precondition — *refuse if `roles/browser` is already bound to the test member* — did
+not fire, which means the first run had finished revoking before the second read the policy.
+Had the two overlapped, the second would have refused rather than granting on top of a
+binding it could not distinguish from its own. That is the guard working under the one
+condition nobody would have arranged deliberately.
+
+### The one defect this found is in the drill, not the path
+
+The `Who am I, actually` step is useless as written and should be replaced with a check that
+reads the federated identity — or removed, since the audit log answers the question
+authoritatively and after the fact. Left in place for now, recorded here so the next reader
+does not trust its empty output as an absence of identity.
 
 **The workflow exists:** [`.github/workflows/break-glass-drill.yml`](../../.github/workflows/break-glass-drill.yml).
 `workflow_dispatch` only, and it refuses without `confirm: dry-run` typed in — it writes IAM

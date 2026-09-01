@@ -2423,3 +2423,33 @@ run is still owed, and it is independent of owner count: one untested recovery p
 untested recovery paths are the same amount of evidence.
 **Exit review:** yes — for the shape. A decision recorded in the future tense is a claim
 about the world, and this one was three sites wide before anybody had done anything.
+
+### W3.32 — the break-glass path is exercised, and the drill's identity check was the useless part
+**Made:** 2026-09-01 · **Work item:** F2C-22 dry run · **Reversibility:** the writes reverted; the knowledge did not
+**Performed.** `ci-deploy@` granted `roles/browser` to `ci-readonly@`, the grant was read back
+from the policy, and it was revoked — twice, in runs `33486264765` and `33486305767`. Owner
+bindings 1 before and 1 after in both. Verified independently afterwards rather than from the
+job's own report: no `roles/browser` anywhere, `ci-readonly@` back to its four original roles.
+`break-glass.md` §5 carries the record.
+
+**The claim it establishes is narrow and worth stating exactly:** `ci-deploy@` can write IAM
+on this project without the human principal. It does **not** establish that a real recovery
+succeeds — that grants owner, and rehearsing it would mean performing it.
+
+**The step that was supposed to prove the identity proved nothing.** `gcloud config
+get-value account` returned empty: it does not report a WIF-federated identity. Had the drill
+been trusted at face value it would have recorded a successful run with an unproven actor,
+which is the shape of every unproven control this phase has spent itself refusing. The proof
+came from Cloud Logging instead — four `SetIamPolicy` entries, all
+`ci-deploy@plumbline-19458.iam.gserviceaccount.com`. Four writes for two runs because each
+binding change is a read-modify-write of the whole policy.
+
+**It ran twice from one dispatch, and the duplication tested something nothing else would
+have.** The mechanism is not established and is not guessed at here. What it did was exercise
+the second run's precondition — *refuse if the test role is already bound* — under a
+near-concurrent condition nobody would have arranged: the guard did not fire, which means the
+first run had finished revoking before the second read the policy. Had they overlapped it
+would have refused rather than granting on top of a binding indistinguishable from its own.
+**Exit review:** yes — for the identity probe. A drill that reports success while its own
+actor is unverified is worse than no drill, because it converts an open question into a
+recorded answer.
