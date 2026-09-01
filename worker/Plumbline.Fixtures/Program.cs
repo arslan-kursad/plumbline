@@ -26,6 +26,43 @@ public static class Program
         var check = args.Contains("--check");
         var root = FindFixtureRoot();
 
+        var encodeIndex = Array.IndexOf(args, "--encode");
+        if (encodeIndex >= 0)
+        {
+            // One twin to one binary, for a corpus built outside testdata/fixtures. The
+            // in-place regeneration below cannot serve the cloud harness, whose corpus is
+            // run-scoped and lives in a working directory.
+            if (encodeIndex + 2 >= args.Length)
+            {
+                Console.Error.WriteLine("usage: --encode <twin.otlp.json> <out.pb>");
+                return 2;
+            }
+
+            File.WriteAllBytes(args[encodeIndex + 2], FixtureEncoder.Encode(File.ReadAllText(args[encodeIndex + 1])));
+            return 0;
+        }
+
+        var normalizeIndex = Array.IndexOf(args, "--normalize");
+        if (normalizeIndex >= 0)
+        {
+            // The cloud harness's local half (directive v1.7, Decision 12). It does not
+            // need testdata/fixtures: the corpus it normalizes is run-scoped and built
+            // elsewhere, so the root lookup below would fail for the wrong reason.
+            var outIndex = Array.IndexOf(args, "--out");
+            var keyIndex = Array.IndexOf(args, "--api-key-id");
+
+            if (normalizeIndex + 1 >= args.Length || outIndex < 0 || outIndex + 1 >= args.Length
+                || keyIndex < 0 || keyIndex + 1 >= args.Length)
+            {
+                Console.Error.WriteLine(
+                    "usage: --normalize <corpus-dir> --out <rows.ndjson> --api-key-id <id>");
+                return 2;
+            }
+
+            return CorpusNormalizer.Normalize(
+                args[normalizeIndex + 1], args[outIndex + 1], args[keyIndex + 1], Console.Out);
+        }
+
         var verifyIndex = Array.IndexOf(args, "--verify");
         if (verifyIndex >= 0)
         {

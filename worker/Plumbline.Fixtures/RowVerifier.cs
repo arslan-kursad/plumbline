@@ -22,12 +22,12 @@ namespace Plumbline.Fixtures;
 /// </remarks>
 public static class RowVerifier
 {
-    /// <summary>Columns the comparison ignores, and why each one has to be ignored.</summary>
-    private static readonly Dictionary<string, string> Ignored = new(StringComparer.Ordinal)
-    {
-        // Stamped by the sink at write time. Asserting a value would be asserting a clock.
-        ["ingest_time"] = "worker write time",
-    };
+    /// <summary>
+    /// Columns the comparison ignores. The list lives in <see cref="VolatileFields"/> so
+    /// that this comparison and the cloud harness's golden diff share one (directive v1.7,
+    /// Decision 12) instead of maintaining two that drift.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> Ignored => VolatileFields.Excluded;
 
     public static int Verify(string fixtureRoot, string observedPath, TextWriter output)
     {

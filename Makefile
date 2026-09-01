@@ -3,7 +3,7 @@
 # changes.
 
 .DEFAULT_GOAL := help
-.PHONY: help gates test test-go test-dotnet fixtures e2e e2e-up e2e-down
+.PHONY: help gates test test-go test-dotnet fixtures e2e e2e-up e2e-down e2e-cloud e2e-cloud-drill
 
 help: ## List the targets
 	@grep -hE '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | awk -F':.*?## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -31,3 +31,11 @@ e2e-up: ## Bring the local stack up and leave it running
 
 e2e-down: ## Tear the local stack down
 	docker compose --profile tools down --volumes --remove-orphans
+
+# The first cloud run of this harness is the DoD 7b exam and it is taken once. Both
+# targets refuse without PLUMBLINE_E2E_TARGET=cloud and E2E_RUN_ID (directive Decision 10).
+e2e-cloud: ## Cloud happy path — armed, run-scoped; the DoD 7b exam on its first cloud run
+	./scripts/e2e/run-cloud.sh
+
+e2e-cloud-drill: ## Cloud failure path — poison to the DLQ, DoD 4; needs a drained queue
+	./scripts/e2e/run-cloud.sh --drill
