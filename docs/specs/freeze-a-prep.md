@@ -1,6 +1,6 @@
 # Freeze A — Pre-session brief
 
-**Version:** 0.2 · **Status:** Accepted · **Date:** 2026-09-01
+**Version:** 0.3 · **Status:** Accepted · **Date:** 2026-09-01
 **Session:** 2026-09-02, 10:00–13:00 Europe/Istanbul · **Duration:** 3 h
 **Freeze target:** [`docs/eval-plan.md`](../eval-plan.md) v0.2 · **Appendix A:** P1–P7, P11
 
@@ -255,13 +255,58 @@ Freeze A is complete when, and only when:
 4. **`#10`'s eval-plan half is discharged** — SC-1 row 1.2's manifest field set gains
    `redacted_fields`. A redacted capture is not raw emitter output, and row 1.3's
    losslessness check has to say which artefact it validates against.
-5. The file is on `main` and its SHA is tagged `eval-plan-freeze-a`, per §2's freeze
+5. **SC-1 row 1.1's data source is corrected** — see §9.1. It names a directory that does
+   not exist.
+6. **§4's `architecture.md` pin is refreshed** — v0.3 is ten versions stale (§9.1).
+7. The file is on `main` and its SHA is tagged `eval-plan-freeze-a`, per §2's freeze
    mechanic.
-6. If the freeze did not complete, the §5 choice — (a) or (b) — is recorded with its date.
+8. If the freeze did not complete, the §5 choice — (a) or (b) — is recorded with its date.
 
-**Items 3 and 4 appeared on no list before this brief was checked against the repository.**
-Both are `eval-plan.md` v0.2 edits, both are targeted at Freeze A by their own issues, and
-both would have been frozen wrong and then needed an ADR under §12 to correct.
+**Items 3–6 appeared on no list before this brief was checked against the repository.**
+All four are `eval-plan.md` v0.2 edits, and all four would have been frozen wrong and then
+needed an ADR under §12 to correct.
+
+### 7.1 Pre-freeze audit of the file being frozen — 2026-09-01
+
+Lane A read `eval-plan.md` against the repository: every internal `§` reference against
+this file's own headings, every cross-document reference against the cited document's
+headings, and every path it names against the filesystem. Four findings; two are exit
+conditions above, two are not defects.
+
+**Clean:** all internal section references resolve. Every `architecture.md` section the
+plan cites — §3.3 dedup, §4.1 `spans_deduped`/`spans_real`/`synthetic`, §4.2 `datasets`/
+`eval_runs`, §5, §7, §10 OQ-1 and OQ-4 — exists and still says what the plan says it says.
+
+**Finding 1 — SC-1 row 1.1 names a directory that does not exist.** The row's data-source
+column reads `normalization/testdata/<dialect>/`. That string occurs **once in the whole
+repository, in this row**. The corpus is at `testdata/fixtures/<dialect>/`, which is what
+the tests actually read — `worker/Plumbline.Normalization.Tests/FixtureCorpus.cs:80` and
+`worker/Plumbline.Worker.Tests/IngestionEndpointTests.cs:152`. Freezing it as written
+pins the primary criterion's primary data source to a path nothing uses.
+
+**Finding 2 — §4 pins `architecture.md` at v0.3; `main` carries v0.13.** Only the pin is
+stale: every section it cites still resolves and still carries the cited content. Worth
+correcting rather than leaving, because a pre-registration that names a version of its
+context file which no longer exists cannot be checked against that version later.
+
+**Finding 3 — `redacted_fields` already exists in all four fixture manifests.** So `#10`'s
+row 1.2 edit (§7 item 4) is the criterion catching up to the artefacts, not a new
+requirement being imposed on them. The manifests carry more than row 1.2 names —
+`provenance`, `construction_basis`, `evidence`, `synthetic_values`, `redaction_rules`,
+`validation_status`. Whether row 1.2's list should grow to match is a decision, not a
+transcription, and is not proposed here.
+
+**Finding 4 — no fixture declares itself `captured`, in its own manifest.** Three read
+`provenance: constructed`; `claude-code` reads
+`provenance: derived-from-measured-evidence` and explains at length why it is not
+`captured` — the raw capture was never committed, and no `claude_code.tool` or
+`claude_code.hook` span was ever produced because every captured run failed
+authentication before reaching a tool call. Row 1.2 requires *"≥1 fixture per dialect
+captured from a real emitter"*.
+
+**So SC-1 is unmet on the corpus's own self-declaration, not on an outside reading.** That
+is `#138`'s SC-1 disposition — do not amend the criterion, schedule the three captures —
+confirmed from the artefacts rather than argued from the plan.
 
 The `eval-plan.md` edit is Class 3 and human-only. It is not delegated to the
 implementation layer, and this brief does not authorize it.
@@ -318,3 +363,14 @@ prefix with the commands that detach billing. It bears on DoD 1 fact 5, not on F
 7. **ADR-0008 moved to its own dated session** (§3). 2026-09-03, thirty minutes. It is
    unbudgeted work on the critical path to C7 and does not belong inside a freeze session
    with zero slack.
+
+**v0.3 — 2026-09-01** (supersedes v0.2). One change, from reading the file being frozen
+rather than the plan for freezing it.
+
+8. **§7 gains items 5 and 6, and §7.1 records the audit that produced them.** Lane A
+   checked every reference and path in `eval-plan.md` against the repository. SC-1 row
+   1.1 names `normalization/testdata/<dialect>/`, a directory that exists nowhere — the
+   corpus is at `testdata/fixtures/<dialect>/` and the tests read it there. §4 pins
+   `architecture.md` at v0.3 against a `main` carrying v0.13. Two further findings are
+   recorded as context rather than as defects: `redacted_fields` is already in all four
+   manifests, and no manifest declares itself `captured`.
