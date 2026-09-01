@@ -1,0 +1,166 @@
+# Break-glass dry run (F2C-22, docs/runbooks/break-glass.md §5).
+#
+# Proves that the recovery path this project depends on actually works, by exercising it
+# rather than by reasoning about it. The path is GitHub -> WIF -> ci-deploy@ -> setIamPolicy,
+# and every link is a single point of failure with no organization behind the project.
+#
+# WHY IT RUNS HERE AND NOT ON A LAPTOP
+# The emergency this rehearses is "the human principal cannot administer the project". A dry
+# run performed with the credentials the emergency assumes missing proves nothing about the
+# emergency — it is the F2C-08 error class wearing a different hat. So this authenticates as
+# `ci-deploy@` through WIF, the same identity and the same path a real recovery would use.
+#
+# WHAT IT DOES
+# Grants `roles/browser` to `ci-readonly@`, reads it back, removes it, reads back again.
+# The role is deliberately inert: `ci-readonly@` already holds `roles/viewer`, which subsumes
+# `roles/browser`, so the grant changes no effective permission while still being a real
+# `setIamPolicy` write. The test is the write, not the role.
+#
+# WHAT IT DOES NOT DO
+# It never touches the owner binding, and it asserts that binding is unchanged before and
+# after. It cannot grant owner: that is the real recovery step, and rehearsing it would mean
+# performing it.
+
+name: break-glass drill
+
+run-name: "break-glass dry run — ${{ inputs.reason }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "dry-run" to proceed. This writes IAM, on purpose.'
+        required: true
+        type: string
+      reason:
+        description: Why this is being run, for the run record
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: plumbline-19458
+  # Both pinned as literals rather than taken from inputs. A drill that can be pointed at an
+  # arbitrary principal or an arbitrary role is not a drill, it is a grant tool.
+  TEST_MEMBER: serviceAccount:ci-readonly@plumbline-19458.iam.gserviceaccount.com
+  TEST_ROLE: roles/browser
+
+jobs:
+  dry-run:
+    name: break-glass dry run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Refuse without the typed confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "dry-run" ]; then
+            echo "::error::confirm must be exactly 'dry-run'. This job writes IAM."
+            exit 1
+          fi
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # The whole point: this identity, this path. If this step fails, the finding is that
+      # the recovery path does not work, which is exactly what the drill exists to discover.
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Who am I, actually
+        run: |
+          echo "active identity: $(gcloud config get-value account 2>/dev/null)"
+          echo "started: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: Before — record the owner binding and assert the test role is absent
+        id: before
+        run: |
+          gcloud projects get-iam-policy "$PROJECT_ID" --format=json > before.json
+          owners=$(python3 -c "import json;p=json.load(open('before.json'));print(sum(len(b.get('members',[])) for b in p['bindings'] if b['role']=='roles/owner'))")
+          echo "owner bindings before: $owners"
+          echo "owners=$owners" >> "$GITHUB_OUTPUT"
+          if [ "$owners" -lt 1 ]; then
+            echo "::error::no owner binding exists. This is the emergency, not a drill — see docs/runbooks/break-glass.md §4."
+            exit 1
+          fi
+          if python3 -c "import json,sys;p=json.load(open('before.json'));sys.exit(0 if any(b['role']=='$TEST_ROLE' and '$TEST_MEMBER' in b.get('members',[]) for b in p['bindings']) else 1)"; then
+            echo "::error::$TEST_ROLE is already bound to the test member; the drill cannot tell its own write apart from a pre-existing one."
+            exit 1
+          fi
+
+      - name: Grant — the write the recovery path depends on
+        id: grant
+        run: |
+          echo "granted_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="$TEST_MEMBER" --role="$TEST_ROLE" --condition=None --quiet > /dev/null
+          echo "granted $TEST_ROLE to $TEST_MEMBER"
+
+      - name: Read back — the grant landed
+        run: |
+          gcloud projects get-iam-policy "$PROJECT_ID" --format=json > during.json
+          python3 - <<'PY'
+          import json, sys
+          p = json.load(open("during.json"))
+          ok = any(b["role"] == "roles/browser"
+                   and "serviceAccount:ci-readonly@plumbline-19458.iam.gserviceaccount.com" in b.get("members", [])
+                   for b in p["bindings"])
+          print("grant visible in the policy:", ok)
+          sys.exit(0 if ok else 1)
+          PY
+
+      # always(), because a drill that leaves its own binding behind has changed the thing it
+      # was measuring. The revoke is as much the test as the grant.
+      - name: Revoke — and this runs even if the read-back failed
+        if: always() && steps.grant.outcome == 'success'
+        run: |
+          gcloud projects remove-iam-policy-binding "$PROJECT_ID" \
+            --member="$TEST_MEMBER" --role="$TEST_ROLE" --condition=None --quiet > /dev/null
+          echo "revoked at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: After — the test role is gone and the owner binding is untouched
+        if: always() && steps.grant.outcome == 'success'
+        run: |
+          gcloud projects get-iam-policy "$PROJECT_ID" --format=json > after.json
+          python3 - "${{ steps.before.outputs.owners }}" <<'PY'
+          import json, sys
+          expected = int(sys.argv[1])
+          p = json.load(open("after.json"))
+          still = [b for b in p["bindings"]
+                   if b["role"] == "roles/browser"
+                   and "serviceAccount:ci-readonly@plumbline-19458.iam.gserviceaccount.com" in b.get("members", [])]
+          owners = sum(len(b.get("members", [])) for b in p["bindings"] if b["role"] == "roles/owner")
+          print("test role still bound:", bool(still))
+          print(f"owner bindings after: {owners} (before: {expected})")
+          bad = []
+          if still:
+              bad.append("the drill's own binding survived; the project is left changed")
+          if owners != expected:
+              bad.append(f"owner binding count moved from {expected} to {owners}")
+          for line in bad:
+              print("FAIL:", line)
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Record — what the runbook's §5 asks for
+        if: always()
+        run: |
+          {
+            echo "## Break-glass dry run"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| run | \`${{ github.run_id }}\` |"
+            echo "| identity | \`${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}\` via WIF |"
+            echo "| granted | \`${{ steps.grant.outputs.granted_at }}\` |"
+            echo "| member | \`$TEST_MEMBER\` |"
+            echo "| role | \`$TEST_ROLE\` |"
+            echo "| owner bindings before | ${{ steps.before.outputs.owners }} |"
+            echo "| reason | ${{ inputs.reason }} |"
+            echo
+            echo "Copy this into \`docs/runbooks/break-glass.md\` §5 with the raw log."
+          } >> "$GITHUB_STEP_SUMMARY"
