@@ -69,7 +69,7 @@ cost a month.
 | C4 | The two windows are one block | binding |
 | C5 | F3 sits between first delivery and the window | *(placeholder)* |
 | C6 | The F4 window carries the human-initiated-session constraint — a staffing constraint | Lane C |
-| C7 | F3 exit + three emitters ingest-ready **≤ 2026-10-04** | **blocked, and now dated** — behind Freeze A and the Adjudicator ground-truth-labelability question. Session scheduled **2026-09-02, 10:00–12:00 Europe/Istanbul**, which leaves 32 days to C7 |
+| C7 | F3 exit + three emitters ingest-ready **≤ 2026-10-04** | **blocked, and now dated** — behind Freeze A and the Adjudicator ground-truth-labelability question. Session scheduled **2026-09-02, 10:00–13:00 Europe/Istanbul**, which leaves 32 days to C7 |
 
 ## 4. Dated open obligations, carried forward
 
