@@ -197,10 +197,66 @@ reads the base table regardless: under the two-column dedup window the views are
 unqueryable against a partition-filtered table (#61), so verifying through them
 would confuse a view defect with a delivery that never landed.
 
-### The views come later
+### The views come later — and which one proves which claim
 
 Exercise `spans_deduped` and `spans_real` as a **separate, later step**, after the
-premise check passes. Their own acceptance is DoD 3.
+premise check passes. Their own acceptance is DoD 3, and the two views carry
+different claims. Confusing them produces evidence that looks complete and is not.
+
+| Claim | View | Why that view and not the other |
+| --- | --- | --- |
+| DoD 3 — every row of the run landed, once | `spans_deduped` | It is the view DoD 3 names. The base table would answer an easier question: it holds duplicates by design, so a count there says delivery happened, not that dedup did |
+| DoD 3 — every landed row is flagged | `spans_deduped` | The claim is about rows, not about what the harness sent. A sender knowing it set the flag is not evidence about what a view returns |
+| F2C-09 — the run is walled off from real traffic | `spans_real` | This is the only view F4's 14-day window reads. Asserting it against `spans_deduped` would prove nothing about what F4 will see, which is the entire point of the flag |
+
+**Do not run these by hand.** `make e2e-cloud` issues them
+([`scripts/e2e/cloud.py`](../../scripts/e2e/cloud.py), directive Decisions 7, 9,
+13). The queries are reproduced below so the runbook can be read without running
+anything, but the harness is the thing that ran, and it is what the evidence cites.
+
+```sql
+-- DoD 3, both halves. One row out; rows_seen must equal distinct_spans,
+-- and unflagged must be 0.
+SELECT COUNT(*) AS rows_seen,
+       COUNT(DISTINCT CONCAT(trace_id, span_id)) AS distinct_spans
+FROM `PROJECT.plumbline.spans_deduped`
+WHERE DATE(start_time) BETWEEN 'LOWER' AND 'UPPER'
+  AND JSON_VALUE(attributes, '$.resource."plumbline.e2e_run_id"') = 'RUN_ID'
+
+-- F2C-09. leaked must be 0: the run must not be visible here at all.
+SELECT COUNT(*) AS leaked
+FROM `PROJECT.plumbline.spans_real`
+WHERE DATE(start_time) BETWEEN 'LOWER' AND 'UPPER'
+  AND JSON_VALUE(attributes, '$.resource."plumbline.e2e_run_id"') = 'RUN_ID'
+```
+
+**Three things in those queries are load-bearing, and each has already caused a
+defect.**
+
+*The JSON path addresses `$.resource`, not the top level.* Resource attributes
+nest under `resource` in the `attributes` column. The obvious path returns NULL
+for every row, so the predicate matches nothing — and then `rows_seen = 0` equals
+`distinct_spans = 0`, and `unflagged = 0`, and `leaked = 0`. **All three
+assertions pass over an empty set and the run looks perfect.** This was written
+wrong once and caught before the exam (decision log W3.11); a query typed by hand
+here will make the same mistake, which is the reason this section says not to type
+one.
+
+*The partition predicate is `DATE(start_time) BETWEEN`, bounded to the run's own
+day.* The filter is required — the base table refuses without one, through the
+views as well — but satisfying it is not the point: a year-wide predicate
+satisfies it and scans a year. The harness refuses a window wider than seven days
+for that reason.
+
+*The run id scopes every query.* Without it a second harness run and a first are
+one result. That the corpus derives per-run span identity (issue #102) is what
+makes them separable at all; the attribute alone would not, because it is not in
+the dedup window.
+
+**If a query returns zero rows, do not conclude the delivery failed.** Check in
+this order: the JSON path above, then the partition window, then the run id, then
+§2's fault tree. Three of those four produce an empty result that is
+indistinguishable from a transport failure at a glance.
 
 ## 5. Dead-letter triage
 
