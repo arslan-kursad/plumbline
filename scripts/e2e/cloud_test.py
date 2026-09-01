@@ -70,6 +70,41 @@ class Window(unittest.TestCase):
         window = cloud.PartitionWindow.around(moment)
         self.assertEqual((window.lower, window.upper), (dt.date(2026, 3, 3), dt.date(2026, 3, 5)))
 
+    def test_the_corpus_window_covers_the_corpus_and_not_today(self):
+        # The defect this replaces: a now-derived window never overlapped the corpus,
+        # because the fixtures carry static timestamps and Decision 6 leaves start_time
+        # alone. Every scoped query then returned nothing and every assertion passed over
+        # an empty set (W3.18).
+        with tempfile.TemporaryDirectory() as tmp:
+            corpus = pathlib.Path(tmp)
+            cloud.build_corpus("run-alpha", corpus)
+            window = cloud.PartitionWindow.for_corpus(corpus)
+
+        fixture_days = set()
+        for twin in sorted(cloud.FIXTURES.glob("*/*/request.otlp.json")):
+            if twin.parent.name == "poison":
+                continue
+            for rs in json.loads(twin.read_text())["resourceSpans"]:
+                for ss in rs["scopeSpans"]:
+                    for span in ss["spans"]:
+                        fixture_days.add(dt.datetime.fromtimestamp(
+                            int(span["startTimeUnixNano"]) / 1e9, dt.timezone.utc).date())
+
+        for day in fixture_days:
+            self.assertTrue(window.lower <= day <= window.upper,
+                            f"{day} is outside {window}; scoped queries would match nothing")
+        self.assertLess(window.upper, dt.date.today(),
+                        "the corpus is historical; a window reaching today is clock-derived")
+
+    def test_an_empty_corpus_is_refused_rather_than_falling_back_to_the_clock(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(cloud.Refused):
+                cloud.PartitionWindow.for_corpus(pathlib.Path(tmp))
+
+    def test_no_query_path_derives_its_window_from_the_clock(self):
+        source = (cloud.REPO / "scripts" / "e2e" / "cloud.py").read_text()
+        self.assertNotIn("PartitionWindow.around(dt.datetime.now", source)
+
 
 class Corpus(unittest.TestCase):
     """Decision 6 and issue #102. A second run has to be a second run."""
@@ -231,6 +266,18 @@ class StageResult(unittest.TestCase):
     def test_completion_is_the_only_passing_stage(self):
         result = cloud.Result("run-alpha", "cloud").reached("complete")
         self.assertTrue(result.document()["passed"])
+
+    def test_an_empty_failure_string_is_not_a_failure(self):
+        # The driver records completion with "${2:-}", so the field arrives empty rather
+        # than absent. An `is None` check reported passed:false on a run that completed.
+        result = cloud.Result("run-alpha", "cloud").reached("complete")
+        result.failure = ""
+        self.assertTrue(result.document()["passed"])
+
+    def test_a_real_failure_string_still_fails(self):
+        result = cloud.Result("run-alpha", "cloud").reached("complete")
+        result.failure = "something broke"
+        self.assertFalse(result.document()["passed"])
 
     def test_the_stages_match_the_runbook_fault_tree_order(self):
         self.assertEqual(cloud.STAGES[0], "view_provenance")

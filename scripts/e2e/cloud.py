@@ -103,9 +103,40 @@ class PartitionWindow:
 
     @classmethod
     def around(cls, moment: dt.datetime, margin_days: int = 1):
-        """The window a run's own emission time implies, with a day either side for UTC edges."""
+        """The window one instant implies, with a day either side for UTC edges."""
         day = moment.astimezone(dt.timezone.utc).date()
         return cls(day - dt.timedelta(days=margin_days), day + dt.timedelta(days=margin_days))
+
+    @classmethod
+    def for_corpus(cls, corpus_dir: pathlib.Path, margin_days: int = 1):
+        """The window the corpus's own `start_time` values imply.
+
+        Decision 7 says the window comes from the run's emission timestamps and **not**
+        from `CURRENT_DATE()`. Deriving it from wall-clock time was wrong in the quiet
+        direction and was caught only by querying by hand: the fixtures carry static
+        timestamps -- 2026-08-19 -- and Decision 6 deliberately leaves `start_time`
+        untouched, so a now-shaped window never overlaps the data. Every scoped query then
+        returns nothing, and *every* assertion passes over an empty set: rows equal
+        distinct spans equal zero, unflagged is zero, leaked is zero. A perfect result and
+        no data (decision log W3.18).
+        """
+        moments = []
+        for twin in sorted(corpus_dir.glob("*.otlp.json")):
+            payload = json.loads(twin.read_text())
+            for resource_spans in payload.get("resourceSpans", []):
+                for scope_spans in resource_spans.get("scopeSpans", []):
+                    for span in scope_spans.get("spans", []):
+                        nanos = span.get("startTimeUnixNano")
+                        if nanos:
+                            moments.append(int(nanos) / 1_000_000_000)
+        if not moments:
+            raise Refused(
+                f"no span timestamps under {corpus_dir}; the window cannot be derived from "
+                "the corpus, and deriving it from the clock is what Decision 7 forbids"
+            )
+        lower = dt.datetime.fromtimestamp(min(moments), dt.timezone.utc).date()
+        upper = dt.datetime.fromtimestamp(max(moments), dt.timezone.utc).date()
+        return cls(lower - dt.timedelta(days=margin_days), upper + dt.timedelta(days=margin_days))
 
     def predicate(self, column: str = "start_time") -> str:
         return f"DATE({column}) BETWEEN '{self.lower}' AND '{self.upper}'"
@@ -263,7 +294,11 @@ class Result:
             "run_id": self.run_id,
             "target": self.target,
             "stage": self.stage,
-            "passed": self.failure is None and self.stage == "complete",
+            # An empty string is not a failure. The driver passes "${2:-}" when it
+            # records completion, so an `is None` check reported `passed: false` on a run
+            # that had reached `complete` -- wrong in the safe direction, and still wrong
+            # for the one field this artefact exists to state (W3.18).
+            "passed": not self.failure and self.stage == "complete",
             "failure": self.failure,
             "started": self.started.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "notes": self.notes,
@@ -496,7 +531,7 @@ def main(argv=None) -> int:
         if args.emit == "provenance":
             print(f"deployed window matches the repository: PARTITION BY {check_provenance()}")
         elif args.emit == "queries":
-            window = PartitionWindow.around(dt.datetime.now(dt.timezone.utc))
+            window = PartitionWindow.for_corpus(pathlib.Path(args.corpus_out))
             queries = dict(walling_queries(window, args.run_id))
             queries["spans_real_exclusion"] = exclusion_query(window, args.run_id)
             print(json.dumps(queries, indent=2))
@@ -505,7 +540,7 @@ def main(argv=None) -> int:
         elif args.emit == "diff":
             if not args.local_rows:
                 raise Refused("--emit diff needs --local-rows, the locally normalized corpus")
-            window = PartitionWindow.around(dt.datetime.now(dt.timezone.utc))
+            window = PartitionWindow.for_corpus(pathlib.Path(args.corpus_out))
             findings = diff_rows(load_ndjson(pathlib.Path(args.local_rows)),
                                  fetch_rows(window, args.run_id))
             for line in findings:

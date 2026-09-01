@@ -1989,3 +1989,43 @@ W3.3's floor live for the first time, attributes intact. That is evidence nobody
 and it is not a substitute for the drill.
 **Exit review:** yes — it is the phase's sixth permission-shaped defect and the first that a
 plan reading could not have found.
+
+### W3.18 — DoD 7b passed, and the harness would have passed it over an empty set
+**Made:** 2026-09-01 · **Work item:** F2C-11 retake, F2C-12 · **Reversibility:** cheap
+**Measured, from the API rather than from the harness:** 13 rows through `spans_deduped`
+scoped to run `w4-second-delivery`, 13 distinct `(trace_id, span_id)`, 0 rows with
+`synthetic` not true, and 0 rows visible through `spans_real`. The worker's log shows
+`POST /push - 204` and `ingested message …: 1 row(s), api_key_id=wave4-e2e-3`. **DoD 7b is
+satisfied**: a real Google-signed token was accepted, by Cloud Run and then by the worker's
+own validator. DoD 3 and F2C-09's walling claim are satisfied on the same reading.
+
+**The harness would have reported all of that as passing without any of it being true.**
+Decision 7 says the partition window comes from the run's own emission timestamps and *not*
+from `CURRENT_DATE()`. It was implemented as `PartitionWindow.around(now)`, which is the
+forbidden form wearing the right name. The fixtures carry static timestamps — 2026-08-19 —
+and Decision 6 deliberately leaves `start_time` alone, so the corpus is always historical
+and a now-shaped window never overlaps it. Every scoped query then returns nothing, and
+every assertion holds vacuously: rows equal distinct spans equal zero, unflagged zero,
+leaked zero. **A perfect result and no data**, which is the exact failure the runbook's §4
+was written to name and which it names for the JSON path rather than for this.
+
+It was caught by querying by hand with a window derived from the data, not by the harness
+reporting anything. That is the second defect in this phase where a scoped predicate
+matched nothing and made an assertion vacuously true (W3.11 was the first, on the JSON
+path). Two instances is a pattern: **every predicate this harness narrows with needs a test
+that it selects something.**
+
+**A second defect in the same artefact.** `Result.document()` computed `passed` with
+`self.failure is None`, and the driver records completion with an empty string, so a run
+that reached `complete` reported `passed: false`. Wrong in the safe direction and still
+wrong for the one field the artefact exists to state.
+
+**Provenance of the run itself is compromised, and is not what the DoD rests on.** The
+window fix was written while the harness was in its polling loop, and each poll invokes
+`cloud.py` afresh, so the run consumed the fix mid-flight and printed PASS. That PASS is not
+citable. The evidence above is the API read, taken independently and repeated after the fix;
+a clean harness run is cheap now and is owed anyway, because the spec asks Wave 4 to assert
+idempotence by running it twice.
+**Exit review:** yes — for the pattern, not the fix. A narrowing predicate that matches
+nothing is indistinguishable from a system that is working perfectly, and this phase has now
+produced two.
