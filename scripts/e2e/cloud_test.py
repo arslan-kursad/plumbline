@@ -355,6 +355,23 @@ class WallingProof(unittest.TestCase):
                 self.assertIn("'w4-first'", sql)
                 self.assertIn("spans_deduped", sql)
 
+    def test_the_exclusion_claim_reads_spans_real(self):
+        # F2C-09 consequence 2. A different view proves a different claim, and the
+        # runbook names which is which; asserting it against spans_deduped would prove
+        # nothing about what F4's window will see.
+        window = cloud.PartitionWindow(dt.date(2026, 8, 30), dt.date(2026, 9, 1))
+        sql = cloud.exclusion_query(window, "w4-first")
+        self.assertIn("spans_real", sql)
+        self.assertNotIn("spans_deduped", sql)
+        self.assertIn("DATE(start_time) BETWEEN", sql)
+        self.assertIn("'w4-first'", sql)
+
+    def test_the_two_claims_use_different_views(self):
+        window = cloud.PartitionWindow(dt.date(2026, 8, 30), dt.date(2026, 9, 1))
+        walling = cloud.walling_queries(window, "w4-first")
+        self.assertTrue(all("spans_deduped" in sql for sql in walling.values()))
+        self.assertIn("spans_real", cloud.exclusion_query(window, "w4-first"))
+
     def test_the_proof_reads_the_view_not_the_base_table(self):
         # DoD 3 claims rows arrive *through the views*. The base table is an easier
         # question wearing the same answer.

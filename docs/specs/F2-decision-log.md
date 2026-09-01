@@ -1807,3 +1807,35 @@ asks for.
 **Exit review:** yes — the first defect is the reusable one. A predicate that matches
 nothing makes an assertion vacuously true, and every guard in this harness is written to
 fail loudly rather than to pass emptily because of it.
+
+### W3.12 — F2C-09: the runbook names which view proves which claim, and it had to be written second
+**Made:** 2026-09-01 · **Work item:** F2C-09 (runbook half) · **Reversibility:** cheap
+**Decision:** `wave4-first-delivery.md` §4's one-sentence "the views come later" becomes the
+section that maps each claim to the view that carries it. Written from the harness as built
+(Amendment 6's ordering), and the queries in it are the queries `make e2e-cloud` issues.
+
+**Writing it second changed what it says.** Two of its three load-bearing notes are defects
+found while building the harness (W3.11) and neither would have been in a runbook written
+from intent: the JSON path addresses `$.resource` rather than the top level, and the
+partition window is bounded rather than merely present. Both are the kind a person typing
+the query by hand reproduces exactly, which is why the section says not to type one.
+
+**The claims were not separable before.** DoD 3 is proven against `spans_deduped`; F2C-09's
+walling is proven against `spans_real`, and only `spans_real` can prove it because that is
+the view F4's 14-day window reads. Asserting the walling against `spans_deduped` would have
+been evidence about the wrong object, and the previous text did not say which view either
+claim belonged to.
+
+**The harness gained the assertion the runbook documents.** F2C-09's second consequence had
+no tool: Decision 13 specifies two assertions and both are against `spans_deduped`. Rather
+than document a claim nothing makes, `exclusion_query` was added -- kept separate from
+`walling_queries` because it is a different claim about a different view, and Decision 13's
+content is not edited to absorb it. 46 guard tests now.
+
+**The failure mode this section exists for.** With the wrong JSON path all three assertions
+pass over an empty set: zero rows equals zero distinct spans, zero unflagged, zero leaked.
+A perfect result and no data. So the section ends with the order to check when a query
+returns nothing -- path, window, run id, then the fault tree -- because three of those four
+are indistinguishable from a transport failure at a glance.
+**Exit review:** yes -- it is the concrete case for Amendment 6's ordering rule. The
+runbook is materially different for having been written after the thing it documents.

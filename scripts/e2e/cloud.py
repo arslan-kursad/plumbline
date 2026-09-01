@@ -437,6 +437,20 @@ def dlq_depth(subscription: str = "traces-dlq-pull", runner=subprocess.run) -> i
     raise Refused(f"no depth series for {subscription}; the drill cannot assert against a missing metric")
 
 
+def exclusion_query(window: PartitionWindow, run_id: str) -> str:
+    """F2C-09's second consequence: `spans_real` must not show this run at all.
+
+    Kept separate from `walling_queries` because it is a different claim about a different
+    view. Decision 13 is about what landed through `spans_deduped`; this is the first live
+    test of the walled-off-synthetic invariant -- taken now, while a synthetic run is the
+    only traffic there is and the test is therefore free.
+
+    Without the flag these rows would sit in `spans_real` and contaminate F4's 14-day
+    real-source window, which F4 has no cheap way to clean afterwards.
+    """
+    return scoped_query(window, run_id, "COUNT(*) AS leaked", "spans_real")
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--run-id")
@@ -464,7 +478,9 @@ def main(argv=None) -> int:
             print(f"deployed window matches the repository: PARTITION BY {check_provenance()}")
         elif args.emit == "queries":
             window = PartitionWindow.around(dt.datetime.now(dt.timezone.utc))
-            print(json.dumps(walling_queries(window, args.run_id), indent=2))
+            queries = dict(walling_queries(window, args.run_id))
+            queries["spans_real_exclusion"] = exclusion_query(window, args.run_id)
+            print(json.dumps(queries, indent=2))
         elif args.emit == "depth":
             print(dlq_depth())
         elif args.emit == "diff":
