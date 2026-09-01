@@ -2089,3 +2089,28 @@ fixture and its own alert.
 **Exit review:** yes — a tool's convenience rendering silently disagreeing with the wire is
 worth carrying past this project, and the shape is the same as W3.18's: the wrong answer and
 the right one are indistinguishable without a second source.
+
+### W3.21 — idempotence proven by replay, and the view held while the base table tripled
+**Made:** 2026-09-01 · **Work item:** Wave 4 idempotence · **Reversibility:** n/a — measurement
+**Measured:** `w4-third-delivery` delivered three times — write batches at 03:55, 04:09 and
+04:19, thirteen rows each. `spans` holds 39 for the run; `spans_deduped` holds 13;
+`spans_real` holds 0. Across the window, base 52 against deduped 26. **The view count did
+not move while the base table tripled.** Evidence:
+[`f2-idempotence.md`](../evidence/f2-idempotence.md).
+
+**The tie-break was checked rather than assumed.** `MAX(ingest_time)` over the base table
+equals `MAX(ingest_time)` over the view, so the survivor is the latest write —
+`ORDER BY ingest_time DESC` behaving as ADR-0007 documents. A dedup that kept an arbitrary
+row would pass every count assertion above and fail this one.
+
+**What it does not prove, stated because the counts look like it does.** Not the dedup
+*premise*. Redeliveries here carry an identical `start_time` by construction: the corpus is
+static and Decision 6 leaves `start_time` alone. The premise's real hazard is a
+nanosecond-to-microsecond conversion differing across worker revisions, which needs real
+traffic and the runbook's premise query — not a replay of one static corpus.
+
+**Three deliveries where the spec asks for two**, recorded as measured rather than trimmed
+to the number the spec names. The extra one strengthens the result; rounding it to two to
+match the sentence would have been the small dishonesty this phase keeps refusing.
+**Exit review:** no — it confirms a documented property. Worth carrying only as the pattern
+of checking the tie-break as well as the counts.
