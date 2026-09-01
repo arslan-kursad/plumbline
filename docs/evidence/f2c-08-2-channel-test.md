@@ -25,14 +25,37 @@ The console's *Send test notification* would be closer in shape, and it is not r
 from an API. If a stronger artefact is wanted, that button is the way to it — recorded here
 so the choice is visible rather than absent.
 
-## The send is proven; arrival is not, by me
+## Arrival — confirmed 2026-09-01
+
+**The email arrived.** Reported by the maintainer from the destination inbox: sender *Google
+Cloud Alerting*, subject *"Your alerting verification code."*, delivered at **07:48 local =
+04:48 UTC** — inside the send bracket recorded below, to the second.
+
+The message body carries a one-time verification code. **It is not recorded here, and it was
+not used.** Recording it would put a credential in a public repository, and this task needs
+the fact of arrival, not the code.
+
+**Claim 2 is therefore satisfied**: a message sent to this channel arrives at the address the
+policy is bound to. The paragraph below stated the gap that this closes; it is kept because
+the distinction it draws is the reason the task exists.
+
+### The channel was deliberately not verified with that code
+
+`verificationStatus` is absent from the API response, which is proto3 omitting an unset
+enum — *unspecified*, not *unverified*. Verifying out of band was rejected for three
+reasons: the channel is Terraform-managed and hand-verifying creates drift the configuration
+does not model; an absent field is not evidence of a missing verification; and the thing
+that actually tests alert delivery is the drill. If the drill's alert does not arrive, that
+is a finding with verification as a named remedy — which is better than verifying first and
+never learning whether it was needed.
+
+## The send was proven before arrival was
 
 A `200` with an empty body means the API accepted the request. **It does not mean an email
 arrived**, and that distinction is exactly the one this task exists to enforce — claim 2 is
 titled *delivery, proven not read* because a configuration read had been standing in for it.
 
-Arrival is confirmed by the person holding the inbox. Until that confirmation is recorded
-here, this document proves a send was accepted and nothing more.
+Arrival is confirmed by the person holding the inbox — recorded above, and it closes this.
 
 ## Decision 14 — attribution is by timestamp, not by marker
 
