@@ -2304,3 +2304,27 @@ without having examined anything (W3.11, W3.18, W3.22) — one layer up, in CI r
 a predicate.
 **Exit review:** yes — it is a property of the CI design rather than of this phase, and F3
 inherits it.
+
+### W3.28 — C1 pinned to 2026-09-21, and the calendar was checked rather than inherited
+**Made:** 2026-09-01 · **Work item:** C1, Decision 3 sub-item · **Reversibility:** Lane C may re-pin
+**Decision (Lane C):** the account upgrade is pinned to **2026-09-21**, taking Decision 15's
+recommendation. The ceiling `≤ 2026-09-28` stays what it always was — a constraint, not a
+date — and Decision 15's closure gate is satisfied, so F2 can close.
+
+**Recorded, not decided here.** Amendment 7 §9 puts this in Lane C explicitly: *"Decision 15
+makes drift visible; it does not pick the date."* The executor's part was to make an unpinned
+ceiling block the closure note, and then to write down what the maintainer chose.
+
+**The derivation was re-checked against the calendar rather than carried from Decision 15's
+prose.** 2026-09-21 is a **Monday**, which Decision 15 did not know when it argued in terms
+of weekends: a failed C2 live-fire's two-working-day retry falls Tuesday–Wednesday with no
+weekend inside it. Seven days remain to the ceiling and fourteen to C3's earliest window
+open on 2026-10-05 (#74). The recommendation was right and is now right for a slightly better
+reason than the one given for it.
+
+**Five sites updated under the amendment hygiene rule**, because the same claim appearing in
+five places is the defect this phase has now paid for three times: the closure note's C1 row,
+§9's Decision 3, F2C-18's open sub-item, the F2C-18 task body, and the Remaining Lane C list.
+A grep afterwards found no surviving "not pinned".
+**Exit review:** no — but the hygiene pass finding five sites for one sentence is worth
+noting as ordinary rather than exceptional.

@@ -63,7 +63,7 @@ cost a month.
 
 | # | Constraint | Status |
 | --- | --- | --- |
-| C1 | Account upgrade **≤ 2026-09-28** | ceiling approved; **date not pinned** — Lane C |
+| C1 | Account upgrade **≤ 2026-09-28** | **pinned: 2026-09-21** (Monday), Lane C decision 2026-09-01. Seven days of slack to the ceiling; the two-working-day retry window for a failed C2 live-fire falls Tue–Wed with no weekend in it |
 | C2 | Kill-switch live fire re-run immediately after upgrade, before the window | *(placeholder)* |
 | C3 | Window must not straddle 2026-10-05; earliest open 2026-10-05, earliest close 2026-10-19 | *(placeholder)* |
 | C4 | The two windows are one block | binding |
