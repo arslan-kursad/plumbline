@@ -992,3 +992,29 @@ which is a better failure but still a failure.
    performed (criteria, formulas, rubric, dataset spec — Freeze B stays at F3), and
    `docs/eval-plan.md` §2's stale "F1 entry gate" line reconciled. That last one is
    human-only: editing the pre-registration document is Class 3 under §4.
+3. **Decide ADR-0008.** **Scheduled 2026-09-03**, thirty minutes, separate from Freeze A.
+   The ADR has carried `Proposed` since 2026-08-26 while `architecture.md` §1 and §2.1
+   still advertise gRPC ingest the deployed collector does not serve, so the repository
+   states a capability and ships another. This is a review, and the status flip is its
+   output — it is not an authoring change and not Lane A's to make.
+
+   *Why it is not in the freeze session:* the decision needs no evaluation-plan context,
+   and it is unbudgeted work sitting on the critical path. Option 1 (h2c multiplexing) is
+   a change to the data plane, plus a deploy and a verification pass, spent out of the 32
+   days before C7's 2026-10-04. Option 2 adds a third Cloud Run service to a phase whose
+   spec says two. Option 3 amends the architecture to HTTP-only in the cloud.
+
+   *Measured input for the session, so it is not re-derived there:* `docs/eval-plan.md`
+   contains **no occurrence of "transport", "protocol", "gRPC" or "OTLP/HTTP"**. No
+   success criterion names how bytes arrive — SC-1 discriminates by `source_dialect` and
+   SC-2 counts by it — and #68 records the two gRPC-capable sources as *documented as
+   gRPC-capable*, which is capability rather than requirement.
+
+   *One sub-question the ADR has to answer explicitly:* option 3 amends the architecture;
+   it does not by itself decide the code. The gRPC listener exists
+   (`collector/internal/receiver/grpc.go`, covered by `receiver_test.go`) and
+   `docker-compose.yml` publishes `4317` beside `4318`, so the local path exercises it
+   today. Either the cloud goes HTTP-only and the listener stays supported locally — the
+   smaller and reversible claim — or the capability is retired and the listener removed.
+   The sites that change under either reading are `architecture.md` §2.1's "Owns:" line
+   and §1's two diagram edges.

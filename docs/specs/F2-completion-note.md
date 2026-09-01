@@ -88,7 +88,12 @@ than left to memory.
   a partition-filtered read succeeding against the **cloud** views. A merged fix is not
   a deployed one.
 - **#68 / ADR-0008** — left at `Proposed`. A status flip is a review output, not an
-  authoring output.
+  authoring output. **Review scheduled 2026-09-03**, its own session, thirty minutes, and
+  deliberately not inside Freeze A on 09-02: the decision needs no evaluation-plan context,
+  and the freeze session has none to spare. The three options and their costs are in #68.
+  Recorded here because this is unbudgeted work on the critical path to C7 — option 1
+  (h2c multiplexing) is a data-plane change plus a deploy and a verification pass, taken
+  out of the 32 days before 2026-10-04.
 - **#91 / F2C-23** — **fixed 2026-08-31.** The seeder strips SQL comments before POSTing
   a statement, so the stand-in no longer reads prose as code, and the circumlocution in
   `002_spans_deduped.sql` reverted to the plain wording F2C-02 asks for. The divergence it
