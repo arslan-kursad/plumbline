@@ -231,8 +231,9 @@ alone does not resolve:
   with a named abort condition. Added so that a pre-granted approval remains a gate
   rather than becoming Lane A discretion.
 - **F2C-09** — decided: the F2 constructed payload carries `synthetic=true`.
-- **F2C-18** — approved as a ceiling, not as a date. C1 still needs a pinned date; **C7**
-  added, because C4 has a prerequisite no calendar item owned.
+- **F2C-18** — approved as a ceiling, not as a date. C1 was pinned to **2026-09-21** on
+  2026-09-01, which closes that sub-item; **C7** added, because C4 has a prerequisite no
+  calendar item owned.
 - **F2C-21** — approved with sequencing constraints: after F2 exit, and only after the
   break-glass runbook exists and has been dry-run.
 
@@ -549,10 +550,11 @@ screenshot alone.
 **F2C-17 — DoD 10:** period invoice fully credit-offset (#17).
 
 **F2C-18 — Calendar C1–C7 written into the closure note as dated items.**
-Approved 2026-08-30 (Decision 3) as a ceiling. **Open sub-item:** C1 is approved as
-`≤ 2026-09-28`, which is the constraint restated, not a date. A ceiling with no pinned
-date drifts to the ceiling; a slip past it cascades into C2 (live-fire before the window
-opens) and C3 (earliest open 2026-10-05). Pin a date.
+Approved 2026-08-30 (Decision 3) as a ceiling. **Sub-item closed 2026-09-01:** C1 was
+approved as `≤ 2026-09-28`, which is the constraint restated rather than a date, and a
+ceiling with no pinned date drifts to the ceiling — a slip past it cascading into C2
+(live-fire before the window opens) and C3 (earliest open 2026-10-05). **Pinned to
+2026-09-21.**
 
 **F2C-19 — C7 (new, this amendment): the window's engineering prerequisite.**
 C4 requires Verification C's window and F4's continuous-ingest window to be one calendar
@@ -774,7 +776,7 @@ Approved by Lane C on 2026-08-30. These are decision-log entries, not proposals.
 |---|---|---|---|
 | 1 | Merge #82 | Approved in advance | Void if F2C-01 shows rounding → STOP, hand back (F2C-03) |
 | 2 | `synthetic=true` on the F2 constructed payload | Decided | DoD 3 proves via `spans_deduped`; `spans_real` exclusion asserted (F2C-09) |
-| 3 | Account upgrade ≤ 2026-09-28 | Approved as ceiling | Concrete date still unpinned; C7 added (F2C-18, F2C-19) |
+| 3 | Account upgrade ≤ 2026-09-28 | Approved as ceiling; **pinned to 2026-09-21 on 2026-09-01** | C7 added (F2C-18, F2C-19). Decision 15's closure gate is satisfied |
 | 4 | Remove standing human apply roles + break-glass runbook | Approved | After F2 exit; runbook written and dry-run first (F2C-22) |
 
 ### Decisions 5–17 (Amendment 7, 2026-08-31)
@@ -931,9 +933,11 @@ which is a better failure but still a failure.
 
 ### Remaining Lane C items
 
-1. **Pin C1 to a date.** A ceiling is not a date. Amendment 7 Decision 15 makes this a
-   closure gate: F2 cannot close over an unpinned ceiling, and `≤ 2026-09-28` is not a
-   valid value for the placeholder. Recommended 2026-09-21, derived there.
+1. ~~**Pin C1 to a date.**~~ **Done 2026-09-01: 2026-09-21.** The recommendation in
+   Decision 15 was taken, and the calendar was checked rather than assumed — 2026-09-21 is a
+   Monday, so a failed C2 live-fire's two-working-day retry falls Tue–Wed with no weekend in
+   it, seven days still remain to the ceiling and fourteen to the window. Decision 15's
+   closure gate is satisfied.
 2. **Schedule the Adjudicator ground-truth-labelability session.** It gates Freeze A,
    which gates F3, which gates C7, which gates the single calendar block C4 requires. It
    is a separate conversation and it is on the critical path to 2026-10-05 — not F2's
