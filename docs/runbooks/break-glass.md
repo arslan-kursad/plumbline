@@ -89,5 +89,7 @@ the control for the recovery path whether or not a role is ever removed, and a c
 has never been exercised is not one — which is the same argument F2C-22's own ordering
 constraint made, surviving the task that made it.
 
-The second owner added under Decision 18 changes the arithmetic of §1 but not this section:
-two recovery paths that have both never been tested are two untested paths.
+**§1's arithmetic is unchanged: one human binding, one recovery path.** Decision 18
+recommends a second owner rather than requiring one, and none has been added. If one ever is,
+it changes §1's first two rows and not this section — an untested second path is still an
+untested path.

@@ -2366,9 +2366,10 @@ the shape was one API read away for the whole phase.
 ### W3.30 — F2C-22 re-scoped: a second owner instead of removing the only one
 **Made:** 2026-09-01 · **Work item:** F2C-22, #129 · **Reversibility:** the decision is cheap; what it avoided was not
 **Decision (Lane C, recorded as Decision 18):** the removal is withdrawn. A second owner is
-added as an independent recovery path; the break-glass runbook stays and its dry run remains
-owed; role removal is deferred out of F2 to a phase with an organization parent or more than
-one maintainer.
+**recommended and not required** — see W3.31, which corrects this entry's first wording
+before it was acted on. The break-glass runbook stays and its dry run remains owed; role
+removal is deferred out of F2 to a phase with an organization parent or more than one
+maintainer.
 
 **Decision 4's premise was sound and its remedy was not, and the difference is the project's
 shape.** Standing apply roles are standing exposure where several humans hold them and the
@@ -2395,3 +2396,30 @@ removal; with removal withdrawn the precondition is moot and the dry run is not.
 path that has never been exercised is not a control, and there are now two of them.
 **Exit review:** yes — a task can be right about a risk and wrong about the remedy, and the
 thing that separated them was one API read of the project's own IAM.
+
+### W3.31 — the second owner is recommended, not required, and the repo nearly said otherwise
+**Made:** 2026-09-01 · **Work item:** Decision 18 correction · **Reversibility:** cheap
+**Corrected before it was acted on.** W3.30 and the directive both said a second owner *"is
+added as an independent recovery path"*. None was added, and none is required. Left as
+written, the repository would have asserted a control that does not exist — the same defect
+class this session cleared three times in other documents, caught this time because the
+maintainer asked whether the account was actually mandatory.
+
+**With the removal withdrawn, the acute risk is gone.** The sole owner keeps owner, so the
+project is exactly as recoverable as it was before F2C-22 was examined. A second owner
+addresses a **different and pre-existing** risk — losing access to the one Google account —
+which nothing in F2 created or worsened.
+
+**And it is narrower than it looks.** A second owner is only a second recovery path if the
+account is a genuinely independent identity: separate device, separate recovery. A second
+Gmail on the same phone with the same recovery method is decoration. Even a genuinely
+separate one recovers only the GCP project — the same identity very likely owns the GitHub
+repository and the billing account, and losing it costs those regardless of how many GCP
+owners exist. For a single-maintainer project the higher-value move is offline 2FA backup
+codes for the one account, which lives outside this repository entirely.
+
+**What survives unchanged is the part that was always the control.** `break-glass.md`'s dry
+run is still owed, and it is independent of owner count: one untested recovery path and two
+untested recovery paths are the same amount of evidence.
+**Exit review:** yes — for the shape. A decision recorded in the future tense is a claim
+about the world, and this one was three sites wide before anybody had done anything.

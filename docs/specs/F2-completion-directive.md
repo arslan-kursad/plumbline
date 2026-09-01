@@ -645,8 +645,19 @@ it, while converting a recoverable state into an unrecoverable one.
 
 *Revised acceptance:*
 
-1. A **second owner** is added as an independent recovery path, defeating each failure mode
-   `break-glass.md` §3 names — repository unavailable, WIF broken, `ci-deploy@` role lost.
+1. A **second owner is recommended and not required.** *(Corrected 2026-09-01, before it was
+   acted on: the first version of this line said one "is added", which would have left the
+   repository asserting something not done.)* With the removal withdrawn the acute risk is
+   gone — the sole owner keeps owner, and the project is exactly as recoverable as it was
+   before F2C-22 was examined. A second owner addresses a **different and pre-existing**
+   risk: losing access to the one Google account.
+   It is worth adding **only if the second account is a genuinely independent identity** —
+   separate device, separate recovery. A second Gmail sharing a phone and a recovery method
+   is not a second recovery path. And it is narrower than it looks even then: the same
+   identity very likely owns the GitHub repository and the billing account, so losing it
+   costs the repository and the billing regardless of how many GCP owners exist. For a
+   single-maintainer project the higher-value move is offline 2FA backup codes for the one
+   account, which lives outside this repository entirely.
 2. The break-glass runbook stays, and its **dry run remains owed**. It is the control for
    the recovery path whether or not any role is ever removed.
 3. **Role removal is deferred out of F2**, to a phase in which the project has either an
@@ -812,7 +823,7 @@ Approved by Lane C on 2026-08-30. These are decision-log entries, not proposals.
 | 2 | `synthetic=true` on the F2 constructed payload | Decided | DoD 3 proves via `spans_deduped`; `spans_real` exclusion asserted (F2C-09) |
 | 3 | Account upgrade ≤ 2026-09-28 | Approved as ceiling; **pinned to 2026-09-21 on 2026-09-01** | C7 added (F2C-18, F2C-19). Decision 15's closure gate is satisfied |
 | 4 | Remove standing human apply roles + break-glass runbook | Approved 2026-08-30; **removal withdrawn 2026-09-01 by Decision 18** | Runbook written; dry run still owed. Removal deferred out of F2 (#129) |
-| 18 | Second owner instead of removing the sole owner | Lane C, 2026-09-01 | F2C-22 re-scoped. Gate C forbids a keyed break-glass account; an organization is deferred as disproportionate |
+| 18 | Do not remove the sole owner; a second owner is recommended, not required | Lane C, 2026-09-01 | F2C-22 re-scoped. Gate C forbids a keyed break-glass account; an organization is deferred as disproportionate. The break-glass dry run stays owed and is independent of owner count |
 
 ### Decisions 5–17 (Amendment 7, 2026-08-31)
 
