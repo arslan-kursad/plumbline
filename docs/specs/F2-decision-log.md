@@ -1897,3 +1897,27 @@ and "I checked something the pin could have been" fail identically at a glance. 
 a passing check and a green paragraph.
 **Exit review:** yes — it is the phase's sixth arming-time defect and the first one produced
 by the verification rather than found by it.
+
+### W3.15 — Wave 4 applied, and #61 closed on a query rather than on the apply
+**Made:** 2026-09-01 · **Work item:** Wave 4 / #61 · **Reversibility:** the apply is not cheap; the measurement is
+**Decision:** Wave 4 applied at deploy run `33461116779` — three in-place updates, no
+creations, no destroys. #61 is closed on a partition-filtered read succeeding against the
+cloud view, not on the apply returning success. Evidence:
+[`f2-61-views-queryable.md`](../evidence/f2-61-views-queryable.md).
+
+**The distinction is not pedantic here; it is the exact way this gap survived once
+already.** #82 merged the corrected view definitions on 2026-08-31 and did not deploy them,
+and the closure note had to say so. A merged fix is not a deployed one, and an applied one
+is not a queryable one until something queries it.
+
+**The stage-0 provenance check has now failed and passed against reality.** It refused on
+2026-08-31 naming both sides, and matched on 2026-09-01. §8 asks for both directions; this
+was not arranged, it is what the calendar produced, and it is better evidence than a
+mismatched fixture would have been.
+
+**The state readout closed its own open reading.** Its row-count query was left failing
+yesterday rather than routed around — a base-table fallback would have returned a number
+and answered an easier question. Today the same tool exits 0 with no failed readings. A
+probe that was deliberately allowed to fail is what makes today's pass mean something.
+**Exit review:** yes — for the ordering. Merge, apply and query are three claims, and this
+phase has now been caught by the gap between each adjacent pair.
