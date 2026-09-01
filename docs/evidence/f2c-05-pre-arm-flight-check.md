@@ -16,6 +16,25 @@ checks read state that decays.
 > Wave 4's first dispatch (run `33460547748`) was refused by the plan job's Artifact
 > Registry guard. Nothing was applied and no approval was requested. Recorded here rather
 > than rewritten: W3.14.
+>
+> **The plan is no longer one resource.** Bumping `image_tag` necessarily updates both
+> Cloud Run services, because the pin is what resolves their images. Measured 2026-09-01,
+> both services are running `6a504b4` — the tag Artifact Registry has already collected;
+> the revisions survive because Cloud Run holds a digest, not the tag. The re-planned diff
+> is three in-place updates and no creations or destroys:
+>
+> ```
+> # google_bigquery_table.spans_deduped   will be updated in-place
+> # google_cloud_run_v2_service.collector will be updated in-place
+> # google_cloud_run_v2_service.worker    will be updated in-place
+> ```
+>
+> Not treated as a Class 3 scope escape: Wave 4 declares activities rather than a resource
+> set (spec §Wave 4), all three resources are already Terraform-owned and were applied by
+> earlier waves, and there is no alternative — the one-resource plan is unreachable because
+> the guard refuses the collected tag. It is also the better outcome: DoD 7b's exam is
+> served by current code rather than by an image whose tag no longer exists. The reviewer
+> sees this diff at the approval gate, which is where it belongs.
 
 ## 1. Pin — re-derived, not confirmed
 
@@ -42,7 +61,8 @@ identity by reading the API. The plan contains none.
 Plan: 0 to add, 1 to change, 0 to destroy.
 ```
 
-**Wave 4 is a one-resource apply.** Its entire content is #61's corrected view definition.
+**Wave 4 was a one-resource apply at the time of this reading.** Its entire content was
+#61's corrected view definition; after the pin bump it is three, per the correction above.
 The pipeline it exercises — collector, worker, topics, subscriptions, dead-letter policy —
 was applied by Waves 1 through 3 and was read live on 2026-08-31
 ([`f2-state-readout`](f2-state-readout-2026-08-31.md)). Zero IAM resources appear in the
