@@ -70,6 +70,34 @@ compared, and a replayed message can be matched to its original, without either
 document holding the data. Size and digest together answer "is this the same message"
 which is the question an archive is normally opened to answer.
 
+### The last two fields must come from the REST pull, not from `gcloud`
+
+**Measured 2026-09-01 against seven real dead-lettered messages.** An archive built from
+`gcloud pubsub subscriptions pull --format=json` disagreed with the Pub/Sub REST `:pull`
+response about the same messages — 792 bytes against 821, 878 against 907, 422 against 436 —
+and one message's `data` field came back 557 characters long, which cannot be base64 under
+any reading, since base64 length is always a multiple of four. The delta is systematic
+rather than random.
+
+So `gcloud`'s rendering of `message.data` is not the wire payload, and a size or digest
+derived from it is wrong. It is wrong in the worst available way for this table: the archive
+exists so a replayed message can be matched to its original, and a digest of the wrong bytes
+fails that comparison **silently**, looking exactly like a genuine mismatch.
+
+Attributes read through `gcloud` are unaffected, and the read-without-acking command above
+stays as it is. For size and digest:
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H 'Content-Type: application/json' -d '{"maxMessages":10}' \
+  "https://pubsub.googleapis.com/v1/projects/$PROJECT_ID/subscriptions/traces-dlq-pull:pull"
+```
+
+Decode `message.data`, measure and hash it in memory, and keep neither. Leases mean one pull
+rarely returns everything; poll until the ids stop being new rather than trusting a single
+response — the first attempt at this archive reported five messages, then six, and the true
+count was seven. Worked example: [`f2-dlq-archive-2026-09-01.md`](../evidence/f2-dlq-archive-2026-09-01.md).
+
 **Why this rule is here and not in ADR-0006.** ADR-0006 places redaction
 post-deserialize, pre-write. A dead-lettered message is *defined* by never having
 reached that stage — it is in the queue because deserialization failed — so the
