@@ -455,13 +455,32 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--run-id")
     parser.add_argument("--corpus-out", default=".e2e-cloud/corpus")
-    parser.add_argument("--emit", choices=("corpus", "queries", "provenance", "diff", "depth"),
+    parser.add_argument("--emit",
+                        choices=("corpus", "queries", "provenance", "diff", "depth", "result"),
                         default="corpus")
+    parser.add_argument("--stage", choices=STAGES)
+    parser.add_argument("--failure")
     parser.add_argument("--local-rows")
     parser.add_argument("--result")
     args = parser.parse_args(argv)
 
     import os
+
+    # Writing the result document is a local file write, and deliberately ahead of the
+    # arming gate: a run that stops *at* arming still has a stage worth recording, and
+    # gating the recorder behind the thing it records is how Decision 11 ended up off the
+    # path the first time.
+    if args.emit == "result":
+        if not args.stage:
+            print("e2e-cloud: --emit result needs --stage", file=sys.stderr)
+            return 2
+        record = Result(args.run_id or "unknown", os.environ.get("PLUMBLINE_E2E_TARGET", "emulator"))
+        record.reached(args.stage)
+        record.failure = args.failure
+        target_path = pathlib.Path(args.result or ".e2e-cloud/result.json")
+        record.write(target_path)
+        print(f"  stage={args.stage} -> {target_path}")
+        return 0
 
     try:
         target = arming(os.environ, args.run_id)

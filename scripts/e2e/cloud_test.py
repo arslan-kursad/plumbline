@@ -342,6 +342,47 @@ class GoldenDiff(unittest.TestCase):
         self.assertIn("cloud='other'", findings[0])
 
 
+class ResultIsWritten(unittest.TestCase):
+    """Decision 11 has to be on the path, not merely in the module.
+
+    It was in the module and not on the path for one real run: the harness stopped at
+    `publish` on a missing key and wrote nothing, so where it stopped had to be
+    reconstructed afterwards from files left on disk. That reconstruction is the
+    improvisation the fault tree exists to prevent (decision log W3.16).
+    """
+
+    DRIVER = (cloud.REPO / "scripts" / "e2e" / "run-cloud.sh").read_text()
+
+    def test_emit_result_writes_a_document_naming_the_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp) / "result.json"
+            code = cloud.main(["--run-id", "run-alpha", "--emit", "result",
+                               "--stage", "publish", "--failure", "no key",
+                               "--result", str(target)])
+            self.assertEqual(code, 0)
+            doc = json.loads(target.read_text())
+        self.assertEqual(doc["stage"], "publish")
+        self.assertEqual(doc["failure"], "no key")
+        self.assertFalse(doc["passed"])
+
+    def test_emit_result_refuses_an_undeclared_stage(self):
+        with self.assertRaises(SystemExit):
+            cloud.main(["--run-id", "run-alpha", "--emit", "result", "--stage", "nearly"])
+
+    def test_the_driver_records_on_failure_and_on_completion(self):
+        # Weak by nature -- it reads the script rather than running it -- but it fails if
+        # the wiring is removed, which is the regression that actually happened.
+        self.assertIn("record()", self.DRIVER)
+        self.assertIn("record complete", self.DRIVER)
+        self.assertRegex(self.DRIVER, r"fail\(\)\s*\{\s*\n\s*record")
+
+    def test_every_fail_call_names_a_declared_stage(self):
+        import re as _re
+        called = set(_re.findall(r"fail (\w+)", self.DRIVER))
+        self.assertTrue(called, "the driver has no fail calls; the wiring is gone")
+        self.assertTrue(called <= set(cloud.STAGES), f"undeclared stages: {called - set(cloud.STAGES)}")
+
+
 class WallingProof(unittest.TestCase):
     """Decision 13. DoD 3 is a claim about rows, so the evidence is a query over rows."""
 
