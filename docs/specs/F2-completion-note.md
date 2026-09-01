@@ -31,7 +31,7 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 | 1 | G1 — #33 closed, post-fix live-fire | *(placeholder)* | |
 | 2 | G2 — #44 closed with ordering evidence | *(placeholder)* | |
 | 3 | Constructed OTLP lands in cloud BigQuery through the views, every row `synthetic = true` | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md), 2026-09-01 — `spans_deduped` scoped to two runs: 13 rows each, `rows_seen = distinct_spans`, `unflagged = 0` |
-| 4 | Poison reaches the cloud DLQ, alert fired, triage archived | **open** | drill written and armed; DLQ drained 2026-09-01 (seven messages archived first, [`f2-dlq-archive`](../evidence/f2-dlq-archive-2026-09-01.md)). Channel test delivered ([`f2c-08-2`](../evidence/f2c-08-2-channel-test.md)); the drill itself has not been fired |
+| 4 | Poison reaches the cloud DLQ, alert fired, triage archived | **satisfied** | [`f2-dod4-drill.md`](../evidence/f2-dod4-drill.md), 2026-09-01 — poison published `05:23:14Z`, dead-lettered `05:25:02Z` after 5 attempts, depth 0→1, alert delivered. Archive digest matches the published payload byte for byte |
 | 5 | Every resource Terraform-owned, final plan clean, zero out-of-path creations | *(placeholder — re-measure)* | |
 | 6 | Cloud Run inside guardrails, guard shown to evaluate them | **satisfied** | [`f2-dod6-cloud-run-guardrails.md`](../evidence/f2-dod6-cloud-run-guardrails.md), 2026-08-31 — API read plus captured guard rejection, run `33390722393` |
 | 7a | Push transport established | **satisfied** | Wave 3, run `32969025343` |

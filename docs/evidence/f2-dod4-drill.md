@@ -62,10 +62,18 @@ executing against a message published for the purpose rather than against an acc
 | bound channel | `17645137777150770481`, email, proven to deliver on 2026-09-01 |
 | metric observed | 0 → **1** at `05:28:00Z` |
 
-The condition is met on the metric the policy watches. **Arrival of the alert email is
-confirmed by the person holding the inbox**, as it was for the channel test — and this time
-the notification carries no marker of ours, so attribution rests on the thirty-minute
-separation from `04:48:39Z` and on this document's timestamps.
+The condition is met on the metric the policy watches, and **the alert email arrived** —
+confirmed 2026-09-01 by the person holding the inbox.
+
+**DoD 4 is therefore satisfied end to end**: a poison message reached the cloud DLQ, the
+alert fired from it, and the triage is archived above under F2C-07's enumeration.
+
+*Attribution.* The notification carries no marker of ours — the alert policy's `userLabels`
+is empty and W2.20's `plumbline_drill=f2-dod4` marks the message, not the email (W3.24). So
+this email is distinguished from the F2C-08.2 channel test by the thirty-minute separation
+enforced at publish time, by the two being different in kind, and by the timestamps in this
+document. That is Decision 14's second option, applied because its first was measured
+unavailable rather than assumed so.
 
 ## 5. What the drill did not prove
 
