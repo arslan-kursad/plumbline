@@ -30,12 +30,12 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 | --- | --- | --- | --- |
 | 1 | G1 — #33 closed, post-fix live-fire | *(placeholder)* | |
 | 2 | G2 — #44 closed with ordering evidence | *(placeholder)* | |
-| 3 | Constructed OTLP lands in cloud BigQuery through the views, every row `synthetic = true` | **open** | cloud `plumbline.spans` at 0 rows; F2C-12 has not run |
-| 4 | Poison reaches the cloud DLQ, alert fired, triage archived | **open** | drill written 2026-08-31 (`dead-letter.md` §5), not executed |
+| 3 | Constructed OTLP lands in cloud BigQuery through the views, every row `synthetic = true` | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md), 2026-09-01 — `spans_deduped` scoped to two runs: 13 rows each, `rows_seen = distinct_spans`, `unflagged = 0` |
+| 4 | Poison reaches the cloud DLQ, alert fired, triage archived | **open — blocked** | drill written 2026-08-31 (`dead-letter.md` §5), not executed. `traces-dlq-pull` holds five real messages from the failed first delivery; the drill needs a drained queue and unambiguous attribution (#112) |
 | 5 | Every resource Terraform-owned, final plan clean, zero out-of-path creations | *(placeholder — re-measure)* | |
 | 6 | Cloud Run inside guardrails, guard shown to evaluate them | **satisfied** | [`f2-dod6-cloud-run-guardrails.md`](../evidence/f2-dod6-cloud-run-guardrails.md), 2026-08-31 — API read plus captured guard rejection, run `33390722393` |
 | 7a | Push transport established | **satisfied** | Wave 3, run `32969025343` |
-| 7b | Push transport exercised — a real Google-signed token accepted | **open** | no message has been published to `traces`; F2C-11 has not run |
+| 7b | Push transport exercised — a real Google-signed token accepted | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md) §1, 2026-09-01 — worker `POST /push - 204` after the `custom_audiences` fix. The first attempt failed at branch A ([`f2-dod7b-first-delivery.md`](../evidence/f2-dod7b-first-delivery.md)) |
 | 8 | Verification B — a real notification reading `costAmount = 0.00` | *(placeholder)* | |
 | 9 | Credit-lag procedure live with one data point | *(placeholder)* | |
 | 10 | Period invoice fully credit-offset | *(placeholder)* | |

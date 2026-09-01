@@ -2029,3 +2029,31 @@ idempotence by running it twice.
 **Exit review:** yes — for the pattern, not the fix. A narrowing predicate that matches
 nothing is indistinguishable from a system that is working perfectly, and this phase has now
 produced two.
+
+### W3.19 — DoD 3 and 7b measured, and the idempotence test is not the one that ran
+**Made:** 2026-09-01 · **Work item:** F2C-11, F2C-12, F2C-09 · **Reversibility:** n/a — measurement
+**Measured:** two clean runs through `spans_deduped`, 13 rows each, `rows_seen` equal to
+`distinct_spans`, `unflagged` zero, and `spans_real` at zero across both. The worker
+answered `POST /push - 204` and logged `ingested message …: 1 row(s)`. DoD 7b, DoD 3 and
+F2C-09's walling are satisfied. Evidence:
+[`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md).
+
+**The harness's own PASS is not the evidence, and the note says which run it distrusts.**
+`w4-second-delivery` consumed the window fix mid-flight (W3.18). `w4-third-delivery` is
+clean, and even for that run the figures were re-read from the API rather than lifted from
+the tool. The distinction costs nothing here and it is the habit the phase is built on.
+
+**Idempotence was not tested, and noticing why is the useful part.** The spec asks Wave 4 to
+run the harness twice and show counts stable through the views — a dedup test. Two runs
+produced `base = 26, deduped = 26`: **no duplicate was ever presented.** Decision 6 derives
+span identity from the run id (#102), so two run ids are two identities and the dedup window
+has nothing to collapse. The test the spec wants is therefore *re-running the same run id*,
+which reproduces the identity and the `start_time` and must collapse to 13.
+
+That is not a defect in #102 — re-runnability and duplicate-presentation are different
+properties and #102 bought the first deliberately. It is a defect in reading "run it twice"
+as satisfied by two invocations. **Two runs of a harness that re-identifies per run is not a
+replay**, and only a replay tests what ADR-0002 rests on.
+**Exit review:** yes — for the last paragraph. A design decision quietly changed what an
+older acceptance sentence means, and nothing in either document noticed until the numbers
+were on the table.
