@@ -183,6 +183,42 @@ complete list.)*
   The habit worth keeping past F2: a path filter makes a required check advisory, and
   nothing in the pull-request view distinguishes *passed* from *did not run*. A dispatched
   full run before a phase closes costs one command.
+- **An identifier is not an identity — it proves neither sameness nor difference, and it
+  does not stop pointing when its referent is replaced.** Three instances in this phase,
+  one shape:
+
+  - **`#68`** — one object with two descriptions, read as two objects. The issue has a
+    single meaning in this repository and every reference agrees with it; a design-layer
+    document paraphrased it twice, and the two paraphrases were taken for two separate
+    obligations. A carried item was invented out of a shared number.
+  - **`G1`** — one label over two different claims, read as one claim. Spec §3's gate row
+    asserts an ordering (*"No application service deploys before G1."*); spec §7 item 1
+    asserts five completion facts and contains no ordering clause. The closure
+    re-derivation measured §3's sentence and recorded §7's item as met. Both texts are
+    real, and neither is a paraphrase of the other. Measured item by item in
+    [`f2-dod1-five-facts.md`](../evidence/f2-dod1-five-facts.md): of the five facts, three
+    hold, one is a state claim written as an event claim and went false five times after
+    it was recorded, and one is below.
+  - **"the corrected credit filter"** — one phrase, two objects, four days apart. Written
+    `2026-08-21`, it could only mean ADR-0004 Amendment 1's enumerated `FREE_TIER` filter.
+    That filter was falsified in production on `2026-08-22` and superseded by Amendment 4
+    on `2026-08-25`. The phrase in §7 item 1 has never been edited, so read with its
+    authoring referent it now asserts as a *completion condition* the exact configuration
+    **Gate H fails the build for containing**.
+
+  The rules this phase already wrote — separate two events by identity rather than by
+  co-existence, and rather than by time — catch none of these, because in all three the
+  identifier was present and was the thing that misled.
+
+  **The part worth not softening:** two of the three surfaced inside remediation artefacts.
+  `f2-dod-1-2-5-12-rederived.md` exists to stop a status being carried forward, and it
+  carried one across sections instead of across documents. A control failing in the shape
+  it was built to prevent is worth more than a control simply failing.
+
+  **Carried to F3 as a design rule:** a normative sentence names its referent by version or
+  by location, never by a bare label — `ADR-0004 Amendment 4's credit filter`, not "the
+  corrected credit filter"; `spec §7 item 1`, not `G1`. Where a label is load-bearing and
+  shared, the document says which of its senses it means.
 
 ## 6. CN3 — Wave 1 drift, root cause recorded
 
