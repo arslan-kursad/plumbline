@@ -4,7 +4,9 @@
 **Date:** *(placeholder — filled at closure)* · **Spec:** [`F2-minimal-gcp-footprint.md`](F2-minimal-gcp-footprint.md)
 **Directive:** [`F2-completion-directive.md`](F2-completion-directive.md) v1.7 (SHA recorded
 in the decision log at commit)
-**Decisions:** [`F2-decision-log.md`](F2-decision-log.md) — D1–D6, W0.\*–W3.8, A2.1–A2.13, W2.14–W2.20
+**Decisions:** [`F2-decision-log.md`](F2-decision-log.md) — D1–D6, W0.\*, W1.\*, W2.\*, W3.1–W3.26,
+A2.1–A2.13 · **Directive §9:** Decisions 1–4 (Amendment 4) and 5–17 (Amendment 7), each of the
+latter carrying its alternative not taken and its residual uncertainty
 
 > **This document is a skeleton authored ahead of the measurements it will carry**
 > (directive F2C-10). Every line marked *(placeholder)* is unmeasured. It is committed
@@ -39,7 +41,7 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 | 8 | Verification B — a real notification reading `costAmount = 0.00` | *(placeholder)* | |
 | 9 | Credit-lag procedure live with one data point | *(placeholder)* | |
 | 10 | Period invoice fully credit-offset | *(placeholder)* | |
-| 11 | Decision log complete | *(placeholder)* | |
+| 11 | Decision log complete | **satisfied** | F2C-20, 2026-09-01 — 73 entries across five series, `W3.1`–`W3.26` unbroken; directive §9 Decisions 5–17 checked mechanically to carry both an alternative not taken and a residual uncertainty. #47, #63, #91 and #102 closed against evidence |
 | 12 | Gates A–H green, nothing loosened | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — nine gate assertions green on run `33475352691`, all ten jobs run and none skipped; `invariant-gates.sh` unchanged since before #82, `.claude/settings.json` untouched all phase |
 | 13 | **Verification C** | **open by design** | see §4; not a phase-exit item |
 
