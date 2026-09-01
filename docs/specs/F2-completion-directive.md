@@ -973,7 +973,11 @@ which is a better failure but still a failure.
    Monday, so a failed C2 live-fire's two-working-day retry falls Tue–Wed with no weekend in
    it, seven days still remain to the ceiling and fourteen to the window. Decision 15's
    closure gate is satisfied.
-2. **Schedule the Adjudicator ground-truth-labelability session.** It gates Freeze A,
-   which gates F3, which gates C7, which gates the single calendar block C4 requires. It
-   is a separate conversation and it is on the critical path to 2026-10-05 — not F2's
-   critical path, the project's.
+2. ~~**Schedule the Adjudicator ground-truth-labelability session.**~~ **Scheduled
+   2026-09-01 for 2026-09-02, 10:00–12:00 Europe/Istanbul.** It gates Freeze A, which gates
+   F3, which gates C7, which gates the single calendar block C4 requires. It is a separate
+   conversation and it is on the critical path to 2026-10-05 — not F2's critical path, the
+   project's. The session owns three outputs: the ground-truth question answered, Freeze A
+   performed (criteria, formulas, rubric, dataset spec — Freeze B stays at F3), and
+   `docs/eval-plan.md` §2's stale "F1 entry gate" line reconciled. That last one is
+   human-only: editing the pre-registration document is Class 3 under §4.
