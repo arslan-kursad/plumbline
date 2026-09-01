@@ -255,9 +255,9 @@ Freeze A is complete when, and only when:
 4. **`#10`'s eval-plan half is discharged** — SC-1 row 1.2's manifest field set gains
    `redacted_fields`. A redacted capture is not raw emitter output, and row 1.3's
    losslessness check has to say which artefact it validates against.
-5. **SC-1 row 1.1's data source is corrected** — see §9.1. It names a directory that does
+5. **SC-1 row 1.1's data source is corrected** — see §7.1. It names a directory that does
    not exist.
-6. **§4's `architecture.md` pin is refreshed** — v0.3 is ten versions stale (§9.1).
+6. **§4's `architecture.md` pin is refreshed** — v0.3 is ten versions stale (§7.1).
 7. The file is on `main` and its SHA is tagged `eval-plan-freeze-a`, per §2's freeze
    mechanic.
 8. If the freeze did not complete, the §5 choice — (a) or (b) — is recorded with its date.
