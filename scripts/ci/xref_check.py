@@ -50,7 +50,7 @@ DOCNAME_RE = re.compile(
     r"|decision log"
     r"|runbook"
     r"|directive"
-    r"|the spec\b",
+    r"|\bspecs?\b|\bplan\b|\bnote\b|\bADR\b",
     re.I,
 )
 # ATX headings that open with a section number: "## 7. Foo", "### 7.2 Bar", "#### 4.1 Baz"
@@ -190,12 +190,6 @@ def check_file(path: str, root: str) -> list[dict]:
             # "**Architecture:** §2.2, §3.2, …" and then use bare §N throughout, so the
             # default referent is established once per document rather than per line.
             if not declared:
-                continue
-            # Outside this document's own top-level numbering range, a bare reference is
-            # another document's by construction. Inside it, a number the document does
-            # not have is what renumbering leaves behind — which is the defect (#7).
-            top = num.split(".")[0]
-            if top not in {d.split(".")[0] for d in declared}:
                 continue
             # A borrowed numbering space only excuses a reference it can actually
             # resolve. api-keys.md borrows architecture's and its §3.2 resolves there,

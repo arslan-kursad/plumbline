@@ -137,6 +137,27 @@ jobs:
       - name: Empty-plan guard self-test
         run: ./scripts/ci/plan-nonempty-guard.sh --self-test
 
+      # Non-blocking, and the two halves are deliberately split. The self-test gates:
+      # a checker that cannot fail on a known-bad corpus is not evidence, so it runs
+      # with the other proofs and breaks the build if the corpus stops behaving.
+      # The scan over docs/ does not gate — it reports. Flipping it to blocking changes
+      # what CI asserts and is a separate decision (F3 entry directive, F3E-04).
+      - name: Cross-reference check self-test
+        run: ./scripts/ci/xref-check.sh --self-test
+
+      - name: Cross-reference scan (non-blocking)
+        run: |
+          mkdir -p artifacts
+          ./scripts/ci/xref-check.sh --json artifacts/xref-findings.json | tee artifacts/xref-findings.txt
+
+      - name: Upload cross-reference findings
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: xref-findings
+          path: artifacts/xref-findings.*
+          if-no-files-found: warn
+
       # Guard fixtures are derived from real plan output, never authored
       # (scripts/ci/testdata/README.md). The gate holds the rule; the self-test
       # proves the gate can refuse each way it is meant to.
