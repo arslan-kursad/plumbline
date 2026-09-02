@@ -1,6 +1,6 @@
 # F3 Entry Directive
 
-**Version:** 0.2 · **Status:** Proposed · **Date:** 2026-09-01
+**Version:** 0.3 · **Status:** Proposed · **Date:** 2026-09-02
 **Executor:** Claude Code (Lane A), except where a task states otherwise
 **Nothing in this directive is a measurement.** See §10.
 
@@ -48,6 +48,8 @@ Each exclusion has a reason. None is deferred silently.
 - [`F2-completion-directive.md`](F2-completion-directive.md) — lane model, autonomy classes, carried obligations.
 - [`F2-minimal-gcp-footprint.md`](F2-minimal-gcp-footprint.md) §7.2 — CN1–CN5, the closing-note requirements.
 - [`freeze-a-prep.md`](freeze-a-prep.md) §7 and §7.1 — the Freeze A exit conditions and the pre-freeze audit.
+- [`f3e-01a-emulator-divergence.md`](../evidence/f3e-01a-emulator-divergence.md) — the surface
+  inventory F3E-01b and F3E-01c are both scoped from.
 - [`architecture.md`](../architecture.md) §5 (normalization), §7 (cost guardrails), §2.1 (collector contract).
 - `scripts/ci/invariant-gates.sh` — the existing gate surface; the shape F3E-04 must not break.
 
@@ -74,12 +76,38 @@ first deliverable is the lane determination for F3E-01b, because that is exactly
 
 ## 5. Waves
 
-**Wave 1 — parallel, no interdependencies:** F3E-01a, F3E-02, F3E-03, F3E-04.
+**Wave 1 — complete 2026-09-02.** F3E-01a (`#152`), F3E-02 (`#153`), F3E-03 (`#154`),
+F3E-04 (`#151`). All four merged; §6 carries each with its evidence.
 
-**Wave 2 — gated on Wave 1:** F3E-01b, on F3E-01a's scope and lane finding.
+**Wave 2 — gated on Wave 1, and split at the lane boundary F3E-01a found:**
+
+- **F3E-01b — rejection probe.** Lane A, read-only, dry-run.
+- **F3E-01c — round-trip probe.** Lane C, requires a written row.
 
 **Closed before work began:** F3E-05, F3E-06, F3E-07a, F3E-07b. Retained in §6 with their
 evidence rather than deleted — what was chartered is part of the record.
+
+### 5.2 Why F3E-01b became two tasks
+
+F3E-01a's inventory ([`f3e-01a-emulator-divergence.md`](../evidence/f3e-01a-emulator-divergence.md))
+returned two findings that change the task rather than inform it.
+
+**The instrument was wrong.** The charter said *"run the fixture corpus through both paths
+and diff the results"*. Rows are identical by construction — timestamp truncation happens
+in the worker before either path is chosen (S6) and the column set is generated from one
+DDL under a CI diff (S7). What differs is **what each side refuses**: the local table is
+unpartitioned so `require_partition_filter` is not enforced (S1), and the local sink uses a
+`COMMITTED` stream where production uses `_default`, so the at-least-once duplicates the
+dedup views exist to remove are not produced locally (S2). A row diff sees none of that and
+comes back clean, which reads as reassurance.
+
+**The lane boundary runs through the middle.** Asking *"does production reject this?"* is
+`bq query --dry_run`, which creates nothing — Lane A, on the precedent W2.17 set. Asking
+*"does production round-trip this JSON identically?"* needs a row written and read back, and
+no dry run produces one — Lane C. A single task spanning both would begin in Lane A, reach
+the round-trip probe, and stop. That is `#109` repeating, and §8 says stop at the discovery
+rather than reclassify afterwards. **Splitting now is that stop, taken before the work
+starts instead of during it.**
 
 ### 5.1 The 04/07b sequencing constraint is retired
 
@@ -101,7 +129,12 @@ re-derived, not inherited** (CN5, and §10 below).
 
 ## 6. Tasks
 
-### F3E-01a — Emulator/production divergence surface inventory
+### F3E-01a — Emulator/production divergence surface inventory · **CLOSED 2026-09-02**
+
+Delivered as [`f3e-01a-emulator-divergence.md`](../evidence/f3e-01a-emulator-divergence.md)
+(`#152`). Seven surfaces, two `unknown`. Two diverge by construction and both in the
+direction that matters. The lane determination it was asked for is what split F3E-01b —
+see §5.2.
 **Charter:** F3 entry carry — [`F2-completion-note.md`](F2-completion-note.md) §5, *"the
 emulator/production divergence is real and only half-measured… Carried to F3."*
 **Lane:** A. **Wave 1.**
@@ -120,25 +153,66 @@ entry reading "unknown" is admissible and preferred over an assumed one.
 
 ---
 
-### F3E-01b — Differential harness
-**Charter:** same. **Lane:** per F3E-01a's determination. **Wave 2, gated on F3E-01a.**
+### F3E-01b — Rejection probe
+**Charter:** F3 entry carry, via F3E-01a. **Lane:** **A** — read-only, dry-run only.
+**Wave 2.** **Covers surfaces S1 and S3.**
 
-Run the fixture corpus through both paths and diff the results.
+Take statements and queries production rejects, and assert the local stack rejects them
+too. Enumerate where it does not.
+
+**Scope is fixed here and may not widen during execution.** `bq query --dry_run` against
+`plumbline-19458`, and read-only queries. Nothing that writes a row, nothing that creates a
+table. The moment a probe needs either, it belongs to F3E-01c and this task stops — §8.
+
+S1 supplies a first case already known to fail: a query with no partition predicate is
+accepted locally and rejected by the cloud table.
 
 **Direction is mandatory in every report.** Emulator-permissive — CI green where production
-would reject — is the only failure that matters. The observed direction so far is the
-opposite one (false-red: CI fails on SQL production accepts, W2.16/W2.17), and the
-unobserved direction is the one that matters. Production-permissive findings are harmless
-and must be labelled as such, never aggregated into a single divergence count.
+would reject — is the only failure that matters. The one direction measured so far is the
+opposite (false-red: CI fails on SQL production accepts, W2.16/W2.17). Production-permissive
+findings are harmless and must be labelled as such, never aggregated into a single
+divergence count.
 
 **Acceptance:** either at least one divergence is found and characterised by direction, or
 the report states *how many surfaces were probed, which ones, and which were not reachable*.
 A report of "no divergence" without that enumeration is not admissible: an empty result must
-state why it is empty — the §5 rule this phase already wrote.
+state why it is empty — the rule the completion note's §5 already carries.
 
 ---
 
-### F3E-02 — Capture harness for the two unblocked emitters
+### F3E-01c — Round-trip probe
+**Charter:** same. **Lane:** **C** — requires a written row. **Wave 2.**
+**Covers surfaces S4 and S5.**
+
+Whether a JSON column survives production byte-identically, and whether column-name
+matching differs between the two sides. Both are recorded as **unknown** in the inventory
+and neither can be settled by reading.
+
+**Why it cannot be Lane A.** Establishing a round-trip needs a row written and read back.
+No dry run produces one, and `bq insert` is on the Lane A deny-list. This is stated before
+the work begins rather than discovered inside it.
+
+**S4 is the one to run first.** It sits directly under SC-1 row 1.3's losslessness claim:
+if the emulator normalises JSON and production does not, a local round-trip test passes
+over a transformation the cloud never performs.
+
+**Cost, so it is chosen and not stumbled into.** One row written to a real table, and the
+row is `synthetic = true` and walled off (architecture §4.1). Under the 200 TRY ceiling
+(ADR-0004 Amendment 5) the write is immaterial; under the old hard zero it would have
+needed its own argument.
+
+**Acceptance:** for each of S4 and S5, either a divergence characterised by direction, or a
+statement of what was written, what came back, and why the two are the same. "No
+divergence" without the artefacts is not admissible.
+
+---
+
+### F3E-02 — Capture harness for the two unblocked emitters · **CLOSED 2026-09-02**
+
+Delivered in `#153`: `scripts/capture/capture.sh`, `redact.py`, `manifest_validate.py`,
+and [`agent-capture.md`](../runbooks/agent-capture.md). The validator discriminates in
+both directions and the redaction gate refuses by default, both asserted in CI. **The
+captures themselves are Lane C and are not done.**
 **Charter:** `eval-plan.md` SC-1 row 1.2; `#42`; `#138`. **Lane:** A builds; C runs. **Wave 1.**
 
 **The gap is now measured from the artefacts, not argued from the plan.** Read 2026-09-01,
@@ -167,7 +241,11 @@ presented to it has not been tested; it has been run.
 
 ---
 
-### F3E-03 — Claude Code capture failure diagnostic package
+### F3E-03 — Claude Code capture failure diagnostic package · **CLOSED 2026-09-02**
+
+Delivered in `#154`: `claude-code-preflight.sh` (eight blocking checks, authentication
+last) and `capture_report.py` (four terminal states, none of them "retry"). **The
+capture attempt itself is Lane C and has not been made.**
 **Charter:** `#10`; OQ-4, [`architecture.md`](../architecture.md) §10. **Lane:** A builds; C runs. **Wave 1.**
 
 The capture is not unscheduled. It was attempted and every run failed at authentication
@@ -195,7 +273,11 @@ this task exists to prevent.
 
 ---
 
-### F3E-04 — Mechanical cross-reference check
+### F3E-04 — Mechanical cross-reference check · **CLOSED 2026-09-02**
+
+Delivered in `#151`. All five acceptance criteria run; criterion 1 verified against the
+merge commit of `#147`. Ships non-blocking, reporting 13 findings against `docs/` of
+which two look real — a ratio recorded rather than tuned away.
 **Charter:** `#7`, pulled forward from F5. **Lane:** A. **Wave 1.**
 
 Scope: internal section references and relative links across `docs/`.
@@ -322,6 +404,20 @@ explicitly marked as requiring re-derivation.
 ---
 
 ## 11. Changelog
+
+**v0.3 — 2026-09-02** (supersedes v0.2). Wave 1 closed; Wave 2 split.
+
+6. **Wave 1 is complete** — F3E-01a, F3E-02, F3E-03 and F3E-04 merged as `#152`, `#153`,
+   `#154` and `#151`. Each entry in §6 is marked closed with its evidence and kept rather
+   than deleted. **What is closed is the Lane A half:** the two agent captures, the Claude
+   Code attempt, and the rejection and round-trip probes are all still to run.
+7. **F3E-01b is split into F3E-01b (Lane A) and F3E-01c (Lane C)**, on two findings from
+   F3E-01a. The instrument was wrong — rows are identical by construction and the
+   divergence is in what each side *refuses*, so a row diff comes back clean and reads as
+   reassurance. And the lane boundary runs through the middle of the task: dry-run probing
+   creates nothing, a round-trip needs a written row. Reasoning in §5.2; a single task
+   spanning both would be `#109` repeating.
+8. **§3 gains the inventory** as a context file, since both Wave 2 tasks are scoped from it.
 
 **v0.2 — 2026-09-01** (supersedes v0.1). Five changes, each with the read that caused it.
 
