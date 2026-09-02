@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.13 · **Status:** Draft for F0 sign-off · **Date:** 2026-08-30
+**Version:** 0.14 · **Status:** Draft for F0 sign-off · **Date:** 2026-09-02
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -297,14 +297,17 @@ secret-free by construction.
 | Cloud Run `min=0`, `max≤2`, smallest instance, us-central1 | Terraform; CI check on plan diff |
 | Pub/Sub: no topic retention; batched+gzipped | Terraform (topics); collector code + golden tests (batching) |
 | LLM: free-tier Gemini + client-side limiter; bulk on Ollama | Eval engine code; quota config in `eval_definitions` |
-| Billing kill-switch | Budget alert (net of all credits) → Pub/Sub → billing-detach function, detaching at `detach_threshold` rather than at any non-zero figure; **fire-tested in F0 (DoD)**, trigger semantics per ADR-0004 Amendment 4 |
-| Runaway detection under promotional credit | `gross-cost-alert` budget, gross cost, notification-only (Terraform). No Pub/Sub binding: the plan guard asserts exactly one budget publishes to `billing-alerts` (ADR-0004 Amendment 4, D3) |
+| Billing kill-switch | Budget alert (net of all credits) → Pub/Sub → billing-detach function, detaching at `detach_threshold` — the **monthly ceiling, 200 TRY net**, month-to-date; **fire-tested in F0 (DoD)**, trigger semantics per ADR-0004 Amendment 4, ceiling per Amendment 5 |
+| Early warning below the ceiling | `gross-cost-alert` budget, notification-only (Terraform), emails at 50% and 100% of 100 TRY — two warnings before the 200 TRY detach. No Pub/Sub binding: the plan guard asserts exactly one budget publishes to `billing-alerts` (ADR-0004 Amendment 4 D3, role restated in Amendment 5 D3) |
 | Artifact Registry < 0.5 GB | Distroless images; cleanup policy keep-last-2 (Terraform) |
 | No Cloud SQL / custom domain / paid SaaS | Architecture review; Terraform allowlist of resource types |
 | Public repository (Pages + unmetered Actions on Free) | F0 spec §0.2; `main` branch protection; Gate C (no exported SA keys) and Gate D (no `pull_request_target`) |
 
-Escape hatch: any spend > $0.00 for two consecutive days triggers an incident note in
-`docs/` — before the kill-switch makes the question moot.
+Escape hatch: net spend on a trajectory to exceed the monthly ceiling — in practice, two
+consecutive days above `ceiling / days_in_month` — triggers an incident note in `docs/`,
+before the kill-switch makes the question moot. The old form of this rule read *"any spend
+> $0.00 for two consecutive days"*, which under a ceiling fires on ordinary operation
+(ADR-0004 Amendment 5).
 
 ### 7.1 Terraform resource-type allowlist
 
@@ -446,6 +449,17 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.14 — 2026-09-02** — the zero-cost constraint becomes a ceiling (ADR-0004 Amendment 5).
+
+1. §7's kill-switch row names `detach_threshold` as the **monthly ceiling, 200 TRY net,
+   month-to-date**, rather than an epsilon above zero.
+2. §7's second budget row is retitled: its job was runaway detection while net cost was
+   zero by construction under the promotional credit. After 2026-10-05 net is meaningful
+   again, so it becomes the early-warning tier — two emails at 50 and 100 TRY before the
+   200 TRY detach. The resource is unchanged; only what it is for.
+3. §7's escape hatch is re-derived. It read "any spend > $0.00 for two consecutive days",
+   which under a ceiling fires on ordinary operation.
 
 **v0.13 — 2026-08-30** — ADR-0007, the canonical views (#61).
 

@@ -587,3 +587,107 @@ Evidence (function logs, billing page state) archived under
 ### Supersedes
 
 The credit-filter clause of Amendment 1. All other Amendment 1 content stands.
+
+---
+
+## Amendment 5 (2026-09-02) — The constraint becomes a ceiling
+
+**Status:** **Proposed** · **Amends:** the Context above, and Amendment 4's `detach_threshold`
+**Related issues:** #74 (the envelope rests on a trial credit), #138 (SC-4b)
+**Decided by:** the maintainer, 2026-09-02, before Freeze A tags `eval-plan.md`.
+
+### Context
+
+The Context section above opens: *"`$0.00` is a hard constraint here, not a target."* That
+sentence has carried the whole design. It is now withdrawn.
+
+Two things made it expensive rather than merely strict.
+
+**It was not measurable on the schedule the project runs on.** Free Tier is
+credit-implemented in GCP, so gross cost is non-zero during entirely free operation
+(Amendment 1). A `$0.00` gross claim over two consecutive calendar months was therefore
+close to unachievable, and the only honest reading — billed `$0.00` — was true only because
+a promotional credit was paying, which is #74 exactly.
+
+**It made every real charge an incident.** Under a hard zero, any non-zero figure is a
+failed experiment, so the guard had to be an epsilon. `detach_threshold` was set to 5.00
+in the billing account's currency to absorb a measured 0.04 TRY of credit-lag noise. That
+is a trip wire, not a budget.
+
+### Decision
+
+**D1 — the constraint is a monthly ceiling of `200 TRY` net.**
+
+Stated in the billing account's own currency, not in USD. The account bills TRY, the budget
+is TRY, the invoice is TRY, and a pre-registered criterion whose truth depends on an
+exchange rate on the day it is read is not falsifiable in the way SC-4 needs. The figure was
+chosen as roughly five US dollars at the time of the decision; that reasoning is recorded
+here and is **not** part of the criterion.
+
+**D2 — `detach_threshold` becomes `200.00`, and it is now the ceiling rather than an
+epsilon.**
+
+The budget publishes `spend_basis = "CURRENT_SPEND"`, so `costAmount` is month-to-date
+cumulative net spend. A threshold of 200 therefore reads as *"detach when this month's net
+spend reaches the ceiling"*, which is the ceiling's own definition and needs no second
+mechanism.
+
+**Leaving it at 5.00 would have been the defect this amendment exists to prevent.** Under a
+hard zero, any real charge was an emergency and 5.00 was correctly sized for noise. Under a
+200 TRY budget, ordinary operation legitimately produces charges, and a 5.00 threshold would
+detach billing on the very spending the ceiling now permits — the guard firing on what it
+was just told to allow.
+
+**D3 — `gross_alert_threshold` stays at 100.00 and gains a clearer role.** Its original job
+was to be the runaway signal while net cost was zero by construction under the credit
+(Amendment 4, D3). After 2026-10-05 net is meaningful again and that job ends. What it
+becomes is the early-warning tier: notification-only emails at 50% and 100% of 100 TRY give
+two warnings at 50 and 100 TRY before the 200 TRY detach. No change is required for it to
+mean this, which is why none is made.
+
+**D4 — the credit filter stays `INCLUDE_ALL_CREDITS`, and Gate H stays.** This was raised as
+a candidate for removal and is the opposite of what the change wants. Net cost *is* what a
+spend ceiling measures; gross is not. Removing the filter would put the budget back on gross,
+which is non-zero during free operation, and reproduce the 2026-08-22 double detach. Gate H
+continues to forbid Amendment 1's enumerated filter.
+
+### Alternatives rejected
+
+- **Ceiling in USD.** Rejected: the enforcement point must be TRY because the Budget API
+  rejects a stated currency that differs from the account's, so a USD criterion would need
+  a conversion at read time. A pre-registration number whose meaning drifts with the
+  exchange rate is the referent problem this project has already recorded three times.
+- **Detach above the ceiling — say 250 — so the criterion can fail without the service
+  dying.** A real trade-off and deliberately not taken: it permits the bill to exceed the
+  number the project publishes. Recorded as the residual uncertainty below rather than
+  dismissed.
+- **Keeping `$0.00` and accepting that it is only provable post-credit.** This is the status
+  quo and it is what #74 objects to. It also leaves the strongest claim in the project
+  resting on a promotion that expires.
+
+### Consequences
+
+- **Hitting the ceiling is still an outage.** Detaching billing stops the service, and
+  re-attachment is human-only by design (§5). Under a hard zero that was proportionate: any
+  spend meant something was wrong. Under a budget it means the month's allowance is gone,
+  which is a different event with the same blast radius. **This is the residual uncertainty
+  of D2** and the first thing to revisit if it fires.
+- **The claim changes shape in publication.** "Runs at $0.00" becomes "runs under a stated
+  monthly ceiling, enforced". Weaker as a headline, and honest for the first time: the old
+  claim was true only while a credit paid it.
+- **#74 is answerable.** The envelope no longer rests on the trial credit; it rests on a
+  ceiling that survives the credit's expiry on 2026-10-05.
+- **SC-4b becomes satisfiable rather than merely strict.** The measurement window is
+  unchanged — two consecutive calendar months, and they must be post-credit or the claim
+  repeats #74's defect — but a net figure under 200 TRY is a claim the architecture can
+  actually meet, where two gross-zero months was not.
+- **The escape hatch's trigger changes.** Architecture §7 read *"any spend > $0.00 for two
+  consecutive days"*. Under a ceiling that fires on ordinary operation; it is re-derived
+  against the ceiling instead.
+
+### Verification
+
+Not live-fired here. Amendment 4's three-step threshold live-fire (§4a) is the procedure,
+and re-running it against 200.00 is required before the ceiling can be claimed as enforced.
+**Until that run is archived, this amendment describes a configuration, not a control** —
+which is the distinction Attempt 1 through Attempt 3 exist to keep visible.
