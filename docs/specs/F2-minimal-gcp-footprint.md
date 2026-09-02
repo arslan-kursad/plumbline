@@ -1,7 +1,8 @@
 # F2 — Minimal GCP Footprint: Work Package Spec
 
 **Version:** 0.2 · **Status:** Approved on handoff (2026-08-21), Amendment 1 proposed
-2026-08-30, Amendments 2 and 3 proposed 2026-09-01 · **Date:** 2026-08-21
+2026-08-30, Amendments 2 and 3 proposed 2026-09-01, Amendment 4 proposed 2026-09-02 ·
+**Date:** 2026-08-21
 **Phase budget:** ~15 h · **Executor:** Claude Code (graduated mode, §2) + maintainer (§9)
 **Predecessor:** F1 complete ([`F1-completion-note.md`](F1-completion-note.md)); the
 claude-code capture (#10) is still open and stays non-blocking — it gates F4's
@@ -439,8 +440,11 @@ Terraform in the wave:
 13. **Verification C — post-credit confirmation.** After the promotional trial credit
     ends (2026-10-05) and the account state has settled, all three of the following
     hold, each recorded with evidence:
-    - **13a.** Billing Reports for a full period show **gross cost $0.00**, not merely
-      $0.00 billed after credit offset.
+    - **13a.** Billing Reports for a full period show **net cost at or below the monthly
+      ceiling — 200 TRY** (ADR-0004 Amendment 5). Net, and stated in the billing account's
+      own currency, because that is what the ceiling measures and what the invoice is
+      denominated in. This read *"gross cost $0.00, not merely $0.00 billed after credit
+      offset"* until 2026-09-02; §12 Amendment 4 records why a hard zero was withdrawn.
     - **13b.** The three-step kill-switch live fire has been re-run **after** the account
       upgrade and passed. Every prior firing occurred behind the credit; this is the
       first time the `INCLUDE_ALL_CREDITS` trigger arms against a real charge.
@@ -572,6 +576,47 @@ detection-fidelity claim, not anything in F2.
 | #36 | Freeze A alignment in `eval-plan.md` | No — context only; F2 does not touch that file |
 
 ## 12. Changelog
+
+**Amendment 4 — 2026-09-02** — §7 item 13a becomes the monthly ceiling
+(source: ADR-0004 Amendment 5; #74; maintainer decision 2026-09-02).
+
+**Numbering, and a collision worth naming.** §12 held Amendments 1, 2 and 3, so this is
+Amendment 4 — verified by reading, not by counting forward from memory. But **ADR-0004
+also has an Amendment 4**, it is the credit-filter decision, and it is cited across this
+repository far more often than anything in §12. Two documents, two sequences, one number.
+Every reference here therefore says *§12 Amendment 4* or *ADR-0004 Amendment 4* and never
+the bare form — the identifier rule in the completion note's §5, applied to the numbering
+of the amendment that applies it.
+
+**What changed, and it is a real narrowing rather than a clarification.**
+
+1. **13a asks for the ceiling instead of a hard zero.** ADR-0004 Amendment 5 withdrew the
+   premise 13a rested on — *"`$0.00` is a hard constraint here, not a target"* — and
+   replaced it with 200 TRY net per month. Gross cost is non-zero during entirely free
+   operation (ADR-0004 Amendment 1), which is why the hard-zero claim was close to
+   unachievable and is the reason the ceiling exists. Left as written, 13a would have
+   asked for evidence of a claim the project had stopped making.
+2. **Net, and in TRY.** Not a detail: the Budget API rejects a stated currency that
+   differs from the account's, so the enforcement point is TRY, and a criterion whose
+   truth moved with an exchange rate would not be checkable at a fixed date. Roughly five
+   US dollars is why 200 was chosen; that reasoning lives in ADR-0004 Amendment 5 and not
+   in the item.
+3. **13b and 13c are unchanged and not renumbered.** 13c is a duration claim over whatever
+   13a resolves to, so it follows without editing. 13b already required the three-step
+   live-fire after the account upgrade and against a real charge; ADR-0004 Amendment 5
+   requires the same procedure against the new threshold, and **one run discharges both** —
+   recorded in [`f2-detach-threshold-200-applied.md`](../evidence/f2-detach-threshold-200-applied.md)
+   rather than filed as two obligations.
+
+**The alternative not taken.** 13a could have survived as a recorded-but-ungated gross
+figure, so the project still reported what it costs before credits without that number
+being a pass condition. Rejected because it keeps a number in the Definition of Done that
+nothing decides on, and a DoD item that cannot fail is not one.
+
+**Residual uncertainty.** The ceiling has been applied and verified live, and it has not
+been fired. Until Amendment 4's three-step procedure is re-run against `200.00`, 13a names
+a threshold that is configured rather than proven — which is the distinction ADR-0004 §5
+was written to keep visible, and the one three live-fire attempts exist to enforce.
 
 **Amendment 3 — 2026-09-01** — §7.2 gains CN5, the full-run anchoring requirement
 (source: runs `33477177883` and `33503481240`; the §5 skipped-jobs measurement).
