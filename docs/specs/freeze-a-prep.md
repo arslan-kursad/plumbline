@@ -1,6 +1,6 @@
 # Freeze A — Pre-session brief
 
-**Version:** 0.6 · **Status:** Accepted · **Date:** 2026-09-02
+**Version:** 0.7 · **Status:** Accepted · **Date:** 2026-09-02
 **Session:** 2026-09-02, 10:00–13:00 Europe/Istanbul · **Duration:** 3 h
 **Freeze target:** [`docs/eval-plan.md`](../eval-plan.md) v0.2 · **Appendix A:** P1–P7, P11
 
@@ -289,6 +289,55 @@ which Freeze A fixes — not a placeholder value.
 Bears on §2's P2 question: option 2 (defer P2 to Freeze B) looks more attractive if the
 answer is "different", and option 1 looks fine if it is "same".
 
+### 4.4 P3's sizing, computed ahead so T+100 reads instead of derives
+
+C-4 supplies one number per agent. P3 turns it into `N_gate` and the achieved MDE, and
+that is arithmetic — done here so the session does not spend the slot on it.
+
+**Method verified against the plan's own figure.** `eval-plan.md` §7.5 states *"unpaired
+two-proportion, one-sided, α = 0.05, power = 0.80, `p_baseline = 0.90`, `δ = 0.10` →
+n ≈ 157 per arm."* Recomputed with the same formula: **156.6**. The rows below are that
+assumption extended, not a second opinion.
+
+| N per arm | Detectable drop | Pass rate would have to fall to |
+|---:|---:|---:|
+| 40 | 22.4 pp | 67.6% |
+| 60 | 17.6 pp | 72.4% |
+| 80 | 14.8 pp | 75.2% |
+| 100 | 13.0 pp | 77.0% |
+| 120 | 11.7 pp | 78.3% |
+| 140 | 10.7 pp | 79.3% |
+| 157 | 10.0 pp | 80.0% |
+| **160** | **9.9 pp** | **80.1%** — the plan's target |
+| 200 | 8.7 pp | 81.3% |
+| 250 | 7.7 pp | 82.3% |
+| 300 | 6.9 pp | 83.1% |
+
+**Two limits, both load-bearing, and neither is visible from the table alone.**
+
+**It is conservative and the plan cannot say by how much.** §7.5: the design is paired, so
+the unpaired figure is *"a conservative upper bound; the realized power depends on the
+discordant-pair rate, which is unknown before calibration."* The true MDE at any N is
+**better** than its row, by an amount nobody can state until Freeze B. A shortfall is
+therefore less bad than it reads — and §5.2 still forbids *"silently keeping the original δ
+at an underpowered N"*, so it is recorded either way.
+
+**`p_baseline = 0.90` is §7.5's assumption, not a measurement, and every row moves with
+it.** The real baseline arrives with Freeze B's calibration (`k = 5` runs of `B0`, §7.3),
+which is *after* this decision. **P3 is therefore fixed on an assumed baseline by
+construction**, and the achieved MDE is re-derived when the measured one lands. Stating
+this here so the table is not read as a measurement.
+
+**If volume falls short**, §4's rule holds — the gate design changes, not the threshold —
+and the three responses are: pool across agents (raises N, costs P6's per-agent
+stratification, and depends on §4.3's comparability question); accept a larger δ and report
+it as the achieved MDE; or change the endpoint, which is already in play if P6 lands on
+scenario B or C.
+
+**One wording question in C-4 itself.** It says *"per agent"*. If P2 is deferred (§2), only
+the Adjudicator's number is needed at Freeze A, and counting Triage's cases becomes part of
+whatever decides replication.
+
 ---
 
 ## 5. The freeze decision at T+150
@@ -497,6 +546,16 @@ prefix with the commands that detach billing. It bears on DoD 1 fact 5, not on F
 7. **ADR-0008 moved to its own dated session** (§3). 2026-09-03, thirty minutes. It is
    unbudgeted work on the critical path to C7 and does not belong inside a freeze session
    with zero slack.
+
+**v0.7 — 2026-09-02** (supersedes v0.6). P3's arithmetic done ahead of the session.
+
+16. **§4.4 carries the sizing table.** C-4 supplies one number; P3 turns it into `N_gate`
+    and the achieved MDE, and that is arithmetic rather than judgement. The method was
+    verified by reproducing §7.5's own 157 (156.6), so the rows extend the plan's
+    assumption rather than offering a second one. Two limits are stated with it: the
+    unpaired figure is conservative by an amount unknowable before calibration, and
+    `p_baseline = 0.90` is an assumption whose real value arrives at Freeze B — **after**
+    P3 is fixed. Recorded so the table is not read as a measurement.
 
 **v0.6 — 2026-09-02** (supersedes v0.5). Two findings from actually performing C-3's
 lookup instead of scheduling it.
