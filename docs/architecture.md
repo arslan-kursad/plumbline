@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.14 · **Status:** Draft for F0 sign-off · **Date:** 2026-09-02
+**Version:** 0.15 · **Status:** Draft for F0 sign-off · **Date:** 2026-09-02
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -303,11 +303,32 @@ secret-free by construction.
 | No Cloud SQL / custom domain / paid SaaS | Architecture review; Terraform allowlist of resource types |
 | Public repository (Pages + unmetered Actions on Free) | F0 spec §0.2; `main` branch protection; Gate C (no exported SA keys) and Gate D (no `pull_request_target`) |
 
-Escape hatch: net spend on a trajectory to exceed the monthly ceiling — in practice, two
-consecutive days above `ceiling / days_in_month` — triggers an incident note in `docs/`,
-before the kill-switch makes the question moot. The old form of this rule read *"any spend
-> $0.00 for two consecutive days"*, which under a ceiling fires on ordinary operation
-(ADR-0004 Amendment 5).
+Escape hatch: **month-to-date net cost above the linear burn line
+`ceiling × (day ÷ days_in_month)`, once month-to-date exceeds 20 TRY**, triggers an
+incident note in `docs/` — before the kill-switch makes the question moot.
+
+Three properties, because each was chosen against an alternative that reads fine:
+
+- **Month-to-date, not a daily figure.** The budget publishes `spend_basis =
+  "CURRENT_SPEND"`, so month-to-date cumulative net is what actually arrives. A per-day
+  number would have to be derived, and the derivation is a step that can be wrong.
+- **A trajectory test, so it self-corrects.** One lumpy day inside an otherwise quiet
+  month is not a breach: if month-to-date falls back under the line, nothing fires. That
+  is the behaviour a *monthly* ceiling wants.
+- **The 20 TRY floor, because the line is tiny early on.** On day 1 it is ≈ 6.7 TRY, so
+  without a floor an ordinary day trips it. 20 TRY is 10% of the ceiling and about three
+  days of average burn. **The floor is a judgement and nothing here derives it.**
+
+**This rule is a reporting trigger, not the control.** The kill-switch detaches at 200 TRY
+month-to-date; this fires earlier and only asks that a human noticed and wrote it down.
+Two mechanisms, two thresholds, deliberately not collapsed into one number.
+
+**Superseded twice, both recorded.** It read *"any spend > $0.00 for two consecutive
+days"* until 2026-09-02, which under a ceiling fires on ordinary operation (ADR-0004
+Amendment 5). It then read *"two consecutive days above `ceiling / days_in_month`"* for
+part of the same day — a quicker re-derivation that fires on a two-day burst inside a
+month that ends well under budget. Kept in the record because a rule that changed twice in
+one day is worth being able to see change.
 
 ### 7.1 Terraform resource-type allowlist
 
@@ -449,6 +470,21 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.15 — 2026-09-02** — §7's escape hatch becomes a burn-line trajectory test.
+
+1. The daily rule is now month-to-date net against `ceiling × (day ÷ days_in_month)` with
+   a 20 TRY floor, replacing the two-consecutive-days form v0.14 introduced hours earlier.
+   The budget publishes month-to-date, so that is the figure the rule should read; and a
+   trajectory test does not fire on a lumpy day inside a month that ends under budget.
+2. The rule is labelled a **reporting trigger** rather than a control, so it is not read as
+   a second kill-switch. The 20 TRY floor is marked as a judgement that nothing derives.
+3. Both superseded forms are kept in the text. A rule that changed twice in one day should
+   be visible as such.
+
+**Paired with `eval-plan.md` row 4.6**, which carries the same rule and is Class 3. The two
+documents must not be allowed to state different daily rules for one mechanism — which is
+the condition this change exists to end, not to create.
 
 **v0.14 — 2026-09-02** — the zero-cost constraint becomes a ceiling (ADR-0004 Amendment 5).
 
