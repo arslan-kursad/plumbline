@@ -237,6 +237,36 @@ complete list.)*
   by location, never by a bare label — `ADR-0004 Amendment 4's credit filter`, not "the
   corrected credit filter"; `spec §7 item 1`, not `G1`. Where a label is load-bearing and
   shared, the document says which of its senses it means.
+- **A passing assertion is not evidence that it measures what it names.** The sibling of
+  the rule above: that one is about what a name points at, this one is about what a check
+  actually tests. Three instances on 2026-09-02, and **all three were found by the tool's
+  own self-test rather than by review**:
+
+  - **The cross-reference check passed and was blind.** Its first version reported
+    thirteen findings against the real `docs/` corpus — a plausible number — and missed
+    **two of the three defects deliberately seeded in its own fixture**. The rule that
+    produced the plausible number was the rule that produced the blindness: ignore
+    references outside the document's own top-level numbering range. Tightening the
+    fixture would have made it pass. Its acceptance criterion 4 — *fix the check, not the
+    corpus* — is what forced the rule out instead.
+  - **The manifest validator rejected correct manifests, and only the acceptance case
+    showed it.** Its parser read folded block scalars (`>`) as empty values, so every
+    field written that way reported as missing; three keys in the real corpus are written
+    that way. Every rejection case passed. The defect was visible only from the case
+    written to prove **acceptance**.
+  - **A self-test asserted the wrong thing entirely.** `set -o pipefail` was on and the
+    tool under test exits non-zero for three of its four outcomes by design, so piping it
+    into `grep` reported the tool's verdict rather than grep's match. Three assertions
+    read correctly and measured something else.
+
+  **The same shape appears in measurement, not only in tests.** F3E-01b's probe includes a
+  case that must *validate* — the partition-filtered query — beside the ones that must be
+  rejected. Without it the probe would have been measuring that the table exists rather
+  than that the constraint holds, and it would have looked identical.
+
+  **Carried to F3 as a design rule:** every check ships with a case it must fail and a
+  case it must pass, and both run together. A validator that only ever refuses and a
+  validator that only ever accepts are equally blind, and **both look like they work**.
 
 ## 6. CN3 — Wave 1 drift, root cause recorded
 
@@ -268,8 +298,8 @@ then would be the substitution this note exists to refuse.
 | Deliveries | 5 runs: one refused at branch A, three of `w4-third-delivery`, one of `w4-second-delivery` |
 | Dead-lettered messages | 8 — 7 from the failed first delivery, 1 from the drill |
 | Decision-log entries | 78, across five series |
-| Evidence documents | 16 |
-| Runbooks | 12 |
+| Evidence documents | 18 |
+| Runbooks | 13 |
 | Pull requests merged from #82 | 43 |
 | Invariant gates | 9, all green with none skipped on run [`33503481240`](https://github.com/arslan-kursad/plumbline/actions/runs/33503481240), `main` @ `216fee2` |
 | Harness guard tests | 63 |
