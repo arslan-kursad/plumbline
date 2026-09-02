@@ -1,6 +1,6 @@
 # Freeze A — Pre-session brief
 
-**Version:** 0.5 · **Status:** Accepted · **Date:** 2026-09-02
+**Version:** 0.6 · **Status:** Accepted · **Date:** 2026-09-02
 **Session:** 2026-09-02, 10:00–13:00 Europe/Istanbul · **Duration:** 3 h
 **Freeze target:** [`docs/eval-plan.md`](../eval-plan.md) v0.2 · **Appendix A:** P1–P7, P11
 
@@ -88,8 +88,52 @@ agent *Apartment Triage* it is §7.1's stretch goal. F3E-02's capture work serve
 and is not blocked on P2. *"Apartment Triage is optional"* and *"the .NET agent is
 optional"* sit one sentence apart in conversation, and the second is false.
 
-**C-3 and C-4 are not design decisions.** They are transcription, lookup, and counting.
-They are listed as preconditions specifically so that they do not consume session time.
+**C-4 is not a design decision.** It is counting, and it is listed as a precondition
+specifically so that it does not consume session time.
+
+**C-3 was listed as a lookup and two thirds of it is not one.** Read from the provider's
+own documentation on 2026-09-02, which is what the precondition asks for:
+
+- **T2's model id is a choice, not a transcription.** `eval-plan.md` §8.3 says *"Gemini
+  Flash"*, which is a family. The models page (dated 2026-08-27) lists **six stable Flash
+  models**, differing in capability and in rate limits. P7 asks for an id, so one has to be
+  picked. **Not a preview model:** the page states preview models *"might come with more
+  restrictive rate limits and will be deprecated with at least 2 weeks notice"*, which
+  would put a two-week clock inside a frozen pre-registration, and replacing a frozen judge
+  is a measurement-instrument change.
+- **`Q` cannot be read from documentation at all — by anyone.** The rate-limits page (dated
+  2026-08-18) carries no numeric free-tier figures; it states limits *"depend on a variety
+  of factors (such as your usage tier)"* and directs the reader to **Google AI Studio**, an
+  authenticated, per-account page. The public pages give only the mechanics — per project
+  rather than per API key, RPD resetting at midnight Pacific — and state that specified
+  limits *are not guaranteed* and update automatically as tier and account status change.
+- **T1's host is undefined, which makes it a design question rather than a lookup.** §8.3
+  says *"Local Ollama"*, and the eval engine that would run it is F3 and does not exist. If
+  it runs on the maintainer's machine, C-3's answer is one command away. If it is meant to
+  run in CI or on Cloud Run, **there is no host** — `min_instances = 0`, `max_instances ≤ 2`
+  and the smallest instance class is not a home for a local model, and P7 would be blocked
+  on an architecture decision C-3 was never scoped to answer.
+
+### 2.1 `Q` cannot be frozen, and `eval-plan.md` §8.3 already says why it need not be
+
+Appendix A fixes `Q` at Freeze A, and §2's freeze contract lets a frozen element change
+only by ADR under §12. **A constant the provider can move without notice is not frozen; it
+is copied.** Same shape as pre-registering a figure in a currency you are not billed in.
+
+The resolution is the one that already worked there: **do not pre-register a number you do
+not control — pre-register the behaviour when it binds.** §8.3 does exactly that:
+
+> Quota exhaustion is never a silent pass. If T2 cannot complete its assigned set, the run
+> is marked `judge_incomplete=true`, E2 returns `UNKNOWN`, and the gate decides on E1 and
+> E3 only.
+
+So `Q`'s **value affects throughput, not validity**. A run that hits the cap is a valid run
+with a disclosed gap.
+
+**Proposed for the session, not decided here:** P7 freezes T1 and T2's model ids as values,
+and records `Q` as an *observation with its date and source* rather than as a frozen
+constant. That is a wording change to Appendix A — which is inside what Freeze A fixes, so
+it belongs in the session rather than after it.
 
 ### C-5 — discharged, and the path in v0.1 was wrong
 
@@ -453,6 +497,21 @@ prefix with the commands that detach billing. It bears on DoD 1 fact 5, not on F
 7. **ADR-0008 moved to its own dated session** (§3). 2026-09-03, thirty minutes. It is
    unbudgeted work on the critical path to C7 and does not belong inside a freeze session
    with zero slack.
+
+**v0.6 — 2026-09-02** (supersedes v0.5). Two findings from actually performing C-3's
+lookup instead of scheduling it.
+
+14. **§2 records that two thirds of C-3 is not a lookup.** T2's model id is a choice among
+    six stable Flash models — §8.3's "Gemini Flash" is a family — with preview models ruled
+    out because a two-week deprecation notice inside a frozen pre-registration is not
+    viable. T1's host is undefined, and if it is not the maintainer's machine then P7 is
+    blocked on an architecture decision rather than a reading.
+15. **§2.1 records that `Q` cannot be frozen.** The provider does not publish it; the
+    rate-limits page defers to an authenticated per-account page and states limits are not
+    guaranteed. A constant the provider can move is copied rather than frozen. §8.3's
+    quota-exhaustion rule already makes `Q`'s value affect throughput and not validity, so
+    the proposal is to record it as a dated observation instead — a wording change to
+    Appendix A, which Freeze A fixes, so it belongs in the session.
 
 **v0.5 — 2026-09-02** (supersedes v0.4). Two additions from building the C-2 intake form.
 
