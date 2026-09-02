@@ -189,7 +189,7 @@ All load-generator traffic carries `synthetic=true`.
 | # | Metric | Method | Threshold |
 |---|---|---|---|
 | 4.5 | Monthly GCP bill | Billing console, archived screenshot per month | $0.00 for two consecutive calendar months |
-| 4.6 | Daily spend | Daily check; any non-zero day → incident note in `docs/` (architecture §7) | 0 unexplained non-zero days |
+| 4.6 | Daily spend trajectory | Daily check of month-to-date net cost against the linear burn line `ceiling × (day ÷ days_in_month)`; a reading above it, once month-to-date exceeds 20 TRY, → incident note in `docs/` (architecture §7) | 0 unexplained trajectory breaches |
 | 4.7 | Kill-switch | F0 live-fire evidence + re-attach runbook | Present and dated |
 
 **Verdict rule:** SC-4 met iff 4.1–4.3 pass their thresholds, 4.4 is documented, and
