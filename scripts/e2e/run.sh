@@ -154,7 +154,58 @@ step "comparing against the golden files"
 dotnet run --project worker/Plumbline.Fixtures -- --verify "${state}/spans_deduped.ndjson"
 
 # ---------------------------------------------------------------------------
-# 6. The poison payloads have to be in the dead-letter topic.
+# 6. Present the dedup view a duplicate it actually has to collapse.
+#
+# The local sink writes through an explicit COMMITTED stream, so the stack produces no
+# at-least-once duplicates of its own (f3e-01a S2). Every assertion above therefore holds
+# identically whether dedup works or whether there was simply nothing to dedup -- a
+# working view and an absent duplicate are the same output, which is the empty-result
+# blindness this phase keeps finding.
+#
+# Replaying one payload through the real path -- collector, Pub/Sub, worker, Storage
+# Write API -- is what redelivery looks like, and the worker deliberately carries no
+# deduplication (IngestionEndpoint.cs). Nothing is written directly: insertAll is a
+# forbidden cost invariant, and a row inserted beside the pipeline would not exercise the
+# path the claim is about.
+#
+# Poison is excluded from the replay because the dead-letter check below asserts an exact
+# depth, and re-sending it would double the count.
+# ---------------------------------------------------------------------------
+replay_fixture="claude-code/happy-path"
+replay_rows="$(python3 -c "import json;print(len(json.load(open('testdata/fixtures/${replay_fixture}/expected-rows.json'))))")"
+
+step "replaying ${replay_fixture} to produce a duplicate"
+"${compose[@]}" --profile tools run --rm --no-deps \
+  -e PLUMBLINE_ONLY="${replay_fixture}" sender
+
+step "waiting for the replayed rows to land"
+want_base=$((expected_rows + replay_rows))
+printf '  base table should reach %s row(s): %s + %s replayed\n' \
+  "$want_base" "$expected_rows" "$replay_rows"
+
+for attempt in $(seq 1 90); do
+  base_now="$(python3 scripts/e2e/query-rows.py --view spans --out /dev/null --count-only 2>/dev/null || echo 0)"
+  if [ "$base_now" -ge "$want_base" ]; then
+    printf '  %s row(s) in the base table after %ss\n' "$base_now" "$attempt"
+    break
+  fi
+  if [ "$attempt" = "90" ]; then
+    printf '  only %s of %s base rows after 90s; the replay did not land\n' \
+      "$base_now" "$want_base" >&2
+    "${compose[@]}" logs --tail 60 worker >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+step "asserting the dedup view returns the later row, not just one row"
+python3 scripts/e2e/dedup-probe.py || {
+  printf '  spans_deduped did not collapse the duplicate correctly\n' >&2
+  exit 1
+}
+
+# ---------------------------------------------------------------------------
+# 7. The poison payloads have to be in the dead-letter topic.
 #
 # One per dialect with a poison case. This is the no-silent-degradation property: an
 # unreadable message is retained where an operator can find it, not dropped.
@@ -174,7 +225,7 @@ python3 scripts/e2e/dlq-depth.py --expect "$poison_count" --timeout 120 || {
 }
 
 # ---------------------------------------------------------------------------
-# 7. No credential took part in any of this.
+# 8. No credential took part in any of this.
 # ---------------------------------------------------------------------------
 step "asserting the run touched no cloud"
 if "${compose[@]}" config | grep -qiE 'GOOGLE_APPLICATION_CREDENTIALS|service[_]account|/\.config/gcloud'; then
