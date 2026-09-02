@@ -161,6 +161,26 @@ jobs:
       - name: Claude Code capture diagnostics self-test
         run: ./scripts/capture/claude-code-preflight.sh --self-test
 
+      # T1-05. `require_partition_filter` is enforced by BigQuery in the cloud and by
+      # nothing locally -- the stand-in cannot create a partitioned table at all. This
+      # constrains the repository where the engine cannot be constrained. The self-test
+      # blocks; the scan does not, on the same reasoning as the cross-reference check.
+      - name: Partition filter self-test
+        run: ./scripts/ci/partition-filter-check.sh --self-test
+
+      - name: Partition filter scan (non-blocking)
+        run: |
+          mkdir -p artifacts
+          ./scripts/ci/partition-filter-check.sh | tee artifacts/partition-filter.txt
+
+      - name: Upload partition filter findings
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: partition-filter-findings
+          path: artifacts/partition-filter.txt
+          if-no-files-found: warn
+
       - name: Cross-reference scan (non-blocking)
         run: |
           mkdir -p artifacts

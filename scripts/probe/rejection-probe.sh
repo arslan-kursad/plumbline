@@ -46,6 +46,8 @@ echo
 # a filter; the local table is created by seed.py with columns only and no timePartitioning,
 # so BigQuery semantics cannot enforce one there. Production is measured here; the local
 # side is settled by construction and is NOT executed by this script.
+# partition-filter: intentionally-absent -- the missing predicate IS the measurement.
+# This query exists to be refused; adding a filter would delete the case.
 run "S1  spans, no partition predicate"        REJECTED \
     'SELECT COUNT(*) FROM `'"$PROJECT"'.plumbline.spans`'
 
@@ -54,6 +56,8 @@ run "S1  spans, no partition predicate"        REJECTED \
 run "S1  spans, with partition predicate"      VALIDATED \
     'SELECT COUNT(*) FROM `'"$PROJECT"'.plumbline.spans` WHERE start_time >= "2026-08-01"'
 
+# partition-filter: intentionally-absent -- same, through the view: this is what proves
+# the base table's requirement reaches consumers that never name the base table.
 run "S1  spans_deduped, no partition predicate" REJECTED \
     'SELECT COUNT(*) FROM `'"$PROJECT"'.plumbline.spans_deduped`'
 
