@@ -145,6 +145,15 @@ jobs:
       - name: Cross-reference check self-test
         run: ./scripts/ci/xref-check.sh --self-test
 
+      # The capture harness cannot be run in CI — a capture needs a real agent and a
+      # human. What CI can hold is that its two checks still discriminate: the manifest
+      # validator accepts a complete captured manifest and rejects both a manifest
+      # missing a row-1.2 field and the hand-authored corpus, and the redaction gate
+      # refuses a payload no rule file accounts for. A validator that only ever refuses,
+      # or only ever passes, has not been tested.
+      - name: Capture harness self-test
+        run: ./scripts/capture/capture.sh --self-test
+
       - name: Cross-reference scan (non-blocking)
         run: |
           mkdir -p artifacts

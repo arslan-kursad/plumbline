@@ -1,0 +1,21 @@
+# Validator self-test — a manifest that IS admissible under SC-1 row 1.2.
+#
+# Not a corpus fixture and not evidence about any emitter. It exists so the validator can
+# be shown to accept as well as reject: a validator that only ever refuses has not been
+# tested either.
+
+dialect: selftest-admissible
+provenance: captured
+capture_origin: >
+  Local OTLP/HTTP receiver on 127.0.0.1:4318, scripts/capture/otlp-file-receiver.py,
+  single interactive run of the agent under test.
+captured_on: 2026-09-02
+emitter: selftest agent
+emitter_version: "1.0.0"
+otel_sdk_version: "OTel-OTLP-Exporter-Python/1.27.0"
+semconv_version_emitted: "1.41.0"
+schema_url_emitted: https://opentelemetry.io/schemas/1.41.0
+otel_semconv_stability_opt_in: unset
+redacted_fields:
+  - user.email
+redaction_rules: normalization/redaction/v1/selftest.yaml
