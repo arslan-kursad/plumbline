@@ -1,6 +1,6 @@
 # Freeze A — Pre-session brief
 
-**Version:** 0.3 · **Status:** Accepted · **Date:** 2026-09-01
+**Version:** 0.4 · **Status:** Accepted · **Date:** 2026-09-02
 **Session:** 2026-09-02, 10:00–13:00 Europe/Istanbul · **Duration:** 3 h
 **Freeze target:** [`docs/eval-plan.md`](../eval-plan.md) v0.2 · **Appendix A:** P1–P7, P11
 
@@ -44,6 +44,23 @@ is adjusted before the session starts, not during it.
 **C-1 is the binding precondition.** P1 and P6 both hang on it, and P6 determines whether
 E1 survives as the primary deterministic endpoint. Entering the session without C-1
 converts the first hour from decision to retrieval.
+
+**C-1 also has to answer where the output lands in the trace.** `eval-plan.md` §5.1 is
+categorical: *"Evaluation of a run must be reproducible from the trace alone: if a metric
+cannot be computed from persisted telemetry, it is not a valid metric here."* P1 asks for
+the output contract; it does not ask whether that contract is **observable**, and R3
+(*"output parses; required fields present; enum values in allowed set"*, §8.1) is computed
+from the trace.
+
+So three questions ride with the schema, and none of them is answered by the field list:
+
+- **Where does the output land** — a span attribute, an event body, or nowhere? If nowhere,
+  **R3 cannot be computed at all**, and E1 loses a conjunct of `R1∧R2∧R3∧R4`. That is an
+  endpoint change, not a placeholder fill.
+- **Is it truncated** by an attribute-size limit at realistic output lengths? A silently
+  truncated output fails R3 for a reason that is not a regression.
+- **Does it carry personal or customer-derived content?** ADR-0006 and CLAUDE.md would
+  require redaction before storage, and a redacted output may not be checkable.
 
 **C-2, C-3 and C-4 are not design decisions.** They are transcription, lookup, and
 counting. They are listed as preconditions specifically so that they do not consume
@@ -157,6 +174,29 @@ carrying different work.
 
 Scenario C is the one that does not fit in the session. If P6 lands on C, §5 option (b)
 is the expected outcome and should be taken at T+150 without further debate.
+
+### 4.2 The degradation catalog has unstated preconditions on the subject
+
+`eval-plan.md` §7.2's six degradations are **frozen at Freeze A**. Three of them assume
+properties of the Adjudicator that nothing in this repository confirms, and a freeze would
+pin a variant that cannot be built.
+
+| Variant | Assumes | Confirmed by |
+|---|---|---|
+| **D2 — prompt ablation**, the **primary** case | the system prompt has a distinguishable constraint/rubric section, removable as a single-factor change with no other diff | C-1 |
+| D4 — context truncated to 1 item | an input carries more than one evidence item | C-1 |
+| D5 — tool errors caught and ignored | the agent calls tools, and has error handling that can be made to swallow | C-1 |
+
+**D2 is the one that changes the session.** §7.2 makes it primary deliberately — *"the
+hardest realistic regression, because the agent keeps producing structurally valid output
+and only quality degrades"* — and notes that a gate catching only D6 catches crashes rather
+than regressions.
+
+**If the prompt has no separable constraint section, the primary experimental case has to
+be redesigned.** That is not a placeholder fill; it is a change to the experiment design
+Freeze A exists to fix, and it lands in §5 option (b) the same way scenario C does.
+
+Checked at T+0 with the rest of §2, not discovered at T+125 when P4 is being written.
 
 ---
 
@@ -274,8 +314,11 @@ headings, and every path it names against the filesystem. Four findings; two are
 conditions above, two are not defects.
 
 **Clean:** all internal section references resolve. Every `architecture.md` section the
-plan cites — §3.3 dedup, §4.1 `spans_deduped`/`spans_real`/`synthetic`, §4.2 `datasets`/
-`eval_runs`, §5, §7, §10 OQ-1 and OQ-4 — exists and still says what the plan says it says.
+plan cites — `architecture.md` §3.3 (dedup), §4.1 (`spans_deduped`/`spans_real`/
+`synthetic`), §4.2 (`datasets`/`eval_runs`), §5, §7, §10 OQ-1 and OQ-4 — exists and still
+says what the plan says it says. **Each is written against `architecture.md` and not as a
+bare number**, because three of them — §4.1, §4.2 and §5 — are also section numbers *this*
+document has, and a bare reference would resolve locally and silently to the wrong one.
 
 **Finding 1 — SC-1 row 1.1 names a directory that does not exist.** The row's data-source
 column reads `normalization/testdata/<dialect>/`. That string occurs **once in the whole
@@ -363,6 +406,29 @@ prefix with the commands that detach billing. It bears on DoD 1 fact 5, not on F
 7. **ADR-0008 moved to its own dated session** (§3). 2026-09-03, thirty minutes. It is
    unbudgeted work on the critical path to C7 and does not belong inside a freeze session
    with zero slack.
+
+**v0.4 — 2026-09-02** (supersedes v0.3). Two additions to C-1's scope, from building its
+intake form against `eval-plan.md`.
+
+9. **C-1 must answer where the output lands in the trace** (§2). §5.1 says a metric that
+   cannot be computed from persisted telemetry is not a metric here, and R3 is computed
+   from the trace. P1 asks for the contract and not for its observability, so an
+   Adjudicator whose output never reaches a span would satisfy P1 and leave E1 with a
+   conjunct it cannot evaluate.
+10. **A reference in §7.1 was silently resolving to the wrong document, and adding §4.2
+    made it worse before it was caught.** §7.1's "clean" line cited
+    `architecture.md` §3.3 through §10 by bare number. This document already had its own
+    §4.1 and §5, so those two were
+    resolving locally rather than to the architecture; adding a §4.2 heading in this
+    revision extended the collision to a third, and the cross-reference check **went quiet
+    rather than louder** — a false positive became a false negative. All of them are now
+    written against their document. The check cannot tell "resolves correctly" from
+    "collides coincidentally", which is worth knowing about it.
+11. **§4.2 records that three degradations assume properties of the subject.** D2 —
+    the primary case — assumes a separable constraint section in the system prompt; D4
+    assumes multi-item inputs; D5 assumes tool calls. The catalog is frozen at Freeze A,
+    so an unconfirmed assumption would pin a variant that cannot be built. D2's failure is
+    a §5 option (b) event, like scenario C.
 
 **v0.3 — 2026-09-01** (supersedes v0.2). One change, from reading the file being frozen
 rather than the plan for freezing it.
