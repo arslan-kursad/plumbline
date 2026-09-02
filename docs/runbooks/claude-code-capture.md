@@ -33,6 +33,17 @@ promoted from bytes. A real capture replaces it, and the manifest's provenance b
 
 ## 3. Prerequisites
 
+**Run the check rather than reading the list:**
+
+```bash
+scripts/capture/claude-code-preflight.sh
+```
+
+Every bullet below used to be a line a human confirmed by eye. Three attempts were spent
+that way and all three failed at authentication before reaching a tool call, so the list
+is now executable and blocks rather than advises. Check 8 is the authentication probe —
+the one that has failed every time — and it runs last because everything above it is free.
+
 - Claude Code installed and **interactively authenticated** (`claude` runs and answers
   without an auth error).
 - Python 3.9+ — standard library only, nothing to install.
@@ -115,6 +126,24 @@ ends — the exporter flushes on shutdown.
 Ctrl-C in terminal 1. It prints how many export requests it captured.
 
 ## 5. What a good capture looks like
+
+**Ask the report, and do not end without a name:**
+
+```bash
+python3 scripts/capture/capture_report.py ~/plumbline-captures/$(date -u +%Y-%m-%d)
+```
+
+It says, per span type, whether the emitter produced it, and then names one of four
+terminal states: `NO-EXPORT`, `REACHED-MODEL-NOT-TOOLS`, `BOUNDARY MOVED`, or
+`EXPORTED-BUT-UNRECOGNISED`. **"Retry" is not among them.** An attempt that ends without a
+named outcome has spent the scarcest resource on the path to 2026-10-04 and bought
+nothing, which is what this tool exists to prevent.
+
+`BOUNDARY MOVED` is the one to hope for: it means a span type appeared that no previous
+capture produced, and that is a direct answer to part of architecture §10 OQ-4.
+
+The checks below are what the report automates, kept here because they are also what you
+would look for by hand:
 
 - **At least one file**, non-zero size, in the capture directory.
 - The session **actually called tools**: you saw Write, Read and Bash run. If the model
