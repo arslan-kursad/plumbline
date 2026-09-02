@@ -81,6 +81,23 @@ than left to memory.
   (13b), and both holding across a 14-day window with ingest running (13c). Owner:
   Lane C. **F2 is not re-opened by it**, and the zero-cost claim is not published
   until it closes.
+
+  **Amended by ADR-0004 Amendment 5 (2026-09-02), and one of the three items no longer
+  reads.** The hard `$0.00` constraint was withdrawn for a **200 TRY net monthly ceiling**;
+  `detach_threshold` is applied and verified live
+  ([`f2-detach-threshold-200-applied.md`](../evidence/f2-detach-threshold-200-applied.md)).
+
+  - **13a asks for evidence of a claim the project has stopped making.** Gross cost is
+    non-zero during entirely free operation, which is why the hard zero was close to
+    unachievable and is the reason the ceiling exists. Two readings — 13a becomes the
+    ceiling, or it survives as a recorded-but-ungated figure — and choosing is a spec
+    amendment, so it is **raised here rather than answered**.
+  - **13b and Amendment 5's live-fire are one event, not two.** Both require Amendment 4's
+    three-step procedure; 13b additionally requires it after the account upgrade and
+    against a real charge. So the run is dated after **C1 (2026-09-21)** and after the
+    credit ends (**2026-10-05**), and it discharges both. Recording them separately would
+    produce two obligations where there is one event — §5's identifier rule.
+  - **13c is unaffected.** It is a duration claim over whatever 13a resolves to.
 - **C1–C7** — §3.
 - **#61** — open until F2C-12. #82 merged the corrected view definitions on
   2026-08-31; it did not deploy them. The cloud views are still the two-column form,
@@ -298,7 +315,7 @@ then would be the substitution this note exists to refuse.
 | Deliveries | 5 runs: one refused at branch A, three of `w4-third-delivery`, one of `w4-second-delivery` |
 | Dead-lettered messages | 8 — 7 from the failed first delivery, 1 from the drill |
 | Decision-log entries | 78, across five series |
-| Evidence documents | 18 |
+| Evidence documents | 19 |
 | Runbooks | 13 |
 | Pull requests merged from #82 | 43 |
 | Invariant gates | 9, all green with none skipped on run [`33503481240`](https://github.com/arslan-kursad/plumbline/actions/runs/33503481240), `main` @ `216fee2` |
