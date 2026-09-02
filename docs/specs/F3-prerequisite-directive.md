@@ -286,9 +286,14 @@ capture from an emitter that does not emit.
 
 **The consequence.** Adjudicator instrumentation sits on F3's critical path irrespective of
 which phase document owns it. This is not a new discovery of the capture requirement — the
-capture plan already stands at three items. It is a discovery about *sequencing*: the planned
-move from SC-1 0/3 to 2/3 does not unblock the gate, because the two capturable emitters are
-not the one it reads. F3's hour budget was set against a scope that excluded instrumentation.
+capture plan already stands at three items. It is a discovery about *sequencing*: **whichever
+captures succeed, none of them is the subject the gate scores.** Read from the manifests
+2026-09-02, no dialect is `captured`; of the three, `langgraph-python` is the Adjudicator and
+cannot be captured at all because nothing emits, `dotnet-agent` is capturable and is the
+stretch-goal replication, and `claude-code` is blocked at authentication and is excluded from
+the experiment by [`eval-plan.md`](../eval-plan.md) §7.1. Moving SC-1 off 0/3 is real progress
+on SC-1 and moves the gate not at all. F3's hour budget — `project-brief.md`:59, ~20h — was
+set against a scope that excluded instrumentation.
 
 **Dispositions. Exactly three, and Lane A picks none of them.**
 
@@ -523,7 +528,9 @@ re-derivation (R-E).
 
 ## 10. Changelog
 
-**v0.2 — 2026-09-02** (supersedes v0.1). Nine changes, each with the read that caused it.
+**v0.2 — 2026-09-02** (supersedes v0.1). Ten changes, each with the read that caused it.
+Item 9 was added the same day, after the rest had merged; it is recorded here rather than as a
+separate version because it corrects a sentence this list already owns.
 
 1. **T1-01 closed as unsatisfiable.** [`seed.py`](../../scripts/e2e/seed.py):187 records both
    halves of the requested work as already attempted and failed, measured in CI; `v0.8.1` is the
@@ -565,7 +572,13 @@ re-derivation (R-E).
    "session summary" — are not files in `docs/`. The count is reconciled against
    [`F3-entry-directive.md`](F3-entry-directive.md), whose own §11 says nine while the
    post-split enumeration is ten.
-9. **§3 separates issues from pull requests, and Track 1's charter is replaced.** `#148`, `#155`
+9. **T2-01's capture arithmetic was wrong and is corrected.** The text
+   read *"the two capturable emitters are not the one it reads"*, inherited from v0.1 without
+   being checked. Read from the manifests: only `dotnet-agent` is capturable today —
+   `langgraph-python` has no emitter and `claude-code` is blocked at authentication — so the
+   count was wrong and the sharper statement is that no capturable dialect is the gate's
+   subject. Found while filing `#177`, which states it correctly.
+10. **§3 separates issues from pull requests, and Track 1's charter is replaced.** `#148`, `#155`
    and `#156` were listed as open issues and are merged pull requests (issues API, 2026-09-02) —
    the defect [`F3-entry-directive.md`](F3-entry-directive.md) §11 item 4 already recorded
    against its own v0.1, with `#148` appearing in both lists. Track 1's charter moves from a
