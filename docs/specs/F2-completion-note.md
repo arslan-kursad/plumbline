@@ -82,16 +82,19 @@ than left to memory.
   Lane C. **F2 is not re-opened by it**, and the zero-cost claim is not published
   until it closes.
 
-  **Amended by ADR-0004 Amendment 5 (2026-09-02), and one of the three items no longer
-  reads.** The hard `$0.00` constraint was withdrawn for a **200 TRY net monthly ceiling**;
+  **Amended by ADR-0004 Amendment 5 (2026-09-02); 13a rewritten by
+  [`F2-minimal-gcp-footprint.md`](F2-minimal-gcp-footprint.md) §12 Amendment 4 the same
+  day.** The hard `$0.00` constraint was withdrawn for a **200 TRY net monthly ceiling**;
   `detach_threshold` is applied and verified live
   ([`f2-detach-threshold-200-applied.md`](../evidence/f2-detach-threshold-200-applied.md)).
 
-  - **13a asks for evidence of a claim the project has stopped making.** Gross cost is
-    non-zero during entirely free operation, which is why the hard zero was close to
-    unachievable and is the reason the ceiling exists. Two readings — 13a becomes the
-    ceiling, or it survives as a recorded-but-ungated figure — and choosing is a spec
-    amendment, so it is **raised here rather than answered**.
+  - **13a is now the ceiling.** Resolved 2026-09-02 by the maintainer and filed as
+    [`F2-minimal-gcp-footprint.md`](F2-minimal-gcp-footprint.md) §12 Amendment 4:
+    *"Billing Reports for a full period show net cost at or below the
+    monthly ceiling — 200 TRY."* It read *"gross cost $0.00"*, and gross is non-zero
+    during entirely free operation, so left alone it would have asked for evidence of a
+    claim the project had stopped making. The alternative — keep gross as a recorded but
+    ungated figure — was rejected: a DoD item nothing decides on is not one.
   - **13b and Amendment 5's live-fire are one event, not two.** Both require Amendment 4's
     three-step procedure; 13b additionally requires it after the account upgrade and
     against a real charge. So the run is dated after **C1 (2026-09-21)** and after the

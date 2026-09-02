@@ -89,3 +89,8 @@ Two readings, and choosing between them is a judgement rather than a transcripti
 **Not drafted here.** It changes a Definition of Done item after the phase ran, which is a
 spec amendment and belongs with the maintainer — the same treatment `eval-plan.md` row 4.6
 was given for the same reason. `#74` and `#138` both touch it.
+
+> **Answered 2026-09-02.** Reading 1 was taken: 13a is now the ceiling, filed as spec §12
+> Amendment 4. The measurement above is unchanged; this line records the outcome so the
+> question is not read as still open. `eval-plan.md` rows 4.5 and 4.6 remain outstanding
+> and are Class 3.
