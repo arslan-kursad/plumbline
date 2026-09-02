@@ -16,7 +16,9 @@ implementation + live case study, dogfooded on the author's own agents.
    a .NET agent (Apartment Triage), and Claude Code's native OTel emission.
 3. Pre-registered evaluation criteria and a seeded-regression controlled experiment
    (baseline agent vs deliberately degraded version; the gate must catch it).
-4. Runs at $0.00 on GCP Always Free, with enforced guardrails — itself a publishable result.
+4. Runs under an enforced monthly cost ceiling of 200 TRY net on GCP — itself a publishable
+   result. This read "$0.00 on GCP Always Free" until 2026-09-02; ADR-0004 Amendment 5
+   records why a hard zero was withdrawn.
 
 ## Architecture (summary — full detail in docs/architecture.md)
 Agents (OTel SDK) -> Go Collector on Cloud Run (OTLP HTTP+gRPC, API-key auth, per-key rate
@@ -68,7 +70,8 @@ OTLP protobuf is preserved end-to-end (ADR-0001); no invented canonical schema.
 - >=3 heterogeneous dialects normalized with golden tests.
 - 14-day uninterrupted live ingest from 3 real sources.
 - Seeded-regression experiment caught by the gate at pre-registered thresholds.
-- Collector p95 overhead and RAM ceiling documented; two consecutive months at $0.00.
+- Collector p95 overhead and RAM ceiling documented; two consecutive calendar months at or
+  below 200 TRY net, both after the promotional credit expires on 2026-10-05.
 
 ## Working model
 claude.ai Project = design/ADR/spec/review layer (no implementation).

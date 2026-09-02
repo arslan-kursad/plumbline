@@ -206,14 +206,29 @@ variable "detach_threshold" {
     Not `> 0`. Amendment 1's trigger was any reported cost above zero, and live
     operation showed that a figure can be non-zero while nothing has been billed:
     a gross line appears before, or instead of, the credit that cancels it. The
-    observed magnitude was 0.04 TRY. Five absorbs that with no state to keep,
-    and stays far below any real charge that could accumulate inside one
-    notification interval.
+    observed magnitude was 0.04 TRY.
 
-    The zero-cost claim is measured from the invoice, never from this number.
+    **This is the ceiling, not an epsilon (Amendment 5, D2).** It was 5.00 while
+    `$0.00` was a hard constraint: any real charge was an emergency, so the
+    threshold only had to absorb credit-lag noise. Under a 200 TRY monthly
+    budget, ordinary operation legitimately produces charges, and 5.00 would
+    detach billing on exactly the spending the ceiling now permits.
+
+    The budget publishes `spend_basis = "CURRENT_SPEND"`, so the figure the
+    function reads is month-to-date cumulative net spend. This number therefore
+    means "detach when this month's net spend reaches the ceiling" and needs no
+    second mechanism to become one.
+
+    Currency is the billing account's, which is TRY. The ceiling is stated in
+    TRY rather than USD deliberately: the Budget API rejects a currency that
+    differs from the account's, so a USD figure would need converting at read
+    time, and a pre-registered number whose meaning moves with the exchange rate
+    is not one.
+
+    The cost claim is measured from the invoice, never from this number.
   EOT
   type        = number
-  default     = 5.00
+  default     = 200.00
 
   validation {
     condition     = var.detach_threshold > 0
