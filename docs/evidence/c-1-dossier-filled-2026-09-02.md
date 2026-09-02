@@ -2,7 +2,8 @@
 
 **Form:** [`c-1-adjudicator-dossier.md`](../specs/c-1-adjudicator-dossier.md) v0.1
 **Filled by:** Lane A, from repository reads only · **Status:** partial — see §7
-**Revised 2026-09-02, second pass** — A3 closed, A4 and A5 narrowed, E3 given numbers.
+**Revised 2026-09-02** — second pass closed A3 and gave E3 numbers; third pass closed A4 and A5.
+**Every field is now answered or carries a decision-shaped `UNKNOWN`.** See §7.
 **Source for every sourced field:** `github.com/arslan-kursad/aiqs-agent` @
 `0779c04ff98a744285b8b1c93ce35f4efd4a89b2`, committed 2026-07-18T18:20:33Z, read
 2026-09-02. Detail in [`c1-adjudicator-readout.md`](c1-adjudicator-readout.md).
@@ -78,23 +79,33 @@ model's re-declaration of them as bare strings (`api/main.py:103-111` passes the
 values straight through). **Milder than "contract by convention", and a different fix:**
 narrowing the response model's annotations, not adding validation that already exists.
 
-**A4 — Contract stability.** **Partly answered, and the remaining gap is narrow.**
+**A4 — Contract stability.** **Answered by measurement, not by argument.**
 
-Three enforcement points make an out-of-set value structurally hard to emit: `Decision` is
-an enum, `Verdict` is a `Literal` whose parser raises on anything else, and
-`AdjudicationState` sets `model_config = {"extra": "forbid"}` (`graph/state.py`) so an
-unexpected field cannot enter the state at all.
+`results/runs/efficient_ad-small_mvtec-screw_20260622T055657Z/decision_scores.csv` holds
+**160 per-item rows** with three decision columns. Every value observed across
+**480 emissions**:
 
-`tests/` carries `test_api.py`, `test_decision.py`, `test_graph.py` and
-`test_graph_parity.py`, so the contract has test coverage.
+| Column | Observed |
+|---|---|
+| `decision_native` | `escalate` × 41, `fail` × 119 |
+| `decision_target` | `pass` × 160 |
+| `decision_target_realistic` | `escalate` × 152, `pass` × 8 |
 
-**`UNKNOWN — not looked up`: whether any historical output ever fell outside the sets.**
-`results/decisions.csv` holds **aggregate metrics per run, not per-item decisions**, so it
-cannot answer this; per-item outputs would be under `results/runs/`, which was not opened.
+**Nothing outside `{pass, fail, escalate}`.** This is the first field in the dossier
+answered by looking at what was emitted rather than at what the code permits, which is what
+A4 asks for.
 
-**Still work, and now smaller than it looked:** with three enforcement points upstream, the
-question is less "does it drift" than "was it always enforced" — a question about history,
-answerable from stored runs.
+Consistent with the three structural enforcement points — `Decision` is an enum, `Verdict`
+is a `Literal` whose parser raises, `AdjudicationState` forbids extra fields — and with the
+test coverage in `tests/`.
+
+**One observation worth carrying, though it is not A4's question.** At the plan's default
+`target_prevalence = 0.02`, `decision_target` is `pass` for **all 160 items**. Under the
+realistic cost matrix it is 152 `escalate` and 8 `pass`. So the policy's verdict
+distribution moves sharply with the prevalence prior, and a baseline run whose verdicts are
+constant offers a seeded-regression experiment no variance in that column to work with.
+**This does not affect E1**, which scores the `R1∧R2∧R3∧R4` contract rather than the
+agent's verdict — recorded so it is not mistaken for one.
 
 **A5 — Failure and refusal shape.** **Answered. Three shapes, and only one of them is the
 agent declining.**
@@ -119,10 +130,22 @@ an empty response, invalid JSON, schema-validation failure, out-of-range confide
 unknown verdict. **It does not fall back to `unsure`** — the mock backend's
 `"no label -> abstain"` at `backend.py:90` is a test path, not production behaviour.
 
-**This matters for `error` in `eval-plan.md` §5.1**, which says a harness or quota failure
-*"is never silently coerced to `fail`"*. The Adjudicator behaves the same way at its own
-boundary, so the two conventions agree. `UNKNOWN — not looked up`: what the API returns
-when `VLMParseError` propagates — whether it becomes a 5xx or is caught upstream.
+**Answered: a parse failure surfaces as HTTP 400.** `VLMParseError(ValueError)`
+(`vlm/backend.py:39`) is caught by the `except ValueError` around `graph.invoke`
+(`api/main.py:176-179`) and re-raised as a 400. The Anthropic client is built with
+`max_retries=8` (`backend.py:109,128`), so transport failures are retried inside the SDK
+before a parse error can surface.
+
+**And that creates a conflation the eval has to undo.** A malformed image and an
+unparseable model response produce **the same status code**, so from outside the API they
+are indistinguishable. `eval-plan.md` §5.1 needs them apart: *"`error` (harness or quota
+failure) is never silently coerced to `fail`; it is reported separately and excluded from
+the denominator."* A bad input is a harness error and belongs outside the denominator; a
+model that cannot produce parseable output is the agent failing, and belongs inside it.
+
+**Recorded as a finding rather than an `UNKNOWN`:** the distinction is not available at the
+API boundary today. Recovering it needs either a distinguishable status or an error body
+that names the cause — a small change in the Adjudicator, and one more item for B4's list.
 
 ---
 
@@ -166,7 +189,11 @@ dossier.**
 | `resolved_by` | **neither** — it records which path resolved the item, not whether the answer was right |
 | `VLMInfo.verdict` | **exists, indirectly** — `defect`/`clean` maps onto the same annotation; `unsure` has no ground truth by construction |
 
-**C2 — Label source and independence.** **MVTec AD**, and it is independent.
+**C2 — Label source and independence.** **MVTec AD**, and it is independent. **Confirmed
+per item, not inferred:** `decision_scores.csv` carries a `label` column alongside every
+decision — `0` = good, `1` = defective, 41 and 119 in the screw run. `vlm/state.py:28`
+records the same field as *"ground truth (eval only; 0=good, 1=defective)"* and notes that
+in production it is `None` and never consulted.
 `src/aiqs/data.py:31` pins *"anomalib 1.2: original MVTec AD only (task=SEGMENTATION keeps
 GT masks for AUPRO/AUPIMO)"*, and `api/artifact.py` carries `n`, `n_good`, `n_defective`
 and `pi_source` (native sample defect prevalence) per run — the counts only exist because
@@ -303,8 +330,8 @@ unchanged.
 | Field | Reason | Is it work? |
 |---|---|---|
 | ~~A3 (exact emitted strings)~~ | **answered on the second pass** — `Decision(str, Enum)`, all lowercase | **closed** |
-| A4 (historical out-of-set values) | not looked up — `results/runs/` not opened | **yes**, small |
-| A5 (what the API returns on `VLMParseError`) | not looked up | **yes**, small |
+| ~~A4 (historical out-of-set values)~~ | **measured** — 480 emissions, none outside the set | **closed** |
+| ~~A5 (`VLMParseError` path)~~ | **answered** — HTTP 400, and it conflates with bad input | **closed, and it added an item to B4** |
 | B4 (size of the instrumentation change) | not decided — depends on how much state is exported | **yes, and it is the largest item here** |
 | C4 (label volume) | not looked up — procedure recorded instead | no, until the dataset's categories are decided |
 | C5 (MVTec inter-annotator reliability) | not looked up — may not have been published | no |
@@ -347,3 +374,51 @@ score absent outputs as failures.
 **E3 gained numbers** and they sit at the threshold — 132 to 160 per category against
 `N_gate ≥ 160`. So the volume question is a category-count question, which is a Freeze A
 choice rather than an operational measurement.
+
+
+---
+
+## Third pass — 2026-09-02. C-1 is complete in the form's sense.
+
+**A4 is closed by measurement.** 160 per-item rows, three decision columns, 480 emissions,
+nothing outside `{pass, fail, escalate}`. The dossier's first field answered by looking at
+what was emitted rather than at what the code permits.
+
+**A5 is closed, and closing it produced a finding.** `VLMParseError` subclasses
+`ValueError`, so it is caught by the guard around `graph.invoke` and returned as **HTTP
+400** — the same code a malformed image gets. From outside the API the two are
+indistinguishable, and `eval-plan.md` §5.1 requires them apart: a bad input is a harness
+error and leaves the denominator, a model that cannot produce parseable output is the agent
+failing and stays in it. **One more item for B4.**
+
+**C2 is now confirmed per item.** `decision_scores.csv` carries `label` beside every
+decision — the reference label is not inferred from run-level counts, it is in the same row
+as the output it would score.
+
+### What remains, and why none of it is a read
+
+| Field | Why it is open |
+|---|---|
+| **B4** — the size of the instrumentation change | **not decided.** Depends on how much state is exported, which nobody has chosen. Now carries a second item: making a parse failure distinguishable from a bad input |
+| **C3, C4** — label cost and volume | follow from which categories `adjudicator-v1` draws |
+| **C5** — MVTec inter-annotator reliability | upstream of this project; may never have been published |
+| **E3** — case volume | 132–160 per category is measured; **which categories** is a Freeze A choice |
+
+**Three of the four are one decision.** Choose the categories and C3, C4 and E3 resolve
+together. That decision belongs to Freeze A, not to C-1 — the dossier's job was to make it
+a decision rather than an unknown, and it has.
+
+**B4 is the one that is neither a read nor a Freeze A choice.** It is work in another
+repository, it is F4 by the Brief's phase list, and both SC-1 and SC-2 depend on it.
+
+### The completion test, applied
+
+1. Every field carries an answer or an `UNKNOWN` with a stated reason. **Yes.**
+2. Every answer names its source. **Yes** — file and line, or a stored run artefact.
+3. The derivation table is filled per field and the overall reading is a scenario.
+   **Yes — Scenario A**, carried by `decision`.
+4. Blocking `UNKNOWN`s are listed in one place. **Yes**, §7 and the table above.
+
+**C-1 is complete.** What it hands to Freeze A is a determined scenario, a viable primary
+endpoint, a working primary degradation vector — and one blocker the form was not built to
+find: the endpoint's input is not observable, because the agent emits nothing.
