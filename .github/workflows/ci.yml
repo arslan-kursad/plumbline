@@ -154,6 +154,13 @@ jobs:
       - name: Capture harness self-test
         run: ./scripts/capture/capture.sh --self-test
 
+      # Same reasoning: the capture itself needs a human and an authenticated Claude
+      # Code, so what CI holds is that the pre-flight refuses a bad environment and the
+      # report names each terminal state — including the one anchored to the real corpus
+      # payload, which is the boundary every attempt so far has hit.
+      - name: Claude Code capture diagnostics self-test
+        run: ./scripts/capture/claude-code-preflight.sh --self-test
+
       - name: Cross-reference scan (non-blocking)
         run: |
           mkdir -p artifacts
