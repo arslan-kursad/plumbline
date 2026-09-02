@@ -13,10 +13,23 @@ set -eu
 collector="${COLLECTOR:-http://collector:4318}"
 key="$(cat /e2e/api-key)"
 
+# PLUMBLINE_ONLY restricts the send to payload paths containing the given substring.
+# Unset -- the default -- sends the whole corpus, which is what the first pass does.
+# The replay pass sets it, because re-sending the poison payloads would double the
+# dead-letter depth and the check downstream asserts an exact count.
+only="${PLUMBLINE_ONLY:-}"
+
 status=0
 sent=0
 
 for payload in /testdata/fixtures/*/*/request.pb; do
+  if [ -n "$only" ]; then
+    case "$payload" in
+      *"$only"*) ;;
+      *) continue ;;
+    esac
+  fi
+
   case "$payload" in
     */poison/request.pb) expect="accepted (unreadable downstream)" ;;
     *) expect="accepted" ;;
@@ -37,6 +50,14 @@ for payload in /testdata/fixtures/*/*/request.pb; do
 done
 
 printf '\nsent %d payload(s)\n' "$sent"
+
+# A filter that matches nothing sends nothing and exits 0, which downstream reads as a
+# successful replay that presented no duplicate. Refuse rather than report an empty
+# success -- the same rule the dedup probe applies to its own empty reading.
+if [ "$sent" -eq 0 ]; then
+  printf 'no payload matched PLUMBLINE_ONLY=%s\n' "$only" >&2
+  exit 1
+fi
 
 if [ "$status" -ne 0 ]; then
   printf 'at least one payload was refused by the collector\n' >&2

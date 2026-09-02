@@ -205,6 +205,13 @@ jobs:
       - name: Cloud harness guard tests
         run: python3 scripts/e2e/cloud_test.py
 
+      # The dedup probe's verdict, which is the part carrying the judgement. It needs
+      # no containers either, and its cases are one per way a dedup view can be wrong
+      # -- including the way that used to be invisible, an absent duplicate reported as
+      # a pass.
+      - name: Dedup probe verdict tests
+        run: python3 scripts/e2e/dedup_probe_test.py
+
       - name: Prove every gate can fail
         run: ./scripts/ci/prove-gates.sh
 
