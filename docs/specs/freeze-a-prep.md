@@ -1,6 +1,6 @@
 # Freeze A — Pre-session brief
 
-**Version:** 0.4 · **Status:** Accepted · **Date:** 2026-09-02
+**Version:** 0.5 · **Status:** Accepted · **Date:** 2026-09-02
 **Session:** 2026-09-02, 10:00–13:00 Europe/Istanbul · **Duration:** 3 h
 **Freeze target:** [`docs/eval-plan.md`](../eval-plan.md) v0.2 · **Appendix A:** P1–P7, P11
 
@@ -62,9 +62,34 @@ So three questions ride with the schema, and none of them is answered by the fie
 - **Does it carry personal or customer-derived content?** ADR-0006 and CLAUDE.md would
   require redaction before storage, and a redacted output may not be checkable.
 
-**C-2, C-3 and C-4 are not design decisions.** They are transcription, lookup, and
-counting. They are listed as preconditions specifically so that they do not consume
-session time.
+**C-2 carries a question the session has to answer before it can be filled.** `Triage`
+appears three times in `eval-plan.md`: §5.2's `triage-v1` dataset, §7.1's *"replication on
+Apartment Triage (.NET) **if budget allows**; replication is a **stretch goal** and its
+absence is **not a criterion failure**"*, and Appendix A's P2, **required by Freeze A**.
+
+So the placeholder blocking the freeze enables an outcome the plan calls optional, and
+Appendix A's rule does not bend for that. Three ways out, and choosing depends on whether
+replication is genuinely wanted — a budget call rather than a reading of the plan:
+
+1. **Fill P2 as specified**, and spend session time fixing a contract for a run that may
+   never happen.
+2. **Move P2 to Freeze B by ADR.** It changes a pre-registration document's freeze
+   mechanics, so it is §12 change control — the same class as §5 option (b), not an
+   informal deferral.
+3. **Fill P2 minimally** — enough for `triage-v1` and P4's R5, deferring what only the
+   controlled experiment needs.
+
+**Ask this at T+0.** Discovering it at T+50 spends the P2 slot on the question instead of
+the answer.
+
+**The .NET agent has two roles and only one of them is C-2's.** As the emitter dialect
+`dotnet-agent` it is load-bearing for SC-1 and SC-2 and is not optional; as the evaluated
+agent *Apartment Triage* it is §7.1's stretch goal. F3E-02's capture work serves the first
+and is not blocked on P2. *"Apartment Triage is optional"* and *"the .NET agent is
+optional"* sit one sentence apart in conversation, and the second is false.
+
+**C-3 and C-4 are not design decisions.** They are transcription, lookup, and counting.
+They are listed as preconditions specifically so that they do not consume session time.
 
 ### C-5 — discharged, and the path in v0.1 was wrong
 
@@ -197,6 +222,28 @@ be redesigned.** That is not a placeholder fill; it is a change to the experimen
 Freeze A exists to fix, and it lands in §5 option (b) the same way scenario C does.
 
 Checked at T+0 with the rest of §2, not discovered at T+125 when P4 is being written.
+
+### 4.3 Replication assumes the two subjects are comparable, and nothing says so
+
+§7.1 says the experiment replicates on Apartment Triage. **That only means something if
+the two subjects are comparable on the endpoints the experiment measures**, and neither
+document states the assumption.
+
+- **E1** is `task_pass_rate` over `R1∧R2∧R3∧R4`. If Triage's output is a different shape
+  from the Adjudicator's, R3 differs and E1 is not the same measurement on both.
+- **E2** is `judge_mean_score` over a **single frozen rubric** (§8.2) — one rubric, two
+  agents — whose J2 dimension is *"instruction adherence, against the pinned task
+  contract"*. If that dimension does not apply to Triage's task in the same sense, E2 is
+  not comparable either, and the rubric would need per-agent anchors §8.2 does not provide
+  for.
+
+So *"is Triage's output the same shape as the Adjudicator's?"* is not a convenience
+question in the C-2 intake. **A different-shaped Triage makes replication a second
+experiment rather than a replication**, and that is a decision about experiment design —
+which Freeze A fixes — not a placeholder value.
+
+Bears on §2's P2 question: option 2 (defer P2 to Freeze B) looks more attractive if the
+answer is "different", and option 1 looks fine if it is "same".
 
 ---
 
@@ -406,6 +453,19 @@ prefix with the commands that detach billing. It bears on DoD 1 fact 5, not on F
 7. **ADR-0008 moved to its own dated session** (§3). 2026-09-03, thirty minutes. It is
    unbudgeted work on the critical path to C7 and does not belong inside a freeze session
    with zero slack.
+
+**v0.5 — 2026-09-02** (supersedes v0.4). Two additions from building the C-2 intake form.
+
+12. **§2 records that P2 blocks the freeze for an outcome the plan calls optional.** §7.1
+    makes Triage replication a stretch goal whose absence is not a criterion failure;
+    Appendix A requires P2 at Freeze A anyway. Three dispositions are named and none
+    recommended — it turns on whether replication is wanted, which is budget rather than
+    reading. §2 also separates the .NET agent's two roles, because the emitter dialect is
+    load-bearing for SC-1 and SC-2 while the evaluated agent is the optional one.
+13. **§4.3 records that replication assumes comparability, and nothing states it.** E1
+    differs if the output shapes differ; E2 uses one frozen rubric across both agents, so
+    a J2 dimension that does not apply to Triage's task breaks comparison without breaking
+    anything visible. A different-shaped Triage makes replication a second experiment.
 
 **v0.4 — 2026-09-02** (supersedes v0.3). Two additions to C-1's scope, from building its
 intake form against `eval-plan.md`.
