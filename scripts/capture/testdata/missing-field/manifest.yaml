@@ -1,0 +1,19 @@
+# Validator self-test — captured, but not auditable.
+#
+# Identical to the admissible manifest with `otel_semconv_stability_opt_in` removed. Row
+# 1.2 requires the value and says it is recorded as `unset` when absent, so an omitted key
+# and a recorded `unset` mean different things — which is exactly the distinction that
+# would be lost if the validator only checked provenance.
+
+dialect: selftest-missing-field
+provenance: captured
+capture_origin: >
+  Local OTLP/HTTP receiver on 127.0.0.1:4318, single interactive run.
+captured_on: 2026-09-02
+emitter: selftest agent
+emitter_version: "1.0.0"
+otel_sdk_version: "OTel-OTLP-Exporter-Python/1.27.0"
+semconv_version_emitted: "1.41.0"
+redacted_fields:
+  - user.email
+redaction_rules: normalization/redaction/v1/selftest.yaml
