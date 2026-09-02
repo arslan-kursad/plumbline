@@ -38,5 +38,4 @@ FROM (
       ORDER BY ingest_time DESC
     ) AS duplicate_rank
   FROM `plumbline.spans`
-)
-WHERE duplicate_rank = 1;
+);
