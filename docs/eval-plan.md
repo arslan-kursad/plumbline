@@ -190,7 +190,7 @@ All load-generator traffic carries `synthetic=true`.
 |---|---|---|---|
 | 4.5 | Monthly GCP net cost | Billing console, archived screenshot per month, **net of all credits** | ≤ 200 TRY for two consecutive calendar months, **both after the promotional credit expires 2026-10-05** |
 | 4.6 | Daily spend trajectory | Daily check of month-to-date net cost against the linear burn line `ceiling × (day ÷ days_in_month)`; a reading above it, once month-to-date exceeds 20 TRY, → incident note in `docs/` (architecture §7) | 0 unexplained trajectory breaches |
-| 4.7 | Kill-switch | F0 live-fire evidence + re-attach runbook | Present and dated |
+| 4.7 | Kill-switch | Live-fire evidence that **names the trigger semantics and the threshold it was fired against**, plus the re-attach runbook | Present, dated, and covering the **deployed** threshold |
 
 **Verdict rule:** SC-4 met iff 4.1–4.3 pass their thresholds, 4.4 is documented, and
 4.5–4.7 hold.
