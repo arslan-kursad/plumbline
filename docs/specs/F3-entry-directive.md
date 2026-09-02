@@ -76,16 +76,18 @@ first deliverable is the lane determination for F3E-01b, because that is exactly
 
 ## 5. Waves
 
-**Wave 1 — complete 2026-09-02.** F3E-01a (`#152`), F3E-02 (`#153`), F3E-03 (`#154`),
-F3E-04 (`#151`). All four merged; §6 carries each with its evidence.
+**The wave structure is dispatch history, not status.** What each task delivered is in the
+register at §6.0; what is still open is read from the tracker. Neither is asserted here.
+
+**Wave 1.** F3E-01a, F3E-02, F3E-03, F3E-04.
 
 **Wave 2 — gated on Wave 1, and split at the lane boundary F3E-01a found:**
 
 - **F3E-01b — rejection probe.** Lane A, read-only, dry-run.
 - **F3E-01c — round-trip probe.** Lane C, requires a written row.
 
-**Closed before work began:** F3E-05, F3E-06, F3E-07a, F3E-07b. Retained in §6 with their
-evidence rather than deleted — what was chartered is part of the record.
+**Chartered, then found already satisfied:** F3E-05, F3E-06, F3E-07a, F3E-07b. Retained in
+§6 with their evidence rather than deleted — what was chartered is part of the record.
 
 ### 5.2 Why F3E-01b became two tasks
 
@@ -129,7 +131,61 @@ re-derived, not inherited** (CN5, and §10 below).
 
 ## 6. Tasks
 
-### F3E-01a — Emulator/production divergence surface inventory · **CLOSED 2026-09-02**
+### 6.0 Task register
+
+**This directive carries charter and lane. It does not carry status.** Each row names the
+pull request or commit that *delivered* the task — an event, which cannot become false —
+and the date the reference was read (CN4). Whether anything remains open is read from the
+tracker, never from this document.
+
+> **The affordance this replaces had already produced a wrong record.** Until 2026-09-02
+> each §6 heading carried a `CLOSED <date>` marker and F3E-01b carried none, while `#156`
+> had merged it. `#155` closed Wave 1 at `2026-09-02T07:15:06Z`; `#156` merged at
+> `07:36:38Z`, twenty-one minutes after the document that would have recorded it was
+> written. **A completion marker closes one instance and leaves the generator**: the next
+> task to close makes the document wrong again. That is why these rows name events instead.
+
+| Task | Lane | Delivered by | Read |
+|---|---|---|---|
+| F3E-01a | A | `#152` | 2026-09-02 |
+| F3E-01b | A | `#156` | 2026-09-02 |
+| F3E-01c | **C** | *no delivering PR at this read* — see the note below | 2026-09-02 |
+| F3E-02 | A builds; C runs | `#153` — the harness only | 2026-09-02 |
+| F3E-03 | A builds; C runs | `#154` — the diagnostics only | 2026-09-02 |
+| F3E-04 | A | `#151` | 2026-09-02 |
+| F3E-05 | A | `f749625`, `f1b8111` | 2026-09-02 |
+| F3E-06 | A | `#137` | 2026-09-02 |
+| F3E-07a | A | `#141`, `#144`, milestone `#4` | 2026-09-02 |
+| F3E-07b | A | `#148` | 2026-09-02 |
+
+**Two rows deliver a build whose run is a separate act.** F3E-02 and F3E-03 shipped Lane A
+harnesses; the two agent captures and the Claude Code attempt are Lane C and are not what
+`#153` and `#154` contain. The column names what was delivered, not what was completed, and
+for these two those differ. Their charters are `#42`, `#138` and `#10`.
+
+> **Finding, recorded rather than repaired here: the tracker has no F3E entry.** Searched
+> 2026-09-02 — no issue in the repository mentions `F3E`, and milestone `#4` holds `#36`,
+> `#74` and `#138` only. So *"completion lives in the tracker"* is the rule this register
+> adopts and the tracker cannot yet answer it for **F3E-01c**, the one task with no
+> delivering PR. Filing that issue is the missing half; it is named here rather than done,
+> because the task it tracks is Lane C.
+
+**Count: ten tasks**, read 2026-09-02 from the §6 headings below.
+
+**The derivation rule, which is the part that was missing.** F3E-01a, F3E-01b and F3E-01c
+count as **three**, not one: `#155` split F3E-01b at the lane boundary (§5.2) and each half
+carries its own charter, lane and acceptance. Under that rule the count is ten.
+
+- **Nine** is the same enumeration *before* the split, and is what §11's *"four of this
+  directive's nine tasks"* records — correct as history, and not a competing present count.
+- **Eight** collapses the 01 family to a single `F3E-01` while keeping `07a` and `07b`
+  apart. Collapsing both pairs instead gives **seven** stems. Neither is used here; both
+  are counts of identifiers rather than of tasks.
+
+A count stated without its derivation rule is the defect, not the number. All three values
+are derivable from this document; only one of them is the count of tasks.
+
+### F3E-01a — Emulator/production divergence surface inventory
 
 Delivered as [`f3e-01a-emulator-divergence.md`](../evidence/f3e-01a-emulator-divergence.md)
 (`#152`). Seven surfaces, two `unknown`. Two diverge by construction and both in the
@@ -207,12 +263,13 @@ divergence" without the artefacts is not admissible.
 
 ---
 
-### F3E-02 — Capture harness for the two unblocked emitters · **CLOSED 2026-09-02**
+### F3E-02 — Capture harness for the two unblocked emitters
 
 Delivered in `#153`: `scripts/capture/capture.sh`, `redact.py`, `manifest_validate.py`,
 and [`agent-capture.md`](../runbooks/agent-capture.md). The validator discriminates in
-both directions and the redaction gate refuses by default, both asserted in CI. **The
-captures themselves are Lane C and are not done.**
+both directions and the redaction gate refuses by default, both asserted in CI. **`#153`
+delivered the harness, not the captures** — those are Lane C and are tracked in `#42` and
+`#138`, not here.
 **Charter:** `eval-plan.md` SC-1 row 1.2; `#42`; `#138`. **Lane:** A builds; C runs. **Wave 1.**
 
 **The gap is now measured from the artefacts, not argued from the plan.** Read 2026-09-01,
@@ -248,11 +305,12 @@ presented to it has not been tested; it has been run.
 
 ---
 
-### F3E-03 — Claude Code capture failure diagnostic package · **CLOSED 2026-09-02**
+### F3E-03 — Claude Code capture failure diagnostic package
 
 Delivered in `#154`: `claude-code-preflight.sh` (eight blocking checks, authentication
-last) and `capture_report.py` (four terminal states, none of them "retry"). **The
-capture attempt itself is Lane C and has not been made.**
+last) and `capture_report.py` (four terminal states, none of them "retry"). **`#154`
+delivered the diagnostics, not the attempt** — that is Lane C and is tracked in `#10`,
+not here.
 **Charter:** `#10`; OQ-4, [`architecture.md`](../architecture.md) §10. **Lane:** A builds; C runs. **Wave 1.**
 
 The capture is not unscheduled. It was attempted and every run failed at authentication
@@ -280,7 +338,7 @@ this task exists to prevent.
 
 ---
 
-### F3E-04 — Mechanical cross-reference check · **CLOSED 2026-09-02**
+### F3E-04 — Mechanical cross-reference check
 
 Delivered in `#151`. All five acceptance criteria run; criterion 1 verified against the
 merge commit of `#147`. Ships non-blocking, reporting 13 findings against `docs/` of
@@ -317,7 +375,7 @@ suspicion.
 
 ---
 
-### F3E-05 — CN5 and the identifier/identity rule · **CLOSED 2026-09-01**
+### F3E-05 — CN5 and the identifier/identity rule
 
 Both rules are recorded. CN5 is `F2-minimal-gcp-footprint.md` §7.2, filed as **Amendment 3**
 (`f749625`). The generalisation at three instances is `F2-completion-note.md` §5
@@ -329,7 +387,7 @@ document, and recorded in Amendment 3's changelog rather than fixed silently.
 
 ---
 
-### F3E-06 — `api-keys.md` §4, two changes · **CLOSED 2026-09-01**
+### F3E-06 — `api-keys.md` §4, two changes
 
 Merged as `#137` (`5f2e180`); `#126` closed with it. Verified on `main`: `revoke-refresh`
 occurs zero times, `updateMask.fieldPaths=status` three times. Both changes landed together,
@@ -341,7 +399,7 @@ command behind it anywhere in the repository.
 
 ---
 
-### F3E-07a — Hygiene, Wave 1 · **CLOSED 2026-09-01**
+### F3E-07a — Hygiene, Wave 1
 
 | Item | Evidence |
 |---|---|
@@ -351,7 +409,7 @@ command behind it anywhere in the repository.
 
 ---
 
-### F3E-07b — Hygiene, Wave 2 · **CLOSED 2026-09-01**
+### F3E-07b — Hygiene, Wave 2
 
 `freeze-a-prep.md`'s two `§9.1` references repaired in `#148` (`e754016`). Zero occurrences
 remain.
@@ -418,6 +476,8 @@ explicitly marked as requiring re-derivation.
    `#154` and `#151`. Each entry in §6 is marked closed with its evidence and kept rather
    than deleted. **What is closed is the Lane A half:** the two agent captures, the Claude
    Code attempt, and the rejection and round-trip probes are all still to run.
+   *(State as at v0.3's authoring, retained as history. `#156` merged the rejection probe
+   twenty-one minutes later; the register at §6.0 is what a reader should use.)*
 7. **F3E-01b is split into F3E-01b (Lane A) and F3E-01c (Lane C)**, on two findings from
    F3E-01a. The instrument was wrong — rows are identical by construction and the
    divergence is in what each side *refuses*, so a row diff comes back clean and reads as
