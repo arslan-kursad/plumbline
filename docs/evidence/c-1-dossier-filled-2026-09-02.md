@@ -2,6 +2,7 @@
 
 **Form:** [`c-1-adjudicator-dossier.md`](../specs/c-1-adjudicator-dossier.md) v0.1
 **Filled by:** Lane A, from repository reads only · **Status:** partial — see §7
+**Revised 2026-09-02, second pass** — A3 closed, A4 and A5 narrowed, E3 given numbers.
 **Source for every sourced field:** `github.com/arslan-kursad/aiqs-agent` @
 `0779c04ff98a744285b8b1c93ce35f4efd4a89b2`, committed 2026-07-18T18:20:33Z, read
 2026-09-02. Detail in [`c1-adjudicator-readout.md`](c1-adjudicator-readout.md).
@@ -39,50 +40,89 @@ contract and is what P1 should fix.
 `VLMInfo`: `fired: bool` (required), `verdict`, `confidence`, `reasoning`, `tokens_in`,
 `tokens_out` (all nullable). `VLMInfo.verdict` is finite — three values.
 
-**A3 — Enumerations.** **Partially answered, and the gap is the one A3 exists to catch.**
+**A3 — Enumerations, as emitted.** **Answered.** The values are a typed enum, and the
+documentation's casing is not the wire's.
 
-Documented sets, read from `description=` strings in `schemas.py`:
+`src/aiqs/eval/decision.py:47-50`:
 
-| Field | Documented set | Casing as written |
+```python
+class Decision(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    ESCALATE = "escalate"  # route to a human
+```
+
+**A `str, Enum`, so it serialises as its value — lowercase.** `schemas.py` describes
+`tier1_decision` as `PASS/FAIL/ESCALATE`, which are the **Python attribute names, not the
+emitted strings**. A3 asks for the second, and the answer is `pass` / `fail` / `escalate`.
+
+| Field | Emitted set, exact | Source |
 |---|---|---|
-| `decision` | `pass` \| `fail` \| `pending_human` | lower |
-| `resolved_by` | `policy` \| `vlm` \| `human` | lower |
-| `tier1_decision` | `PASS` / `FAIL` / `ESCALATE` | **UPPER** |
-| `VLMInfo.verdict` | `defect` \| `clean` \| `unsure` | lower (from `vlm/prompt.py`'s `QUESTION`) |
+| `decision` | `pass` \| `fail` \| `pending_human` | `Decision` values; `pending_human` set literally at `api/main.py:102` |
+| `resolved_by` | `policy` \| `vlm` \| `human` | `graph/nodes.py`, `finalize` |
+| `tier1_decision` | `pass` \| `fail` \| `escalate` | `Decision` values — **not** the documented upper case |
+| `VLMInfo.verdict` | `defect` \| `clean` \| `unsure` | `vlm/backend.py:26`, `Verdict = Literal[...]` |
 
-**`UNKNOWN — not looked up`: the exact strings as emitted.** These are descriptions, not
-types. `graph/nodes.py` calls `Decision.ESCALATE.value`, so an enum exists and its `.value`
-is what actually travels; that definition was not located, so **the casing above is what the
-documentation says, not what the wire carries.** A3 asks for the second.
+**Correction to the readout, and it is a real one.** `c1-adjudicator-readout.md` recorded
+the sets as *documented in descriptions rather than enforced by types*. That is true of the
+**API response model** — `AdjudicateResponse.decision` is `str | None` — and false of the
+values themselves:
 
-**Also recorded: the value sets are not enforced by types.** `decision`, `resolved_by`,
-`tier1_decision` and `VLMInfo.verdict` are all `str | None`. The **request** side does it
-properly — `HumanVerdictRequest.decision` is `Literal["pass", "fail"]`. So the same repo
-types its inputs and leaves its outputs as bare strings, and R3's *"enum values in allowed
-set"* would rest on convention rather than on the contract.
+- `Decision` is a typed enum.
+- `vlm/backend.py:26` declares `Verdict = Literal["defect", "clean", "unsure"]`, and the
+  parser **raises `VLMParseError`** on an unknown verdict, an out-of-range confidence or a
+  missing field (`backend.py:47-66`).
 
-**And the vocabulary changes three times across one flow:** the VLM answers
-`defect|clean|unsure`, `vlm_decision` becomes `pass|fail|escalate`, `final_decision` is
-`pass|fail`. P4's R5 will have to say which layer it asserts about.
+So the sets **are** enforced where they are produced. What is untyped is the response
+model's re-declaration of them as bare strings (`api/main.py:103-111` passes the enum
+values straight through). **Milder than "contract by convention", and a different fix:**
+narrowing the response model's annotations, not adding validation that already exists.
 
-**A4 — Contract stability.** `UNKNOWN — not looked up.` Whether the agent has ever emitted
-a field or value outside A2/A3 is a measurement over historical outputs, and no such
-measurement exists in the repository. **This is work**, and it is small: it needs one pass
-over stored run outputs.
+**A4 — Contract stability.** **Partly answered, and the remaining gap is narrow.**
 
-**A5 — Failure and refusal shape.** **Declared, and it is not an error path.**
-`pending_human` is a first-class outcome: `graph/build.py` routes
-`cost_policy → vlm_second_look → vlm_abstain_rule → human_interrupt → finalize`, and
-`finalize` (`graph/nodes.py`) resolves `human | vlm | policy`. `decision` is
-`pending_human` and `resolved_by` is null while the item waits.
+Three enforcement points make an out-of-set value structurally hard to emit: `Decision` is
+an enum, `Verdict` is a `Literal` whose parser raises on anything else, and
+`AdjudicationState` sets `model_config = {"extra": "forbid"}` (`graph/state.py`) so an
+unexpected field cannot enter the state at all.
 
-**Consequence for E1, and it is the reason A5 is in the form:** R3 must score a
-`pending_human` response as **well-formed**. Treating it as a contract failure would
-penalise the agent for performing its designed abstain, and contract-pass-rate would fall
-whenever the cost policy correctly escalated.
+`tests/` carries `test_api.py`, `test_decision.py`, `test_graph.py` and
+`test_graph_parity.py`, so the contract has test coverage.
 
-`UNKNOWN — not looked up`: the shape on **timeout or backend error**, as distinct from
-abstain. Not read.
+**`UNKNOWN — not looked up`: whether any historical output ever fell outside the sets.**
+`results/decisions.csv` holds **aggregate metrics per run, not per-item decisions**, so it
+cannot answer this; per-item outputs would be under `results/runs/`, which was not opened.
+
+**Still work, and now smaller than it looked:** with three enforcement points upstream, the
+question is less "does it drift" than "was it always enforced" — a question about history,
+answerable from stored runs.
+
+**A5 — Failure and refusal shape.** **Answered. Three shapes, and only one of them is the
+agent declining.**
+
+**Abstain — a first-class outcome, not an error.** `graph/build.py` routes
+`cost_policy → vlm_second_look → vlm_abstain_rule → human_interrupt → finalize`. `decision`
+is `pending_human` and `resolved_by` is null while the item waits.
+
+**Consequence for E1, and it is why A5 is in the form:** R3 must score a `pending_human`
+response as **well-formed**. Treating it as a contract failure would drop
+contract-pass-rate every time the cost policy correctly escalated — the endpoint would
+penalise the agent for working.
+
+**Rejected input — HTTP, no response body.** `api/main.py`: `400` for invalid base64, an
+`image_path` escaping `--image-root`, or a missing file; `401` for a bad key; `404` for an
+unknown `item_id`; `409` for an item already finalised. **No `AdjudicateResponse` is
+produced**, so these are not contract failures — they are absent outputs, and R3 must not
+count them in the denominator.
+
+**Model failure — raised, not coerced.** `vlm/backend.py:47-66` raises `VLMParseError` on
+an empty response, invalid JSON, schema-validation failure, out-of-range confidence or an
+unknown verdict. **It does not fall back to `unsure`** — the mock backend's
+`"no label -> abstain"` at `backend.py:90` is a test path, not production behaviour.
+
+**This matters for `error` in `eval-plan.md` §5.1**, which says a harness or quota failure
+*"is never silently coerced to `fail`"*. The Adjudicator behaves the same way at its own
+boundary, so the two conventions agree. `UNKNOWN — not looked up`: what the API returns
+when `VLMParseError` propagates — whether it becomes a 5xx or is caught upstream.
 
 ---
 
@@ -227,9 +267,29 @@ configuration. Category is the natural key — it is what the benchmark varies a
 stratification key that exists in the source but not on the trace is not usable by a
 trace-computed gate.* **Every candidate here is blocked behind B4.**
 
-**E3 — Real case volume over the window.** `UNKNOWN — not looked up`, with the sourcing
-procedure recorded per [`c-1-adjudicator-dossier.md`](../specs/c-1-adjudicator-dossier.md) §0:
-`n_good + n_defective` per category from a run artifact. **And
+**E3 — Real case volume over the window.** **Partly answered from stored runs**, and the
+numbers land at the plan's threshold.
+
+`results/decisions.csv` carries eight run records with per-category counts:
+
+| Category | n | normal | defective | image AUROC |
+|---|---:|---:|---:|---:|
+| `mvtec-screw` | 160 | 41 | 119 | 0.9758 |
+| `mvtec-capsule` | 132 | 23 | 109 | 0.9765 |
+| a `patchcore-wide` run | 160 | 60 | 100 | 0.7387 |
+
+**One category yields 132–160 items**, against `eval-plan.md` §7.5's `N_gate ≥ 160`. Read
+against the sizing table in [`freeze-a-prep.md`](../specs/freeze-a-prep.md) §4.4: a single
+category at 132 gives a conservative MDE of about **11.7 pp** where the plan wants 0.10; at
+160 it is **9.9 pp** and the target is met.
+
+**So the volume question is a category-count question.** One category is borderline, two or
+three pooled clear it — and pooling is one of the three named responses in
+[`freeze-a-prep.md`](../specs/freeze-a-prep.md) §4.4, at the cost of
+the per-category stratification E2 would use.
+
+**Still `UNKNOWN — not decided`: which categories `adjudicator-v1` draws from.** A Freeze A
+choice, and the number follows from it rather than the other way round. **And
 see C2's consequence** — if the corpus is the benchmark, this number is a property of the
 dataset rather than of a 32-day window, and C-4's phrasing does not survive that reading
 unchanged.
@@ -242,13 +302,13 @@ unchanged.
 
 | Field | Reason | Is it work? |
 |---|---|---|
-| A3 (exact emitted strings) | not looked up — enum definition not located | **yes**, small: one file read |
-| A4 (contract stability) | not looked up — no such measurement exists | **yes**, small: one pass over stored outputs |
-| A5 (timeout/error shape) | not looked up | **yes**, small |
+| ~~A3 (exact emitted strings)~~ | **answered on the second pass** — `Decision(str, Enum)`, all lowercase | **closed** |
+| A4 (historical out-of-set values) | not looked up — `results/runs/` not opened | **yes**, small |
+| A5 (what the API returns on `VLMParseError`) | not looked up | **yes**, small |
 | B4 (size of the instrumentation change) | not decided — depends on how much state is exported | **yes, and it is the largest item here** |
 | C4 (label volume) | not looked up — procedure recorded instead | no, until the dataset's categories are decided |
 | C5 (MVTec inter-annotator reliability) | not looked up — may not have been published | no |
-| E3 (case volume) | not looked up — procedure recorded instead | no, same dependency as C4 |
+| E3 (which categories the dataset draws from) | not decided — a Freeze A choice | no; the counts follow from it |
 
 **Rules 1–3 satisfied:** every field carries an answer or an `UNKNOWN` with one of the four
 reasons, and every answer names its source. **Rule 4 observed:** B2 is recorded as
@@ -258,3 +318,32 @@ as a whole.
 **This dossier locates its gap.** The scenario question is determined — **A** — and the
 blocker is somewhere the form did not originally point: not at whether a correct answer
 exists, but at whether the agent's answer is observable at all.
+
+
+---
+
+## Revision note — 2026-09-02, second pass
+
+A3, A4 and A5 were re-read after the first pass left them `UNKNOWN`. Three changes, and one
+corrects the readout this copy was built from.
+
+**A3 is closed.** `eval/decision.py:47-50` defines `Decision(str, Enum)` with values `pass`,
+`fail`, `escalate` — **all lowercase**. `schemas.py`'s `PASS/FAIL/ESCALATE` are the Python
+attribute names. A field that asked for *"exact strings, exact casing"* found a casing
+difference between the documentation and the wire, which is what it was for.
+
+**The "contract by convention" finding is corrected and narrowed.** `Decision` is a typed
+enum, `Verdict` is a `Literal` whose parser raises on anything outside it, and
+`AdjudicationState` forbids extra fields. The values **are** enforced where they are
+produced; only the API response model widens them to `str | None`. The fix is narrowing
+those annotations, not adding validation that already exists — smaller and different from
+what the first pass implied.
+
+**A5 turned out to be three shapes, not one**, and the distinction decides a denominator:
+an abstain is a well-formed response, a rejected input produces no response at all, and a
+model failure raises rather than coercing to `unsure`. R3 has to separate those or it will
+score absent outputs as failures.
+
+**E3 gained numbers** and they sit at the threshold — 132 to 160 per category against
+`N_gate ≥ 160`. So the volume question is a category-count question, which is a Freeze A
+choice rather than an operational measurement.
