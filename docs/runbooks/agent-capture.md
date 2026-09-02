@@ -5,6 +5,14 @@ agent driven by a human, and the artefact lands outside the repository by design
 
 **Scope: `langgraph-python` (Anomaly Adjudicator) and `dotnet-agent` (Apartment Triage).**
 Both are first-party, with no beta gate and no nested-authentication constraint —
+
+> **Before you run this: the agents do not emit yet.** Read 2026-09-02, the Adjudicator
+> (`aiqs-agent` @ `0779c04f`) carries **no OpenTelemetry instrumentation** — see
+> [`c1-adjudicator-readout.md`](../evidence/c1-adjudicator-readout.md). A receiver with
+> nothing pointed at it captures nothing. **Instrumenting the agents is F4 work**; this
+> runbook is what you follow once they emit.
+
+
 [`claude-code-capture.md`](claude-code-capture.md) owns the third, which is blocked on #10.
 
 ## Why this exists

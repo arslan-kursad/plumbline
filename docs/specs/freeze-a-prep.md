@@ -1,6 +1,6 @@
 # Freeze A — Pre-session brief
 
-**Version:** 0.7 · **Status:** Accepted · **Date:** 2026-09-02
+**Version:** 0.8 · **Status:** Accepted · **Date:** 2026-09-02
 **Session:** 2026-09-02, 10:00–13:00 Europe/Istanbul · **Duration:** 3 h
 **Freeze target:** [`docs/eval-plan.md`](../eval-plan.md) v0.2 · **Appendix A:** P1–P7, P11
 
@@ -44,6 +44,34 @@ is adjusted before the session starts, not during it.
 **C-1 is the binding precondition.** P1 and P6 both hang on it, and P6 determines whether
 E1 survives as the primary deterministic endpoint. Entering the session without C-1
 converts the first hour from decision to retrieval.
+
+### C-1 — partly answered, and the answer changes F3E-02's timing
+
+Read 2026-09-02 from `github.com/arslan-kursad/aiqs-agent` @ `0779c04f`, recorded in
+[`c1-adjudicator-readout.md`](../evidence/c1-adjudicator-readout.md). **Record the repo
+name and that SHA in `eval-plan.md` v0.2** — C-1 names its source as *"Adjudicator repo"*,
+a description rather than an identity, and nothing in this repository names it.
+
+| Question | Answer |
+|---|---|
+| 1.1 output form | JSON over HTTP — `AdjudicateResponse`, FastAPI |
+| 1.3 enums | Documented in `description=` strings, **not enforced by types**. The request side uses a real `Literal`; the response side does not. R3's *"enum values in allowed set"* would rest on convention |
+| **1.4 verdict** | **Discrete** — three values. **So the branch is A or B, never C** |
+| 1.5 abstain path | `pending_human` is a designed outcome. R3 must treat it as well-formed, or the endpoint penalises the agent for working |
+| **2.1 where in the trace** | **Nowhere.** No `opentelemetry-*` dependency, no imports, nothing emitting |
+| 5.1 one item | one adjudication — one score, one image |
+| **6.1 D2** | **Applicable.** `prompt.py` splits `SYSTEM_PROMPT` (role and calibration constraints) from `QUESTION` (the JSON contract), so the constraint sentences come out as a single-factor change with the output shape intact |
+| 6.3 D5 | Applicable — there is a backend call to make fail |
+| 6.2 D4 | **Probably not applicable** — one item carries one image, so there is no second evidence item to truncate |
+
+**Still open and not answerable from the repo: question 4.1, ground truth.** It decides A
+versus B, and it is the only thing standing between C-1 and a determined scenario.
+
+**The instrumentation answer costs more than it looks.** An agent that emits nothing cannot
+be an SC-2 source, cannot have R3 computed from its trace, and cannot be captured —
+which is why the `langgraph-python` fixture reads `provenance: constructed`. Instrumenting
+the agents is **F4** by the Project Brief's phase list, so F3E-02's harness runs later than
+that task implied; corrected in the directive and in the runbook.
 
 **C-1 also has to answer where the output lands in the trace.** `eval-plan.md` §5.1 is
 categorical: *"Evaluation of a run must be reproducible from the trace alone: if a metric
@@ -546,6 +574,20 @@ prefix with the commands that detach billing. It bears on DoD 1 fact 5, not on F
 7. **ADR-0008 moved to its own dated session** (§3). 2026-09-03, thirty minutes. It is
    unbudgeted work on the critical path to C7 and does not belong inside a freeze session
    with zero slack.
+
+**v0.8 — 2026-09-02** (supersedes v0.7). C-1 read from the Adjudicator repo.
+
+17. **§2 carries C-1's answers**, pinned to `aiqs-agent` @ `0779c04f`. The verdict is
+    discrete, so the branch is **A or B and never C** — one of the two questions that
+    reshapes the agenda is settled. D2 is applicable, which settles the other: `prompt.py`
+    separates the constraint sentences from the output contract, so the primary
+    experimental case survives. D4 probably is not — one item, one image.
+18. **The output reaches no trace, and that is the expensive answer.** No
+    `opentelemetry-*` dependency, no imports, nothing emitting. It cannot be an SC-2
+    source, R3 cannot be computed from it, and it cannot be captured — which is why its
+    fixture reads `constructed`. Instrumentation is F4, so **F3E-02's harness runs later
+    than that task implied**; corrected in the directive and the runbook rather than left
+    to be discovered by someone starting a capture.
 
 **v0.7 — 2026-09-02** (supersedes v0.6). P3's arithmetic done ahead of the session.
 

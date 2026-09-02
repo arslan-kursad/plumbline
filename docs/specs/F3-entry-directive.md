@@ -221,9 +221,16 @@ no fixture manifest declares itself `captured`: `dotnet-agent`, `langgraph-pytho
 `derived-from-measured-evidence` and explains why. SC-1 row 1.2 requires *"≥1 fixture per
 dialect captured from a real emitter, not hand-authored"*.
 
-**Two of the three emitters carry no blocker** — the LangGraph adjudicator and the .NET
-agent are first-party, with no beta gate and no nested-authentication constraint. Two
-thirds of the SC-1 gap is reachable without waiting on `#10`.
+**Two of the three emitters carry no *access* blocker** — the LangGraph adjudicator and the
+.NET agent are first-party, with no beta gate and no nested-authentication constraint.
+
+> **Corrected 2026-09-02.** This originally read that two thirds of the SC-1 gap was
+> *reachable* on that basis. It is not. Read at
+> [`c1-adjudicator-readout.md`](../evidence/c1-adjudicator-readout.md), the Adjudicator has
+> **no OTLP instrumentation at all** — no `opentelemetry-*` dependency, no imports, nothing
+> emitting. There is no access problem because there is nothing to access. Instrumenting
+> the agents is **F4** by the Project Brief's own phase list. The harness below is correct
+> and still needed; it runs later than this task implied.
 
 **Deliverables:** (1) a one-command capture path per emitter; (2) mechanical redaction —
 not a documented manual step; (3) a manifest validator covering every field SC-1 row 1.2
