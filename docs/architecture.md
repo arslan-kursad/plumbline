@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.15 · **Status:** Draft for F0 sign-off · **Date:** 2026-09-02
+**Version:** 0.16 · **Status:** Draft for F0 sign-off · **Date:** 2026-09-03
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -448,6 +448,7 @@ because it is always the cheapest thing available under schedule pressure.
 | ADR-0006 | PII redaction happens in the worker, after deserialization | Accepted |
 | ADR-0007 | Canonical dedup views under `require_partition_filter` | Proposed |
 | ADR-0008 | Single-port OTLP protocol multiplexing on Cloud Run (#68) | Proposed |
+| ADR-0009 | Instrumental expenditure of expiring trial credit before the measurement window | Proposed |
 
 Rationale, alternatives, and consequences live in `docs/adr/`; this index carries titles
 and status only. Where this document and an ADR disagree, the ADR is the decision record
@@ -470,6 +471,15 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.16 — 2026-09-03** — ADR-0009 enters the index.
+
+1. §10 gains ADR-0009, *Instrumental expenditure of expiring trial credit before the
+   measurement window*, status Proposed. The index carries title and status only; the
+   decision, its preconditions and its enforcement table live in
+   [`docs/adr/ADR-0009-instrumental-credit-expenditure.md`](adr/ADR-0009-instrumental-credit-expenditure.md).
+   Registered here because `docs/adr/README.md` names this section as the index, so an ADR
+   filed without a row leaves the index wrong rather than merely incomplete.
 
 **v0.15 — 2026-09-02** — §7's escape hatch becomes a burn-line trajectory test.
 
