@@ -456,12 +456,25 @@ could grant itself the access. The separation is a convention this repository ke
 one Google enforces — it means a routine apply cannot touch the kill-switch by accident,
 and reaching it would take a visible IAM change. It is not a wall.
 
-**Two scopes, two paths — the budgets cannot go through CI.** `ci-deploy` holds
+**Two scopes, two different refusals, one path.** `ci-deploy` holds
 `roles/billing.viewer` on the billing account and nothing else (decision log W1.5), and
 a budget is a billing-account resource. An armed apply that touches one fails with
-`403: The caller does not have permission`, by design. The budgets are applied by the
-maintainer from their own credentials, targeted; the function and its source object are
-project-scoped and go through the gate as normal.
+`403: The caller does not have permission`, by design. The function and its source object
+are project-scoped, so they clear *that* boundary and meet a different one: replacing the
+source archive is a delete plus a create in a bucket `ci-deploy` has no grant on at all,
+and the gated apply that tried it failed with `403: ... does not have
+storage.objects.delete access` (decision log A2.11). Two scopes, two refusals with
+different causes, one conclusion — all four resources are applied by the maintainer,
+targeted.
+
+> **Corrected 2026-09-05.** This paragraph used to end *"the budgets are applied by the
+> maintainer from their own credentials, targeted; the function and its source object are
+> project-scoped and go through the gate as normal."* That was accurate when it was
+> written on 2026-08-25 (decision log A2.9) and wrong the following day, when the gated
+> apply of the function met the source-bucket boundary and A2.11 moved it to the same path
+> as the budgets. The correction landed above this paragraph rather than in it, so §4a
+> asserted both for ten days — issue #192. A2.9 is **not** edited: the decision log's
+> convention is that a later entry corrects an earlier one, and dated history stays dated.
 
 **Seek again after changing the filter, not only before re-attaching.** Changing what a
 budget measures does not change messages already published. On 2026-08-25 the filter
