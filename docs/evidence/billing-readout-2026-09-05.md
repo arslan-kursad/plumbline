@@ -74,9 +74,19 @@ DETACH_THRESHOLD=200;LOG_EXECUTION_ID=true;TARGET_PROJECT_ID=plumbline-19458
 2026-09-02T09:22:01.148214741Z    billing-killswitch-00003-yoh
 ```
 
-Unchanged: same value, same revision, same update time. **Still configured rather than
-proven** — ADR-0004 Amendment 5's Verification section is unmoved by any of this, and the
-three-step live fire at `200.00` is [`completion-plan.md`](../specs/completion-plan.md) W1-8.
+Unchanged at the moment of the read: same value, same revision, same update time.
+**Still configured rather than proven** — ADR-0004 Amendment 5's Verification section is
+unmoved by any of this, and the three-step live fire at `200.00` is
+[`completion-plan.md`](../specs/completion-plan.md) W1-8.
+
+> **Superseded within the hour, and recorded rather than left to look current.** The
+> maintainer redeployed the function at `2026-09-05T11:00:53Z` to carry `grpc v1.83.1`,
+> so the revision is now `00004-don` and the update time has moved
+> ([`f2-killswitch-grpc-1831-redeploy-2026-09-05.md`](f2-killswitch-grpc-1831-redeploy-2026-09-05.md)).
+> **`DETACH_THRESHOLD` is unchanged at `200` across that redeploy**, which is the part this
+> section asserts. The two rows above are true for the time they name and false as a
+> present-tense claim about the revision — which is the whole reason this project stamps a
+> reading with its clock rather than filing it as a fact.
 
 ## 3. No drift between the deployed budgets and Terraform
 
