@@ -30,7 +30,7 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 
 | # | Item | Status | Measured where, and when |
 | --- | --- | --- | --- |
-| 1 | G1 — five facts, spec §7 item 1 as amended (Amendment 2) | **3 of 5; not closed** | [`f2-dod1-five-facts.md`](../evidence/f2-dod1-five-facts.md), 2026-09-01, fact by fact. **1.1** #33 closed `2026-08-21T20:35:09Z`. **1.2** live fire passed on Attempt 3, `billingEnabled: false` at the API, idempotent under redelivery. **1.3** archived in `kill-switch.md` §4, all three attempts; the console screenshot #33 asked for is a recorded deliberate omission. **1.4 open** — billing attached is a present-tense claim and went false five times after the item was recorded; current state unread by Lane A (`.claude/settings.json` denies `Bash(gcloud billing:*)`). **1.5 open** — repository side measured (`killswitch.tf:284` `INCLUDE_ALL_CREDITS`, Gate H green on run `33475352691`), live side unread, same denial. The earlier [re-derivation](../evidence/f2-dod-1-2-5-12-rederived.md) measured §3's ordering clause, which is not this item |
+| 1 | G1 — five facts, spec §7 item 1 as amended (Amendment 2) | **5 of 5; satisfied** | [`f2-dod1-five-facts.md`](../evidence/f2-dod1-five-facts.md), 2026-09-01, fact by fact. **1.1** #33 closed `2026-08-21T20:35:09Z`. **1.2** live fire passed on Attempt 3, `billingEnabled: false` at the API, idempotent under redelivery. **1.3** archived in `kill-switch.md` §4, all three attempts; the console screenshot #33 asked for is a recorded deliberate omission. **1.4 holds** — the claim is present-tense and went false five times after the item was recorded, so it is read rather than carried: `billingEnabled: true` at the API, [`billing-readout-2026-09-05.md`](../evidence/billing-readout-2026-09-05.md) §1, 2026-09-05. **1.5 holds** — repository side measured (`killswitch.tf:284` `INCLUDE_ALL_CREDITS`, Gate H green on run `33475352691`); live side now measured too — the deployed `zero-spend` budget carries `INCLUDE_ALL_CREDITS` with an empty `creditTypes` list, same readout §2. Both were open on one refused API call until the Lane A deny-list rewrite was applied on 2026-09-05. The earlier [re-derivation](../evidence/f2-dod-1-2-5-12-rederived.md) measured §3's ordering clause, which is not this item |
 | 2 | G2 — #44 closed with ordering evidence | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — `f7d6ca3` at `2026-08-21T19:37Z`, five days before the subscription that binds it; both obligations verified in current form |
 | 3 | Constructed OTLP lands in cloud BigQuery through the views, every row `synthetic = true` | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md), 2026-09-01 — `spans_deduped` scoped to two runs: 13 rows each, `rows_seen = distinct_spans`, `unflagged = 0` |
 | 4 | Poison reaches the cloud DLQ, alert fired, triage archived | **satisfied** | [`f2-dod4-drill.md`](../evidence/f2-dod4-drill.md), 2026-09-01 — poison published `05:23:14Z`, dead-lettered `05:25:02Z` after 5 attempts, depth 0→1, alert delivered. Archive digest matches the published payload byte for byte |
@@ -42,7 +42,7 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 | 9 | Credit-lag procedure live with one data point | *(placeholder)* | |
 | 10 | Period invoice fully credit-offset | *(placeholder)* | |
 | 11 | Decision log complete | **satisfied** | F2C-20, 2026-09-01 — 73 entries across five series, `W3.1`–`W3.26` unbroken; directive §9 Decisions 5–17 checked mechanically to carry both an alternative not taken and a residual uncertainty. #47, #63, #91 and #102 closed against evidence |
-| 12 | Gates A–H green, nothing loosened | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — nine gate assertions green on run `33475352691`, all ten jobs run and none skipped; `invariant-gates.sh` unchanged since before #82, `.claude/settings.json` untouched all phase |
+| 12 | Gates A–H green, nothing loosened | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — nine gate assertions green on run `33475352691`, all ten jobs run and none skipped; `invariant-gates.sh` unchanged since before #82, `.claude/settings.json` untouched all phase — and **untouched until 2026-09-05**, when the maintainer applied the rewrite prepared in [`lane-a-denylist-rewrite.md`](../proposals/lane-a-denylist-rewrite.md) as F3 entry work. That change is outside the window this row measures and is dated here rather than left to be discovered; DoD 12's assertion is restated for F3 against the new list, never inherited from this one |
 | 13 | **Verification C** | **open by design** | see §4; not a phase-exit item |
 
 ## 2. CN1 — the credit sentence
@@ -175,7 +175,12 @@ complete list.)*
   fixing it means editing `.claude/settings.json` while DoD 12 asserts nothing was
   loosened. Shaped rule goes to F3 entry. Corrected under Amendment 7; the earlier wording
   was carried forward without being read against the file, which is the CN4 error class
-  this note exists to refuse.
+  this note exists to refuse. **Fixed 2026-09-05**, after F2's measured window: two entries
+  narrowed from a command surface to the mutating verbs on it, twelve left untouched, and
+  the four reads it had been blocking taken the same day
+  ([`billing-readout-2026-09-05.md`](../evidence/billing-readout-2026-09-05.md)). The
+  residual is recorded in the proposal and survives the fix: a pattern match is not an
+  effect analysis.
 - **Skipped CI jobs, named.** Measured 2026-09-01 across the **38 pull requests merged
   from #82 onward**, reading each PR's own run rather than the push run on `main`:
 

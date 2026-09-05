@@ -1,9 +1,17 @@
 {
   "permissions": {
     "deny": [
-      "Bash(gcloud billing:*)",
+      "Bash(gcloud billing accounts update:*)",
+      "Bash(gcloud billing accounts create:*)",
+      "Bash(gcloud billing projects link:*)",
+      "Bash(gcloud billing projects unlink:*)",
+      "Bash(gcloud billing budgets create:*)",
+      "Bash(gcloud billing budgets update:*)",
+      "Bash(gcloud billing budgets delete:*)",
       "Bash(gcloud projects delete:*)",
-      "Bash(gcloud alpha:*)",
+      "Bash(gcloud alpha * create:*)",
+      "Bash(gcloud alpha * update:*)",
+      "Bash(gcloud alpha * delete:*)",
       "Bash(terraform apply:*)",
       "Bash(terraform destroy:*)",
       "Bash(terraform import:*)",
