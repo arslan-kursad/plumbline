@@ -1,6 +1,6 @@
 # plumbline — Architecture
 
-**Version:** 0.16 · **Status:** Draft for F0 sign-off · **Date:** 2026-09-03
+**Version:** 0.17 · **Status:** Draft for F0 sign-off · **Date:** 2026-09-05
 **Semantic conventions:** OTel GenAI semconv pinned at **v1.41** (see §5)
 **Scope:** Current-state architecture, component contracts, data flow, data model, and
 enforcement points for cost/security invariants. Decision *rationale* lives in ADRs (§10);
@@ -449,6 +449,7 @@ because it is always the cheapest thing available under schedule pressure.
 | ADR-0007 | Canonical dedup views under `require_partition_filter` | Proposed |
 | ADR-0008 | Single-port OTLP protocol multiplexing on Cloud Run (#68) | Proposed |
 | ADR-0009 | Instrumental expenditure of expiring trial credit before the measurement window | Proposed |
+| ADR-0010 | F3 exit contingency: gate proven against a replay corpus | Proposed |
 
 Rationale, alternatives, and consequences live in `docs/adr/`; this index carries titles
 and status only. Where this document and an ADR disagree, the ADR is the decision record
@@ -471,6 +472,13 @@ raised rather than resolved silently.
 ---
 
 ## 11. Changelog
+
+**v0.17 — 2026-09-05** — ADR-0010 enters the index.
+
+1. §10 gains ADR-0010, *F3 exit contingency: gate proven against a replay corpus*, status
+   Proposed. Records decision D6 of the F3 Unblock Directive and the phase-list correction
+   that directive assigns to it. Registered here because `docs/adr/README.md` names this
+   section as the index.
 
 **v0.16 — 2026-09-03** — ADR-0009 enters the index.
 
