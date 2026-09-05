@@ -5,6 +5,13 @@
 #     scripts/ci/terraform-plan-guard.sh <plan.tfplan|plan.json>
 #     scripts/ci/terraform-plan-guard.sh --self-test
 #
+# The plan path may be relative to your own working directory or to the
+# repository root. Both are tried, yours first. It used to be root-relative only,
+# which is not discoverable from anywhere: this script cds to the root before
+# resolving anything, so a plan named from the directory it sits in was reported
+# as missing. That skipped the guard on a real apply on 2026-09-05 --
+# docs/evidence/f2-killswitch-grpc-1831-redeploy-2026-09-05.md.
+#
 # Asserts, against a Terraform plan, that:
 #
 #   1. every resource type is in the architecture §7.1 allowlist;
@@ -19,6 +26,11 @@
 # Exits non-zero listing every violation found, not just the first.
 
 set -euo pipefail
+
+# Captured before the cd below discards it. The root is where the allowlist and
+# the fixtures are addressed from; the plan file is the caller's, and the two are
+# not the same directory unless the caller happened to be standing at the root.
+invocation_dir="$PWD"
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -77,6 +89,76 @@ convert_plan() {
   fi
 }
 
+resolve_plan() {
+  # Prints the resolved path and returns 0, or returns 1 having printed nothing.
+  #
+  # Both relative forms are real usage in this repository and neither is a
+  # mistake: .github/workflows/deploy.yml runs from the root and names
+  # infra/terraform/plan.tfplan, while the block in infra/terraform/README.md is
+  # run from infra/terraform and names plan.tfplan. The caller's directory wins,
+  # because that is the one they can see.
+  local arg="$1" candidate
+  local -a candidates
+
+  case "$arg" in
+    /*) candidates=("$arg") ;;
+    *)  candidates=("${invocation_dir}/${arg}" "${PWD}/${arg}") ;;
+  esac
+
+  for candidate in "${candidates[@]}"; do
+    if [ -f "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+self_test_paths() {
+  # Resolution is this script's behaviour, not plan_guard.py's, so the fixture
+  # loop cannot reach it -- that loop calls analyse() directly. Proven here on
+  # the same reasoning the fixtures are: against the case that used to fail.
+  local failures=0 dir got saved
+
+  dir="$(mktemp -d "${TMPDIR:-/tmp}/plan-guard-paths.XXXXXX")"
+  cp scripts/ci/testdata/plan-clean.json "${dir}/probe.json"
+
+  printf '\n--- path resolution\n'
+
+  # Relative to the caller's directory: the form that was reported as missing.
+  saved="$invocation_dir"
+  invocation_dir="$dir"
+  if got="$(resolve_plan probe.json)" && [ "$got" = "${dir}/probe.json" ]; then
+    printf '    caller-relative resolves: as expected\n'
+  else
+    printf '    SELF-TEST FAILED: caller-relative path did not resolve\n'
+    failures=$((failures + 1))
+  fi
+  invocation_dir="$saved"
+
+  # Relative to the repository root: the form the workflows use, unchanged.
+  if got="$(resolve_plan scripts/ci/testdata/plan-clean.json)" \
+     && [ "$got" = "${PWD}/scripts/ci/testdata/plan-clean.json" ]; then
+    printf '    root-relative resolves: as expected\n'
+  else
+    printf '    SELF-TEST FAILED: root-relative path did not resolve\n'
+    failures=$((failures + 1))
+  fi
+
+  # A name that is neither still has to be refused. Widening resolution must not
+  # turn a wrong invocation into a silent one -- that is the defect, not the fix.
+  if resolve_plan no-such-plan-file.json >/dev/null 2>&1; then
+    printf '    SELF-TEST FAILED: a missing plan file resolved\n'
+    failures=$((failures + 1))
+  else
+    printf '    missing file refused: as expected\n'
+  fi
+
+  rm -rf "$dir"
+  return "$failures"
+}
+
 self_test() {
   # Every assertion is proven against a fixture that violates it, on the same
   # reasoning as the gate proofs: a check verified only against a passing plan is
@@ -120,6 +202,10 @@ plan-worker-public.json fail
 plan-invoker-unresolved.json fail
 FIXTURES
 
+  local path_failures=0
+  self_test_paths || path_failures=$?
+  failures=$((failures + path_failures))
+
   printf '\n'
   if [ "$failures" -gt 0 ]; then
     printf '%d self-test(s) failed\n' "$failures"
@@ -133,7 +219,15 @@ if [ "$1" = "--self-test" ]; then
   exit 0
 fi
 
-[ -f "$1" ] || { printf 'no such plan file: %s\n' "$1" >&2; exit 2; }
+if ! plan_path="$(resolve_plan "$1")"; then
+  printf 'no such plan file: %s\n' "$1" >&2
+  case "$1" in
+    /*) ;;
+    *)  printf 'looked in %s (where you ran this) and %s (the repository root)\n' \
+          "$invocation_dir" "$PWD" >&2 ;;
+  esac
+  exit 2
+fi
 
-convert_plan "$1"
+convert_plan "$plan_path"
 analyse "$plan_json"
