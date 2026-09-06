@@ -27,7 +27,11 @@
 
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+# The repository this script ships in, not the one the caller is standing in: a
+# guard has to read the `docs/` and `scripts/` that were reviewed beside it, and
+# this project has several roots at once. README, third convention; issue #198.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$repo_root"
 
 # Directories that contain source code. Declared once, here. The coverage check
 # in Gate B fails if a source file appears outside this list, so extending the

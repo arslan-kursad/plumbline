@@ -76,7 +76,11 @@ FIXTURES
 
 [ "$#" -eq 1 ] || usage
 
-cd "$(git rev-parse --show-toplevel)"
+# The repository this script ships in, not the one the caller is standing in: a
+# guard has to read the `docs/` and `scripts/` that were reviewed beside it, and
+# this project has several roots at once. README, third convention; issue #198.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$repo_root"
 
 if [ "$1" = "--self-test" ]; then
   self_test
