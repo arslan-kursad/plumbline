@@ -26,7 +26,10 @@
 
 set -euo pipefail
 
-repo_root="$(git rev-parse --show-toplevel)"
+# The repository this script ships in, not the one the caller is standing in: a
+# guard has to read the `docs/` and `scripts/` that were reviewed beside it, and
+# this project has several roots at once. README, third convention; issue #198.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 gates="${repo_root}/scripts/ci/invariant-gates.sh"
 
 worktree="$(mktemp -d "${TMPDIR:-/tmp}/plumbline-gate-proof.XXXXXX")/tree"
