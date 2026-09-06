@@ -207,3 +207,28 @@ The closure note's §1 row 1 now carries all five facts with their individual st
 from ten satisfied to nine.
 
 Facts 4 and 5 stay open on the same missing read, which is one API call Lane A is denied.
+
+
+---
+
+## Postscript — 2026-09-05, both open facts closed
+
+**The measurement above is unchanged and is not re-opened.** It was correct for its date,
+and its two open facts were open on one refused API call rather than on anything unmeasured.
+
+The Lane A deny-list rewrite was applied on 2026-09-05, and both reads were taken the same
+day ([`billing-readout-2026-09-05.md`](billing-readout-2026-09-05.md)):
+
+- **Fact 4 holds** — `billingEnabled: true` at the API. Still a present-tense claim, and
+  still one that has gone false before; the reading carries its date for that reason.
+- **Fact 5 holds** — the deployed `zero-spend` budget carries `INCLUDE_ALL_CREDITS` with an
+  empty `creditTypes` list, so Amendment 4's filter is live and not only committed.
+
+**So the item is 5 of 5 and the phase tally moves from nine back to ten.** The `10/13`
+figure this file's §"What this changes" said rests on this item is the figure it lands on,
+by a different route than the one that produced it.
+
+**And fact 2's timezone question is answered**, which this file raised and could not settle:
+Cloud Logging stamps UTC explicitly, and Attempt 3 fired at `2026-08-21T20:29:10Z` against
+`#33`'s closure at `20:35:09Z` — six minutes, fire before closure, the first of the two
+readings offered here ([`budget-notification-stream-2026-09-05.md`](budget-notification-stream-2026-09-05.md) §6).

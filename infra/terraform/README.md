@@ -41,9 +41,19 @@ cp backend.hcl.example backend.hcl        # fill in the bucket name
 cp terraform.tfvars.example terraform.tfvars
 terraform init -backend-config=backend.hcl
 terraform plan -out plan.tfplan
-../../scripts/ci/terraform-plan-guard.sh plan.tfplan
+../../scripts/ci/terraform-plan-guard.sh infra/terraform/plan.tfplan
 terraform apply plan.tfplan
 ```
+
+**The guard's argument is relative to the repository root, not to this
+directory.** It runs `cd "$(git rev-parse --show-toplevel)"` before resolving the
+path — it has to, because it parses the allowlist out of `docs/architecture.md`
+§7.1 — so a bare `plan.tfplan` from here does not resolve and the guard refuses
+with `no such plan file: plan.tfplan`. That message names the file rather than
+the reason, so it reads like a missing artefact rather than a wrong invocation.
+It is the same form `.github/workflows/deploy.yml` uses. This line said
+`plan.tfplan` until 2026-09-05, and on that day the guard was skipped on a real
+apply because of it — `docs/evidence/f2-killswitch-grpc-1831-redeploy-2026-09-05.md`.
 
 `terraform.tfvars` and `backend.hcl` are gitignored: they are environment
 specific, not secret.

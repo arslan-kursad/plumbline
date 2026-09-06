@@ -38,8 +38,8 @@ A hand-authored status table is a hand-authored fixture, and it fails the same w
 | 6 | Cloud Run inside guardrails, guard shown to evaluate them | **satisfied** | [`f2-dod6-cloud-run-guardrails.md`](../evidence/f2-dod6-cloud-run-guardrails.md), 2026-08-31 — API read plus captured guard rejection, run `33390722393` |
 | 7a | Push transport established | **satisfied** | Wave 3, run `32969025343` |
 | 7b | Push transport exercised — a real Google-signed token accepted | **satisfied** | [`f2-dod3-first-delivery.md`](../evidence/f2-dod3-first-delivery.md) §1, 2026-09-01 — worker `POST /push - 204` after the `custom_audiences` fix. The first attempt failed at branch A ([`f2-dod7b-first-delivery.md`](../evidence/f2-dod7b-first-delivery.md)) |
-| 8 | Verification B — a real notification reading `costAmount = 0.00` | *(placeholder)* | |
-| 9 | Credit-lag procedure live with one data point | *(placeholder)* | |
+| 8 | Verification B — a real notification reading `costAmount = 0.00` | **satisfied** | [`budget-notification-stream-2026-09-05.md`](../evidence/budget-notification-stream-2026-09-05.md) §3, read 2026-09-05 from the kill-switch function's own logs — `2026-09-01T05:44:42Z`, `cost=0 currency=TRY`, `interval_start=2026-08-01T07:00:00Z`. Sixteen minutes after the DoD 7b first delivery and nineteen after the drill dead-lettered, reporting on the period that contains both. Two later notifications in the same period read the same |
+| 9 | Credit-lag procedure live with one data point | **satisfied** | [`budget-notification-stream-2026-09-05.md`](../evidence/budget-notification-stream-2026-09-05.md) §4, read 2026-09-05 — four data points, not one: 0.01 TRY on `2026-08-22T02:16Z` and 0.04 TRY on `08-22T17:11Z`, `08-25T10:58Z` and `08-25T11:53Z`, each a gross line arriving before the credit that cancelled it. The procedure is `kill-switch.md` §4a and is deployed |
 | 10 | Period invoice fully credit-offset | *(placeholder)* | |
 | 11 | Decision log complete | **satisfied** | F2C-20, 2026-09-01 — 73 entries across five series, `W3.1`–`W3.26` unbroken; directive §9 Decisions 5–17 checked mechanically to carry both an alternative not taken and a residual uncertainty. #47, #63, #91 and #102 closed against evidence |
 | 12 | Gates A–H green, nothing loosened | **satisfied** | [re-derived](../evidence/f2-dod-1-2-5-12-rederived.md), 2026-09-01 — nine gate assertions green on run `33475352691`, all ten jobs run and none skipped; `invariant-gates.sh` unchanged since before #82, `.claude/settings.json` untouched all phase — and **untouched until 2026-09-05**, when the maintainer applied the rewrite prepared in [`lane-a-denylist-rewrite.md`](../proposals/lane-a-denylist-rewrite.md) as F3 entry work. That change is outside the window this row measures and is dated here rather than left to be discovered; DoD 12's assertion is restated for F3 against the new list, never inherited from this one |
@@ -311,9 +311,10 @@ across Wave 4's apply, the `custom_audiences` apply, or the image-pin bump.
 
 ## 7. Numbers
 
-Measured 2026-09-01. **The billing row is deliberately absent, not forgotten** — DoD 8, 9
-and 10 are evaluated against a period that has not closed, and a number written here before
-then would be the substitution this note exists to refuse.
+Measured 2026-09-01. **The billing row is deliberately absent, not forgotten** — DoD 10 is
+evaluated against a period total, and a number written here before that period is read would be
+the substitution this note exists to refuse. DoD 8 and 9 were in this sentence until 2026-09-05;
+they are not period totals and were closed from the notification stream, which is why they left it.
 
 | | |
 | --- | --- |
