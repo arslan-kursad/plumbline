@@ -6,10 +6,11 @@
 #
 # The budget threshold is not the trigger. `all_updates_rule` publishes a
 # notification on every cost update (~30 min cadence), and the function detaches
-# whenever reported net cost reaches `detach_threshold` — a small epsilon rather
-# than "greater than zero" (ADR-0004 Amendment 4, D2), because a reported figure
-# can be non-zero while nothing has been billed. Threshold rules only add a
-# labelled "exceeded" event to the same stream.
+# whenever reported net cost reaches `detach_threshold` rather than "greater than
+# zero" (ADR-0004 Amendment 4, D2), because a reported figure can be non-zero while
+# nothing has been billed. That threshold is the monthly ceiling, not an epsilon,
+# since Amendment 5, D2 — `variables.tf` carries the distinction. Threshold rules
+# only add a labelled "exceeded" event to the same stream.
 #
 # A second budget lives at the bottom of this file and reports gross cost. It has
 # no Pub/Sub binding and cannot reach this function: it emails, and that is all.
@@ -221,9 +222,10 @@ resource "google_cloudfunctions2_function" "killswitch" {
     environment_variables = {
       TARGET_PROJECT_ID = var.project_id
 
-      # The epsilon (Amendment 4, D2). Passed rather than compiled in so the
-      # value is reviewable in a plan diff; the function refuses to start without
-      # it rather than falling back to a default nobody chose.
+      # The detach threshold — the monthly ceiling since Amendment 5, D2, an
+      # epsilon under Amendment 4, D2 before it. Passed rather than compiled in so
+      # the value is reviewable in a plan diff; the function refuses to start
+      # without it rather than falling back to a default nobody chose.
       DETACH_THRESHOLD = var.detach_threshold
     }
   }
@@ -272,15 +274,16 @@ resource "google_billing_budget" "zero_spend" {
     # beyond Always Free stayed visible. Live operation falsified its premise: this
     # account's usage is absorbed by a promotional credit, no matching credit line
     # appeared, and the filter therefore subtracted nothing. The budget reported
-    # gross, and this chain detaches on any reported spend — so the kill-switch
+    # gross, and the chain then detached on any reported spend — so the kill-switch
     # detached billing 18 minutes after it was attached, on 0.04 TRY of its own
-    # CPU seconds.
+    # CPU seconds. That trigger is gone (Amendment 4, D2); the filter's premise is
+    # what this comment is about.
     #
     # Enumerating types re-creates that failure the next time a type appears that
     # nobody anticipated. Subtracting all of them is the one reading that cannot
     # be wrong about a category it has not met, and the guard against a credit
     # masking real spend moves to two places that do not depend on guessing: the
-    # epsilon threshold below, and the gross-cost alert budget in this file.
+    # detach threshold below, and the gross-cost alert budget in this file.
     credit_types_treatment = "INCLUDE_ALL_CREDITS"
   }
 

@@ -32,10 +32,12 @@ variable "budget_amount" {
   description = <<-EOT
     Budget amount in whole units of the billing account's own currency. The budget
     is not the trigger: notifications are published on every cost update
-    (all_updates_rule) and the function detaches billing whenever reported cost is
-    strictly greater than zero. The amount only scales the threshold rule that
-    records "budget exceeded" in the alert stream, so its currency is immaterial to
-    the control.
+    (all_updates_rule) and the function detaches billing when the reported net cost
+    reaches `detach_threshold` (ADR-0004 Amendment 4, D2, as amended by Amendment 5,
+    D2 — see that variable). The amount only scales the threshold rule that records
+    "budget exceeded" in the alert stream, and the function logs that flag as
+    context without deciding anything on it. So the amount is immaterial to the
+    control, and so is its currency.
   EOT
   type        = string
   default     = "1"
